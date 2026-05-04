@@ -1,0 +1,83 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information and role",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "client"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "email", "role"]
+    },
+    "ProductOption": {
+      "title": "Product Option",
+      "description": "Defines a custom field for a product",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "type": { "type": "string", "enum": ["select", "text", "number"] },
+        "values": { "type": "array", "items": { "type": "string" } },
+        "placeholder": { "type": "string" },
+        "defaultValue": { "type": "string" }
+      },
+      "required": ["id", "label", "type"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Service or product offered by the studio",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "unit": { "type": "string" },
+        "image": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "maxQuantity": { "type": "number", "description": "Maximum quantity allowed for a single order" },
+        "options": { "type": "array", "$ref": "ProductOption" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "price", "unit", "categoryId"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A quote request or order placed by a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "productId": { "type": "string" },
+        "productName": { "type": "string" },
+        "quantity": { "type": "number" },
+        "options": { "type": "object" },
+        "totalPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "processing", "completed", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "productId", "quantity", "status"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "products/{productId}": {
+      "schema": "Product",
+      "description": "Product catalog"
+    },
+    "orders/{orderId}": {
+      "schema": "Order",
+      "description": "Quote requests and orders"
+    }
+  }
+}

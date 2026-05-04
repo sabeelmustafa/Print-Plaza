@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", sans-serif;
+  --font-serif: "Playfair Display", serif;
+  --font-mono: "JetBrains Mono", monospace;
+  
+  --color-page: #FDFCFB;
+  --color-print-primary: #2D545E;
+  --color-print-secondary: #E17055;
+  --color-print-black: #1A1A1A;
+  
+  --color-neutral-warm: #EBEAE8;
+}
+
+html {
+  scroll-behavior: smooth;
+  background-color: var(--color-page);
+  color: var(--color-print-black);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+.bg-grainy {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  background-size: 150px 150px;
+  opacity: 0.05;
+}
+
+.bg-duo-gradient {
+  background: linear-gradient(135deg, var(--color-print-primary) 0%, var(--color-print-secondary) 100%);
+}
+
+.text-stroke-black {
+  -webkit-text-stroke: 1.5px #1A1A1A;
+  color: transparent;
+  paint-order: stroke fill;
+}
+
+.btn-studio {
+  @apply relative overflow-hidden transition-all duration-300 active:scale-[0.98] rounded-full;
+}
+
+.btn-studio-square {
+  @apply relative overflow-hidden transition-all duration-300 active:scale-[0.98];
+}
+
+.btn-studio::after, .btn-studio-square::after {
+  content: '';
+  @apply absolute inset-0 bg-white opacity-0 transition-opacity duration-300;
+}
+
+.btn-studio:hover::after, .btn-studio-square:hover::after {
+  @apply opacity-10;
+}
+
+.tracking-brutal {
+  letter-spacing: -0.05em;
+}
+
+.glass-morphism {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.border-studio {
+  border: 1.5px solid var(--color-print-black);
+}
+
+.selection\:bg-primary ::selection {
+  background-color: var(--color-print-primary);
+  color: white;
+}
+
