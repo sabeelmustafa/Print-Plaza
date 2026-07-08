@@ -37,7 +37,7 @@ function AppContent() {
 
   const fetchProducts = async () => {
     try {
-      const dbProducts = DataService.getProducts();
+      const dbProducts = await DataService.getProducts();
       
       if (dbProducts.length > 0) {
         // Group products by category

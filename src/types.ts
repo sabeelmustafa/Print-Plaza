@@ -6,10 +6,11 @@
 export interface ProductOption {
   id: string;
   label: string;
-  type: 'select' | 'number' | 'text';
+  type: 'select' | 'number' | 'text' | 'textarea' | 'checkbox' | 'file';
   values?: string[];
   placeholder?: string;
-  defaultValue?: string | number;
+  defaultValue?: string | number | boolean;
+  required?: boolean;
 }
 
 export interface Product {
@@ -36,7 +37,7 @@ export interface OrderItem {
   productId: string;
   productName: string;
   quantity: number;
-  options: Record<string, string | number>;
+  options: Record<string, string | number | boolean>;
   totalPrice: number;
 }
 
@@ -48,7 +49,7 @@ export interface Order {
   productId: string;
   productName: string;
   quantity: number;
-  options: Record<string, string | number>;
+  options: Record<string, string | number | boolean>;
   totalPrice: number;
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
   createdAt: string;

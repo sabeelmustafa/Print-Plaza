@@ -32,21 +32,21 @@ export default function AdminPanel() {
 
   const fetchData = async () => {
     setLoading(true);
-    // Simulation delay
-    setTimeout(() => {
+    try {
       if (activeTab === 'orders') {
-        const data = DataService.getOrders();
+        const data = await DataService.getOrders();
         setOrders(data);
       } else {
-        const data = DataService.getProducts();
+        const data = await DataService.getProducts();
         setProducts(data);
       }
+    } finally {
       setLoading(false);
-    }, 400);
+    }
   };
 
   const handleUpdateOrderStatus = async (orderId: string, status: string) => {
-    DataService.updateOrderStatus(orderId, status);
+    await DataService.updateOrderStatus(orderId, status);
     fetchData();
   };
 
@@ -54,14 +54,14 @@ export default function AdminPanel() {
     e.preventDefault();
     if (!editingProduct) return;
     
-    DataService.saveProduct(editingProduct);
+    await DataService.saveProduct(editingProduct);
     setEditingProduct(null);
     fetchData();
   };
 
   const handleDeleteProduct = async (id: string) => {
     if (!confirm('Destroy product record? This action is irreversible.')) return;
-    DataService.deleteProduct(id);
+    await DataService.deleteProduct(id);
     fetchData();
   };
 
@@ -363,6 +363,9 @@ export default function AdminPanel() {
                             }}
                           >
                             <option value="text">Text Input</option>
+                            <option value="textarea">Long Text</option>
+                            <option value="checkbox">Checkbox</option>
+                            <option value="file">File Upload</option>
                             <option value="select">Dropdown Menu</option>
                             <option value="number">Numeric</option>
                           </select>

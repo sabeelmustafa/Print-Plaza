@@ -35,8 +35,7 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
     }
 
     setIsSubmitting(true);
-    // Simulation delay
-    setTimeout(() => {
+    try {
       const orderData = {
         userId: user.uid,
         userEmail: user.email,
@@ -48,13 +47,14 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
         totalPrice: product.price * formData.quantity,
       };
 
-      const results = DataService.saveOrder(orderData);
+      await DataService.saveOrder(orderData);
       
       onSubmit({
         ...orderData
       });
+    } finally {
       setIsSubmitting(false);
-    }, 800);
+    }
   };
 
   return (
@@ -192,7 +192,7 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                     {option.type === 'select' ? (
                       <div className="relative group/select">
                         <select 
-                          required
+                          required={option.required !== false}
                           className="w-full bg-white border-2 border-black/5 px-6 py-5 focus:border-[#2D545E] focus:bg-white outline-none text-base font-bold transition-all appearance-none uppercase tracking-widest cursor-pointer group-hover/select:border-black/10 shadow-sm"
                           onChange={(e) => setFormData({
                             ...formData,
@@ -208,10 +208,45 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                           <ChevronRight className="w-5 h-5 rotate-90" />
                         </div>
                       </div>
+                    ) : option.type === 'textarea' ? (
+                      <textarea
+                        required={option.required !== false}
+                        rows={4}
+                        placeholder={option.placeholder || "Enter requirements..."}
+                        className="w-full bg-white border-2 border-black/5 px-6 py-5 focus:border-[#2D545E] focus:bg-white outline-none text-base font-bold transition-all placeholder:text-black/10 uppercase tracking-widest shadow-sm resize-y"
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          options: { ...formData.options, [option.id]: e.target.value }
+                        })}
+                      />
+                    ) : option.type === 'checkbox' ? (
+                      <label className="flex items-center gap-5 bg-white border-2 border-black/5 px-6 py-5 cursor-pointer hover:border-black/10 transition-all">
+                        <input
+                          type="checkbox"
+                          className="w-5 h-5 accent-[#2D545E]"
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            options: { ...formData.options, [option.id]: e.target.checked }
+                          })}
+                        />
+                        <span className="text-[11px] font-black uppercase tracking-[0.3em] text-black/50">
+                          {option.placeholder || 'Enable option'}
+                        </span>
+                      </label>
+                    ) : option.type === 'file' ? (
+                      <input
+                        type="file"
+                        required={option.required !== false}
+                        className="w-full bg-white border-2 border-black/5 px-6 py-5 focus:border-[#2D545E] focus:bg-white outline-none text-sm font-bold transition-all shadow-sm file:mr-5 file:border-0 file:bg-black file:text-white file:px-5 file:py-3 file:text-[10px] file:font-black file:uppercase file:tracking-widest"
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          options: { ...formData.options, [option.id]: e.target.files?.[0]?.name || '' }
+                        })}
+                      />
                     ) : (
                       <input 
                         type={option.type === 'number' ? 'number' : 'text'}
-                        required
+                        required={option.required !== false}
                         placeholder={option.placeholder || "Enter requirements..."}
                         className="w-full bg-white border-2 border-black/5 px-6 py-5 focus:border-[#2D545E] focus:bg-white outline-none text-lg font-bold transition-all placeholder:text-black/10 uppercase tracking-widest shadow-sm"
                         onChange={(e) => setFormData({

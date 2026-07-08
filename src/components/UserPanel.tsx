@@ -15,11 +15,12 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
 
   const fetchOrders = async () => {
     setLoading(true);
-    setTimeout(() => {
-      const data = DataService.getOrders(user?.uid);
+    try {
+      const data = await DataService.getOrders(user?.uid);
       setOrders(data);
+    } finally {
       setLoading(false);
-    }, 400);
+    }
   };
 
   return (
