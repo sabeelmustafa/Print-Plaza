@@ -32,6 +32,7 @@ jobs:
           mkdir -p .deploy/dist
           cp -a dist/. .deploy/
           cp -a dist/. .deploy/dist/
+          rm -f .deploy/.htaccess
           cp server.cjs package.json package-lock.json .npmrc .deploy/
 
       - name: Sync built files to cPanel
@@ -42,4 +43,3 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           server-dir: ${{ secrets.FTP_TARGET }}
           local-dir: ./.deploy/
-          dangerous-clean-slate: true
