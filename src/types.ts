@@ -87,6 +87,12 @@ export interface SiteSettings {
     phone?: string;
     address?: string;
   };
+  documents?: {
+    invoiceLogo?: string;
+    companyName?: string;
+    tagline?: string;
+    accentColor?: string;
+  };
 }
 
 export interface OrderItem {

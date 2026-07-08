@@ -92,6 +92,12 @@ const defaultSettings: SiteSettings = {
     phone: '+1 212 555 7788',
     address: 'Studio Block A, Creative District, NY 10001',
   },
+  documents: {
+    invoiceLogo: '',
+    companyName: 'Print Plaza',
+    tagline: 'Industrial Print Production',
+    accentColor: '#E17055',
+  },
 };
 
 export default function AdminPanel() {
@@ -133,6 +139,7 @@ export default function AdminPanel() {
         theme: { ...defaultSettings.theme, ...nextSettings.theme },
         homepage: { ...defaultSettings.homepage, ...nextSettings.homepage },
         footer: { ...defaultSettings.footer, ...nextSettings.footer },
+        documents: { ...defaultSettings.documents, ...nextSettings.documents },
       });
       setMedia(nextMedia);
     } catch (caught) {
@@ -174,6 +181,7 @@ export default function AdminPanel() {
       DataService.saveSiteSetting('homepage', settings.homepage),
       DataService.saveSiteSetting('theme', settings.theme),
       DataService.saveSiteSetting('footer', settings.footer),
+      DataService.saveSiteSetting('documents', settings.documents),
     ]);
     flash('Website settings saved.');
   };
@@ -310,10 +318,10 @@ export default function AdminPanel() {
                 />
               )}
               {activeTab === 'business' && (
-                <BusinessEditor orders={orders} onManage={setBusinessOrder} />
+                <BusinessEditor orders={orders} settings={settings} onManage={setBusinessOrder} />
               )}
               {activeTab === 'customers' && (
-                <CustomersEditor orders={orders} onManage={setBusinessOrder} />
+                <CustomersEditor orders={orders} settings={settings} onManage={setBusinessOrder} />
               )}
             </>
           )}
@@ -343,6 +351,12 @@ export default function AdminPanel() {
       {businessOrder && (
         <BusinessOrderModal
           order={businessOrder}
+          settings={settings}
+          onDocumentSettingsChange={async documents => {
+            const nextSettings = { ...settings, documents: { ...settings.documents, ...documents } };
+            setSettings(nextSettings);
+            await DataService.saveSiteSetting('documents', nextSettings.documents);
+          }}
           onClose={() => setBusinessOrder(null)}
           onChanged={async () => {
             await loadAll();
@@ -390,6 +404,7 @@ export function WebsiteEditorPage() {
       theme: { ...defaultSettings.theme, ...nextSettings.theme },
       homepage: { ...defaultSettings.homepage, ...nextSettings.homepage },
       footer: { ...defaultSettings.footer, ...nextSettings.footer },
+      documents: { ...defaultSettings.documents, ...nextSettings.documents },
     });
     setLoading(false);
   };
@@ -404,6 +419,7 @@ export function WebsiteEditorPage() {
       DataService.saveSiteSetting('homepage', settings.homepage),
       DataService.saveSiteSetting('theme', settings.theme),
       DataService.saveSiteSetting('footer', settings.footer),
+      DataService.saveSiteSetting('documents', settings.documents),
     ]);
     setNotice('Saved');
     setTimeout(() => setNotice(''), 2200);
@@ -1206,7 +1222,7 @@ function formatCurrencySummary(summary: Record<string, number>) {
   return entries.map(([currency, value]) => money(value, currency)).join(' / ');
 }
 
-function BusinessEditor({ orders, onManage }: { orders: Order[]; onManage: (order: Order) => void }) {
+function BusinessEditor({ orders, settings, onManage }: { orders: Order[]; settings: SiteSettings; onManage: (order: Order) => void }) {
   const activeOrders = orders.filter(order => order.status !== 'cancelled');
   const revenue = summarizeByCurrency(activeOrders, order => Number(order.sellPrice ?? order.totalPrice ?? 0));
   const costs = summarizeByCurrency(activeOrders, order => Number(order.costPrice || 0));
@@ -1265,7 +1281,7 @@ function BusinessEditor({ orders, onManage }: { orders: Order[]; onManage: (orde
   );
 }
 
-function CustomersEditor({ orders, onManage }: { orders: Order[]; onManage: (order: Order) => void }) {
+function CustomersEditor({ orders, settings, onManage }: { orders: Order[]; settings: SiteSettings; onManage: (order: Order) => void }) {
   const [selectedEmail, setSelectedEmail] = useState('');
   const customers = Object.values(orders.reduce<Record<string, {
     email: string;
@@ -1375,7 +1391,7 @@ function CustomersEditor({ orders, onManage }: { orders: Order[]; onManage: (ord
                       <td className="p-4">
                         <div className="flex gap-2">
                           <button onClick={() => onManage(order)} className="bg-black text-white px-4 py-3 text-[9px] font-black uppercase tracking-widest">Manage</button>
-                          <button onClick={() => printInvoice(order)} className="border border-black/15 px-4 py-3 text-[9px] font-black uppercase tracking-widest">Invoice</button>
+                          <button onClick={() => printInvoice(order, settings)} className="border border-black/15 px-4 py-3 text-[9px] font-black uppercase tracking-widest">Invoice</button>
                         </div>
                       </td>
                     </tr>
@@ -1420,7 +1436,19 @@ function PaymentBadge({ status }: { status: 'unpaid' | 'partial' | 'paid' }) {
   return <span className={`inline-flex px-3 py-1.5 text-[9px] font-black uppercase tracking-widest ${classes}`}>{status}</span>;
 }
 
-function BusinessOrderModal({ order, onClose, onChanged }: { order: Order; onClose: () => void; onChanged: () => Promise<void> }) {
+function BusinessOrderModal({
+  order,
+  settings,
+  onDocumentSettingsChange,
+  onClose,
+  onChanged,
+}: {
+  order: Order;
+  settings: SiteSettings;
+  onDocumentSettingsChange: (documents: SiteSettings['documents']) => Promise<void>;
+  onClose: () => void;
+  onChanged: () => Promise<void>;
+}) {
   const [costPrice, setCostPrice] = useState(Number(order.costPrice || 0));
   const [sellPrice, setSellPrice] = useState(Number(order.sellPrice ?? order.totalPrice ?? 0));
   const [currency, setCurrency] = useState(normalizeCurrencyCode(order.currency));
@@ -1452,6 +1480,12 @@ function BusinessOrderModal({ order, onClose, onChanged }: { order: Order; onClo
         </header>
         <div className="p-6 space-y-6">
           <form onSubmit={saveFinance} className="bg-white border border-black/10 p-6 space-y-5">
+            <ImageUploadField
+              label="Invoice logo"
+              value={settings.documents?.invoiceLogo || settings.header?.logoImage || ''}
+              previewTitle="Invoice logo"
+              onChange={url => onDocumentSettingsChange({ ...settings.documents, invoiceLogo: url })}
+            />
             <div className="grid sm:grid-cols-2 gap-5">
               <Field label="Cost price (internal)"><input type="number" min="0" step="0.01" className={inputClass} value={costPrice} onChange={event => setCostPrice(Number(event.target.value))} /></Field>
               <Field label="Sell price (invoice)"><input type="number" min="0" step="0.01" className={inputClass} value={sellPrice} onChange={event => setSellPrice(Number(event.target.value))} /></Field>
@@ -1462,7 +1496,7 @@ function BusinessOrderModal({ order, onClose, onChanged }: { order: Order; onClo
             <Field label="Invoice notes"><textarea className={textareaClass} value={invoiceNotes} onChange={event => setInvoiceNotes(event.target.value)} placeholder="Payment terms or customer note" /></Field>
             <div className="flex flex-wrap gap-3">
               <button disabled={saving} className="bg-black text-white px-5 py-4 text-[9px] font-black uppercase tracking-widest">Save finances</button>
-              <button type="button" onClick={() => printInvoice({ ...order, sellPrice, currency, invoiceNotes, paymentDueDate })} className="border border-black/15 px-5 py-4 text-[9px] font-black uppercase tracking-widest flex items-center gap-2"><ReceiptText className="w-4 h-4" /> Print invoice</button>
+              <button type="button" onClick={() => printInvoice({ ...order, sellPrice, currency, invoiceNotes, paymentDueDate }, settings)} className="border border-black/15 px-5 py-4 text-[9px] font-black uppercase tracking-widest flex items-center gap-2"><ReceiptText className="w-4 h-4" /> Print invoice</button>
             </div>
           </form>
 
@@ -1500,11 +1534,21 @@ function escapeInvoice(value: unknown) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character] || character));
 }
 
-function printInvoice(order: Order) {
+function printInvoice(order: Order, settings?: SiteSettings) {
   const invoice = window.open('', '_blank', 'width=900,height=900');
   if (!invoice) return;
   const sell = Number(order.sellPrice ?? order.totalPrice ?? 0);
   const currency = normalizeCurrencyCode(order.currency);
+  const paid = Number(order.paidAmount || 0);
+  const balance = Math.max(0, sell - paid);
+  const documentSettings = settings?.documents || {};
+  const footer = settings?.footer || {};
+  const companyName = documentSettings.companyName || settings?.header?.logoText || 'Print Plaza';
+  const tagline = documentSettings.tagline || settings?.header?.tagline || 'Industrial Print Production';
+  const logo = documentSettings.invoiceLogo || settings?.header?.logoImage || '/brand/print-plaza-logo.png';
+  const logoUrl = logo && logo.startsWith('/') ? `${window.location.origin}${logo}` : logo;
+  const accent = documentSettings.accentColor || settings?.theme?.accentColor || '#E17055';
+  const primary = settings?.theme?.primaryColor || '#2D545E';
   const invoiceItems = order.items?.length ? order.items : [{
     productId: order.productId,
     productName: order.productName,
@@ -1518,17 +1562,54 @@ function printInvoice(order: Order) {
     return `<tr><td><strong>${escapeInvoice(item.productName)}</strong></td><td>${escapeInvoice(item.quantity)}</td><td class="right">${money(unitPrice, currency)}</td><td class="right">${money(lineTotal, currency)}</td></tr>`;
   }).join('');
   invoice.document.write(`<!doctype html><html><head><title>Invoice ${escapeInvoice(order.id)}</title><style>
-    body{font-family:Arial,sans-serif;color:#111;margin:0;padding:48px}header{display:flex;justify-content:space-between;border-bottom:3px solid #111;padding-bottom:28px;margin-bottom:38px}
-    h1{font-size:40px;margin:0}.muted{color:#666;font-size:12px;line-height:1.6}.bill{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:40px}
-    table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:15px;border-bottom:1px solid #ddd}th{font-size:11px;text-transform:uppercase;letter-spacing:1px}
-    .right{text-align:right}.total{font-size:24px;font-weight:800}.notes{margin-top:40px;padding:20px;background:#f5f5f3;white-space:pre-wrap}@media print{body{padding:20px}}
+    *{box-sizing:border-box}
+    body{font-family:Inter,Arial,sans-serif;color:#111;margin:0;background:#edecea;padding:28px}
+    .sheet{max-width:920px;min-height:1120px;margin:0 auto;background:#fff;box-shadow:0 24px 70px rgba(0,0,0,.12);position:relative;overflow:hidden}
+    .stripe{display:flex;height:10px}.stripe span:first-child{flex:1;background:${escapeInvoice(primary)}}.stripe span:last-child{flex:1;background:${escapeInvoice(accent)}}
+    .inner{padding:54px 58px 42px}
+    header{display:grid;grid-template-columns:1fr 260px;gap:40px;align-items:start;margin-bottom:42px}
+    .brand{display:flex;gap:20px;align-items:center}.logo{width:210px;max-height:78px;object-fit:contain;object-position:left center}
+    .brand-text h1{font-size:36px;line-height:.9;margin:0;text-transform:uppercase;letter-spacing:-1px}.tagline{font-size:10px;text-transform:uppercase;letter-spacing:4px;color:${escapeInvoice(primary)};font-weight:800;margin-top:10px}
+    .invoice-card{background:#111;color:#fff;padding:24px;text-align:right;position:relative}.invoice-card:before{content:"";position:absolute;left:0;top:0;width:7px;height:100%;background:${escapeInvoice(accent)}}.invoice-card h2{margin:0 0 16px;font-size:28px;text-transform:uppercase;letter-spacing:-.5px}.meta{font-size:12px;line-height:1.9;color:rgba(255,255,255,.72)}.meta strong{color:#fff}
+    .panels{display:grid;grid-template-columns:1.25fr .75fr;gap:18px;margin-bottom:36px}.panel{border:1px solid #ddd;background:#faf9f7;padding:22px}.panel-title{font-size:10px;text-transform:uppercase;letter-spacing:3px;color:#888;font-weight:900;margin-bottom:13px}.panel h3{margin:0 0 8px;font-size:20px}.panel p{margin:0;color:#555;font-size:13px;line-height:1.7}
+    table{width:100%;border-collapse:collapse;margin-top:8px}th{background:#111;color:#fff;text-align:left;padding:15px 16px;font-size:10px;text-transform:uppercase;letter-spacing:2px}td{padding:18px 16px;border-bottom:1px solid #e4e0dc;font-size:14px}td strong{font-size:15px}.right{text-align:right}
+    .summary{display:grid;grid-template-columns:1fr 310px;gap:34px;margin-top:30px;align-items:start}.notes{background:#faf9f7;border-left:5px solid ${escapeInvoice(primary)};padding:20px;min-height:110px;white-space:pre-wrap;color:#555;font-size:13px;line-height:1.7}.notes strong{display:block;color:#111;text-transform:uppercase;font-size:10px;letter-spacing:2px;margin-bottom:10px}
+    .totals{border:1px solid #ddd}.total-row{display:flex;justify-content:space-between;gap:20px;padding:14px 18px;border-bottom:1px solid #eee;font-size:13px}.grand{background:#111;color:#fff;border-bottom:0;font-size:24px;font-weight:900}.grand span:first-child{font-size:13px;text-transform:uppercase;letter-spacing:2px;align-self:center}.balance{color:${escapeInvoice(accent)};font-weight:900}
+    footer{margin-top:54px;padding-top:24px;border-top:1px solid #ddd;display:grid;grid-template-columns:1fr 1fr;gap:24px;color:#666;font-size:11px;line-height:1.7}.foot-title{font-weight:900;color:#111;text-transform:uppercase;letter-spacing:2px;font-size:10px;margin-bottom:8px}.report{font-family:monospace;text-align:right;color:#999}
+    @media print{body{background:#fff;padding:0}.sheet{box-shadow:none;max-width:none;min-height:0}.inner{padding:42px 46px}@page{margin:0.35in}}
   </style></head><body>
-    <header><div><h1>PRINT PLAZA</h1><div class="muted">Industrial Print Production</div></div><div class="right"><strong>INVOICE</strong><div class="muted"># ${escapeInvoice(order.id)}<br>Date: ${new Date(order.createdAt).toLocaleDateString()}<br>Due: ${escapeInvoice(order.paymentDueDate || 'On receipt')}</div></div></header>
-    <div class="bill"><div><strong>Bill to</strong><div class="muted">${escapeInvoice(order.userName || 'Customer')}<br>${escapeInvoice(order.userEmail)}</div></div><div class="right"><strong>Order status</strong><div class="muted">${escapeInvoice(order.status)}</div></div></div>
-    <table><thead><tr><th>Description</th><th>Quantity</th><th class="right">Unit price</th><th class="right">Amount</th></tr></thead>
-    <tbody>${rows}
-    <tr><td colspan="3" class="right total">Total</td><td class="right total">${money(sell, currency)}</td></tr></tbody></table>
-    ${order.invoiceNotes ? `<div class="notes"><strong>Notes</strong><br><br>${escapeInvoice(order.invoiceNotes)}</div>` : ''}
+    <main class="sheet">
+      <div class="stripe"><span></span><span></span></div>
+      <div class="inner">
+        <header>
+          <div class="brand">
+            ${logoUrl ? `<img class="logo" src="${escapeInvoice(logoUrl)}" alt="${escapeInvoice(companyName)}">` : `<div class="brand-text"><h1>${escapeInvoice(companyName)}</h1><div class="tagline">${escapeInvoice(tagline)}</div></div>`}
+          </div>
+          <section class="invoice-card">
+            <h2>Invoice</h2>
+            <div class="meta"><strong># ${escapeInvoice(order.id)}</strong><br>Date: ${new Date(order.createdAt).toLocaleDateString()}<br>Due: ${escapeInvoice(order.paymentDueDate || 'On receipt')}<br>Currency: ${escapeInvoice(currency)}</div>
+          </section>
+        </header>
+        <section class="panels">
+          <div class="panel"><div class="panel-title">Bill to</div><h3>${escapeInvoice(order.userName || 'Customer')}</h3><p>${escapeInvoice(order.userEmail)}</p></div>
+          <div class="panel"><div class="panel-title">Order status</div><h3>${escapeInvoice(order.status)}</h3><p>${escapeInvoice(invoiceItems.length)} item${invoiceItems.length === 1 ? '' : 's'} / ${escapeInvoice(order.paymentStatus || 'unpaid')}</p></div>
+        </section>
+        <table><thead><tr><th>Description</th><th>Quantity</th><th class="right">Unit price</th><th class="right">Amount</th></tr></thead><tbody>${rows}</tbody></table>
+        <section class="summary">
+          <div class="notes"><strong>Notes</strong>${escapeInvoice(order.invoiceNotes || 'Thank you for choosing Print Plaza. Payment is due according to the terms above.')}</div>
+          <div class="totals">
+            <div class="total-row"><span>Subtotal</span><strong>${money(sell, currency)}</strong></div>
+            <div class="total-row"><span>Paid</span><strong>${money(paid, currency)}</strong></div>
+            <div class="total-row"><span>Balance due</span><strong class="balance">${money(balance, currency)}</strong></div>
+            <div class="total-row grand"><span>Total</span><span>${money(sell, currency)}</span></div>
+          </div>
+        </section>
+        <footer>
+          <div><div class="foot-title">${escapeInvoice(companyName)}</div>${escapeInvoice(tagline)}<br>${escapeInvoice(footer.email || 'hi@print.plaza')} ${footer.phone ? ` / ${escapeInvoice(footer.phone)}` : ''}<br>${escapeInvoice(footer.address || '')}</div>
+          <div class="report">PLAZAHQ DOCUMENT<br>${escapeInvoice(new Date().toLocaleString())}</div>
+        </footer>
+      </div>
+    </main>
     <script>window.onload=()=>window.print();<\/script></body></html>`);
   invoice.document.close();
 }
