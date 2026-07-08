@@ -22,6 +22,85 @@ import { db } from './lib/firebase';
 
 import { DataService } from './lib/dataService';
 
+function AdminLoginPage() {
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch('/api/admin/session', { credentials: 'include' })
+      .then(response => response.json())
+      .then(data => setAuthenticated(Boolean(data.authenticated)))
+      .catch(() => setAuthenticated(false))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+
+    const response = await fetch('/api/admin/login', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+
+    if (!response.ok) {
+      setError('Invalid admin password.');
+      return;
+    }
+
+    setAuthenticated(true);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#FDFCFB] flex items-center justify-center">
+        <div className="w-16 h-px bg-black animate-pulse" />
+      </div>
+    );
+  }
+
+  if (authenticated) {
+    return <AdminPanel />;
+  }
+
+  return (
+    <div className="min-h-screen bg-[#FDFCFB] flex items-center justify-center px-6">
+      <form onSubmit={handleLogin} className="w-full max-w-md bg-white border border-black/10 p-10 shadow-2xl">
+        <div className="mb-10">
+          <div className="text-[10px] font-black uppercase tracking-[0.4em] text-[#2D545E] mb-4">Print Plaza CMS</div>
+          <h1 className="text-4xl font-display font-black uppercase tracking-tight leading-none">Admin Login</h1>
+        </div>
+
+        <label className="block text-[9px] font-black uppercase tracking-[0.3em] text-black/30 mb-4">
+          Password
+        </label>
+        <input
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          className="w-full border-2 border-black/10 px-5 py-4 outline-none focus:border-[#2D545E] font-bold"
+          autoFocus
+        />
+
+        {error && (
+          <p className="mt-4 text-[11px] font-bold uppercase tracking-widest text-red-600">{error}</p>
+        )}
+
+        <button
+          type="submit"
+          className="mt-8 w-full bg-black text-white py-5 text-[10px] font-black uppercase tracking-[0.4em] hover:bg-[#2D545E] transition-colors"
+        >
+          Open Control Panel
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function AppContent() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const [services, setServices] = useState<ServiceCategory[]>(CONSTANT_SERVICES);
@@ -284,6 +363,10 @@ function AppContent() {
 }
 
 export default function App() {
+  if (window.location.pathname.startsWith('/admin')) {
+    return <AdminLoginPage />;
+  }
+
   return (
     <AuthProvider>
       <AppContent />

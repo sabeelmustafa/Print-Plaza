@@ -41,21 +41,28 @@ function requireDb(_req, res, next) {
 }
 
 function requireAdmin(req, res, next) {
-  const configuredSecret = process.env.ADMIN_API_SECRET;
-  const sentSecret = req.get('x-admin-secret');
-  const sessionToken = getCookie(req, 'pp_admin_session');
-
-  if (configuredSecret && sentSecret === configuredSecret) {
-    next();
-    return;
-  }
-
-  if (process.env.ADMIN_SESSION_SECRET && sessionToken === signAdminSession()) {
+  if (isAdminRequest(req)) {
     next();
     return;
   }
 
   res.status(401).json({ error: 'Admin access required.' });
+}
+
+function isAdminRequest(req) {
+  const configuredSecret = process.env.ADMIN_API_SECRET;
+  const sentSecret = req.get('x-admin-secret');
+  const sessionToken = getCookie(req, 'pp_admin_session');
+
+  if (configuredSecret && sentSecret === configuredSecret) {
+    return true;
+  }
+
+  if (process.env.ADMIN_SESSION_SECRET && sessionToken === signAdminSession()) {
+    return true;
+  }
+
+  return false;
 }
 
 function getCookie(req, name) {
@@ -277,6 +284,11 @@ app.delete('/api/admin/products/:id', requireDb, requireAdmin, async (req, res, 
 app.get('/api/orders', requireDb, async (req, res, next) => {
   try {
     const userId = req.query.userId;
+    if (!userId && !isAdminRequest(req)) {
+      res.status(401).json({ error: 'Admin access required.' });
+      return;
+    }
+
     const query = userId
       ? 'SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC'
       : 'SELECT * FROM orders ORDER BY created_at DESC';
