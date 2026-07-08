@@ -14,11 +14,9 @@ import AuthModal from './components/AuthModal';
 import AdminPanel from './components/AdminPanel';
 import UserPanel from './components/UserPanel';
 import { SERVICES as CONSTANT_SERVICES } from './constants';
-import { ServiceCategory, Product } from './types';
+import { ServiceCategory, Product, SiteSettings } from './types';
 import { CheckCircle2, ChevronLeft } from 'lucide-react';
 import { AuthProvider, useAuth } from './lib/AuthContext';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from './lib/firebase';
 
 import { DataService } from './lib/dataService';
 
@@ -104,6 +102,7 @@ function AdminLoginPage() {
 function AppContent() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const [services, setServices] = useState<ServiceCategory[]>(CONSTANT_SERVICES);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>({});
   const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -111,16 +110,21 @@ function AppContent() {
   const [view, setView] = useState<'main' | 'dashboard'>('main');
 
   useEffect(() => {
-    fetchProducts();
+    fetchCmsData();
   }, [view]); // Refresh when coming back from dashboard
 
-  const fetchProducts = async () => {
+  const fetchCmsData = async () => {
     try {
-      const dbProducts = await DataService.getProducts();
+      const [dbProducts, dbCategories, settings] = await Promise.all([
+        DataService.getProducts(),
+        DataService.getCategories(),
+        DataService.getSiteSettings(),
+      ]);
+      setSiteSettings(settings);
       
       if (dbProducts.length > 0) {
-        // Group products by category
-        const categories = CONSTANT_SERVICES.map(cat => ({
+        const sourceCategories = dbCategories.length > 0 ? dbCategories : CONSTANT_SERVICES;
+        const categories = sourceCategories.map(cat => ({
           ...cat,
           products: dbProducts.filter(p => p.categoryId === cat.id)
         }));
@@ -164,7 +168,7 @@ function AppContent() {
       />
       
       <main>
-        <Hero />
+        <Hero settings={siteSettings.homepage} theme={siteSettings.theme} />
         
         <section id="products" className="py-24 sm:py-40 bg-[#FDFCFB] relative overflow-hidden border-b border-black/5">
           <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 relative">
@@ -274,8 +278,8 @@ function AppContent() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-16 md:gap-20">
             <div className="sm:col-span-2">
               <div className="mb-10 sm:mb-12">
-                <h6 className="font-display font-black text-4xl sm:text-5xl mb-4 tracking-tighter uppercase leading-none">Print <span className="text-[#2D545E]">Plaza.</span></h6>
-                <div className="text-[10px] uppercase tracking-[0.4em] font-black text-[#2D545E]">Creative Production Studio</div>
+                <h6 className="font-display font-black text-4xl sm:text-5xl mb-4 tracking-tighter uppercase leading-none">{siteSettings.footer?.brandText || 'Print Plaza.'}</h6>
+                <div className="text-[10px] uppercase tracking-[0.4em] font-black text-[#2D545E]">{siteSettings.footer?.tagline || 'Creative Production Studio'}</div>
               </div>
               <p className="text-sm leading-loose opacity-60 max-w-sm font-medium tracking-wide">
                 Refined creative production with a focus on tactile excellence and tonal precision.
@@ -295,9 +299,9 @@ function AppContent() {
             <div>
               <h5 className="text-[10px] uppercase tracking-[0.3em] font-black mb-8 sm:mb-10 text-[#2D545E]">Plaza Studio</h5>
               <ul className="space-y-4 sm:space-y-6 text-sm font-medium leading-relaxed opacity-60 font-mono">
-                <li>hi@print.plaza</li>
-                <li>+1 212 555 7788</li>
-                <li>Studio Block A<br />Creative District, NY 10001</li>
+                <li>{siteSettings.footer?.email || 'hi@print.plaza'}</li>
+                <li>{siteSettings.footer?.phone || '+1 212 555 7788'}</li>
+                <li>{siteSettings.footer?.address || 'Studio Block A, Creative District, NY 10001'}</li>
               </ul>
             </div>
           </div>

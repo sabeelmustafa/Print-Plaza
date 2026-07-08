@@ -23,6 +23,8 @@ export interface Product {
   categoryId: string;
   maxQuantity?: number;
   options: ProductOption[];
+  active?: boolean;
+  sortOrder?: number;
 }
 
 export interface ServiceCategory {
@@ -31,6 +33,39 @@ export interface ServiceCategory {
   description: string;
   icon: string;
   products: Product[];
+  active?: boolean;
+  sortOrder?: number;
+}
+
+export interface MediaAsset {
+  id: string;
+  title: string;
+  url: string;
+  alt_text?: string;
+  altText?: string;
+}
+
+export interface SiteSettings {
+  theme?: {
+    primaryColor?: string;
+    accentColor?: string;
+    backgroundColor?: string;
+    textColor?: string;
+  };
+  homepage?: {
+    heroTitle?: string;
+    heroSubtitle?: string;
+    primaryButtonText?: string;
+    secondaryButtonText?: string;
+    heroImage?: string;
+  };
+  footer?: {
+    brandText?: string;
+    tagline?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+  };
 }
 
 export interface OrderItem {

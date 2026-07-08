@@ -1,4 +1,4 @@
-import { Product, Order } from '../types';
+import { Product, Order, ServiceCategory, SiteSettings, MediaAsset } from '../types';
 import { SERVICES as INITIAL_SERVICES } from '../constants';
 
 const PRODUCTS_KEY = 'plaza_studio_products';
@@ -54,6 +54,23 @@ function getLocalOrders(userId?: string): Order[] {
 }
 
 export const DataService = {
+  getCategories: async (): Promise<ServiceCategory[]> => {
+    try {
+      const categories = await request<Omit<ServiceCategory, 'products'>[]>('/api/categories');
+      return categories.map(category => ({ ...category, products: [] }));
+    } catch (_error) {
+      return INITIAL_SERVICES;
+    }
+  },
+
+  saveCategory: async (category: Partial<ServiceCategory>) => {
+    await request('/api/admin/categories', {
+      method: 'POST',
+      body: JSON.stringify(category),
+    });
+    return DataService.getCategories();
+  },
+
   getProducts: async (): Promise<Product[]> => {
     try {
       return await request<Product[]>('/api/products');
@@ -133,5 +150,37 @@ export const DataService = {
       localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
       return updated;
     }
+  },
+
+  getSiteSettings: async (): Promise<SiteSettings> => {
+    try {
+      return await request<SiteSettings>('/api/site-settings');
+    } catch (_error) {
+      return {};
+    }
+  },
+
+  saveSiteSetting: async <K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) => {
+    await request(`/api/admin/site-settings/${String(key)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+    });
+    return DataService.getSiteSettings();
+  },
+
+  getMedia: async (): Promise<MediaAsset[]> => {
+    try {
+      return await request<MediaAsset[]>('/api/media');
+    } catch (_error) {
+      return [];
+    }
+  },
+
+  saveMedia: async (asset: Partial<MediaAsset>) => {
+    await request('/api/admin/media', {
+      method: 'POST',
+      body: JSON.stringify(asset),
+    });
+    return DataService.getMedia();
   }
 };

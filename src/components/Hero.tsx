@@ -5,14 +5,28 @@
 
 import { motion } from 'motion/react';
 import { ArrowRight } from 'lucide-react';
+import { SiteSettings } from '../types';
 
-export default function Hero() {
+interface HeroProps {
+  settings?: SiteSettings['homepage'];
+  theme?: SiteSettings['theme'];
+}
+
+export default function Hero({ settings, theme }: HeroProps) {
+  const heroTitle = settings?.heroTitle || 'INDUSTRIAL PRINT PRODUCTION.';
+  const titleWords = heroTitle.split(' ');
+  const firstLine = titleWords.slice(0, 1).join(' ') || 'INDUSTRIAL';
+  const secondLine = titleWords.slice(1, 2).join(' ') || 'PRINT';
+  const thirdLine = titleWords.slice(2).join(' ') || 'PRODUCTION.';
+  const primaryColor = theme?.primaryColor || '#2D545E';
+  const accentColor = theme?.accentColor || '#E17055';
+
   return (
-    <section className="relative pt-32 sm:pt-48 pb-20 sm:pb-32 overflow-hidden border-b border-black/10 bg-[#FDFCFB]">
+    <section className="relative pt-32 sm:pt-48 pb-20 sm:pb-32 overflow-hidden border-b border-black/10 bg-[#FDFCFB]" style={{ backgroundColor: theme?.backgroundColor || '#FDFCFB', color: theme?.textColor || '#000000' }}>
       {/* Decorative Elements */}
       <div className="absolute top-0 left-0 w-full h-full bg-grainy opacity-[0.03] pointer-events-none" />
-      <div className="absolute top-20 right-[5%] w-72 h-72 bg-[#2D545E] rounded-full mix-blend-multiply opacity-[0.08] blur-3xl animate-pulse" />
-      <div className="absolute bottom-20 left-[5%] w-96 h-96 bg-[#E17055] rounded-full mix-blend-multiply opacity-[0.05] blur-3xl" />
+      <div className="absolute top-20 right-[5%] w-72 h-72 rounded-full mix-blend-multiply opacity-[0.08] blur-3xl animate-pulse" style={{ backgroundColor: primaryColor }} />
+      <div className="absolute bottom-20 left-[5%] w-96 h-96 rounded-full mix-blend-multiply opacity-[0.05] blur-3xl" style={{ backgroundColor: accentColor }} />
 
       <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 relative z-10">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
@@ -30,23 +44,23 @@ export default function Hero() {
                 <motion.div initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ duration: 0.5, delay: 0.4 }} className="w-8 sm:w-10 h-[3px] sm:h-[4px] bg-[#000000]" title="Key (Black)" />
               </div>
               <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-6xl xl:text-8xl font-display font-black tracking-tight leading-[0.85] mb-8 sm:mb-10 uppercase break-words">
-                INDUSTRIAL <br />
-                <span className="text-[#2D545E]">PRINT</span> <br />
-                <span className="text-stroke-black">PRODUCTION.</span>
+                {firstLine} <br />
+                <span style={{ color: primaryColor }}>{secondLine}</span> <br />
+                <span className="text-stroke-black">{thirdLine}</span>
               </h1>
               <p className="max-w-md text-base sm:text-lg leading-relaxed text-black/70 font-medium font-sans">
-                High-fidelity manufacturing for the modern brand. From offset lithography to large-scale signage, we deliver <span className="font-serif italic text-black/90">chromatic precision</span> and <span className="font-serif italic text-black/90">material excellence.</span>
+                {settings?.heroSubtitle || 'High-fidelity manufacturing for the modern brand. From offset lithography to large-scale signage, we deliver chromatic precision and material excellence.'}
               </p>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-start sm:items-center">
               <button className="w-full sm:w-auto btn-studio bg-black text-white px-10 py-5 text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-[#2D545E] hover:shadow-[0_20px_40px_-10px_rgba(45,84,94,0.4)] transition-all">
-                Launch Production <ArrowRight className="w-3.5 h-3.5" />
+                {settings?.primaryButtonText || 'Launch Production'} <ArrowRight className="w-3.5 h-3.5" />
               </button>
               <button className="group relative text-[10px] font-black uppercase tracking-[0.2em] pb-1 transition-all">
-                <span className="relative z-10 transition-colors group-hover:text-[#2D545E]">Substrate Catalog</span>
-                <span className="absolute bottom-0 left-0 w-full h-[2px] bg-[#E17055] origin-right scale-x-100 group-hover:scale-x-0 transition-transform duration-300" />
-                <span className="absolute bottom-0 left-0 w-full h-[2px] bg-[#2D545E] origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-300" />
+                <span className="relative z-10 transition-colors" style={{ color: primaryColor }}>{settings?.secondaryButtonText || 'Substrate Catalog'}</span>
+                <span className="absolute bottom-0 left-0 w-full h-[2px] origin-right scale-x-100 group-hover:scale-x-0 transition-transform duration-300" style={{ backgroundColor: accentColor }} />
+                <span className="absolute bottom-0 left-0 w-full h-[2px] origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-300" style={{ backgroundColor: primaryColor }} />
               </button>
             </div>
           </motion.div>
@@ -60,7 +74,7 @@ export default function Hero() {
             <div className="relative aspect-[4/5] bg-neutral-200 border-studio p-4 brutal-shadow-primary transform rotate-1 hover:rotate-0 transition-transform duration-700">
               <div className="w-full h-full bg-[#EBEAE8] overflow-hidden relative">
                 <img 
-                  src="https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?auto=format&fit=crop&q=80&w=1920&h=1080" 
+                  src={settings?.heroImage || 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?auto=format&fit=crop&q=80&w=1920&h=1080'} 
                   alt="Creative studio print" 
                   className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-1000"
                   referrerPolicy="no-referrer"
