@@ -161,6 +161,40 @@ export const DataService = {
     }
   },
 
+  updateOrderFinance: async (orderId: string, details: {
+    costPrice: number;
+    sellPrice: number;
+    invoiceNotes?: string;
+    paymentDueDate?: string;
+  }) => {
+    await request(`/api/admin/orders/${encodeURIComponent(orderId)}/finance`, {
+      method: 'PATCH',
+      body: JSON.stringify(details),
+    });
+    return DataService.getOrders();
+  },
+
+  addPayment: async (orderId: string, payment: {
+    amount: number;
+    paymentMethod: string;
+    reference?: string;
+    notes?: string;
+    paidAt?: string;
+  }) => {
+    await request(`/api/admin/orders/${encodeURIComponent(orderId)}/payments`, {
+      method: 'POST',
+      body: JSON.stringify(payment),
+    });
+    return DataService.getOrders();
+  },
+
+  deletePayment: async (paymentId: string) => {
+    await request(`/api/admin/payments/${encodeURIComponent(paymentId)}`, {
+      method: 'DELETE',
+    });
+    return DataService.getOrders();
+  },
+
   getSiteSettings: async (): Promise<SiteSettings> => {
     try {
       return await request<SiteSettings>('/api/site-settings');

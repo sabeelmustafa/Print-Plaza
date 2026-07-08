@@ -41,11 +41,32 @@ CREATE TABLE IF NOT EXISTS orders (
   quantity INT NOT NULL DEFAULT 1,
   options_json JSON NULL,
   total_price DECIMAL(12,2) NOT NULL DEFAULT 0,
+  cost_price DECIMAL(12,2) NOT NULL DEFAULT 0,
+  sell_price DECIMAL(12,2) NOT NULL DEFAULT 0,
+  invoice_notes TEXT NULL,
+  payment_due_date DATE NULL,
   status ENUM('pending', 'processing', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_orders_user (user_id),
   INDEX idx_orders_status_created (status, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS payment_records (
+  id VARCHAR(128) PRIMARY KEY,
+  order_id VARCHAR(128) NOT NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  payment_method VARCHAR(80) NOT NULL DEFAULT 'bank_transfer',
+  reference VARCHAR(220) NULL,
+  notes TEXT NULL,
+  paid_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_payments_order (order_id),
+  INDEX idx_payments_paid_at (paid_at),
+  CONSTRAINT fk_payments_order
+    FOREIGN KEY (order_id) REFERENCES orders(id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS site_settings (

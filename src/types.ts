@@ -46,6 +46,15 @@ export interface MediaAsset {
 }
 
 export interface SiteSettings {
+  header?: {
+    logoText?: string;
+    logoImage?: string;
+    tagline?: string;
+    servicesLabel?: string;
+    productsLabel?: string;
+    loginLabel?: string;
+    buttonText?: string;
+  };
   theme?: {
     primaryColor?: string;
     accentColor?: string;
@@ -62,6 +71,7 @@ export interface SiteSettings {
   footer?: {
     brandText?: string;
     tagline?: string;
+    description?: string;
     email?: string;
     phone?: string;
     address?: string;
@@ -86,7 +96,26 @@ export interface Order {
   quantity: number;
   options: Record<string, string | number | boolean>;
   totalPrice: number;
+  costPrice?: number;
+  sellPrice?: number;
+  paidAmount?: number;
+  balanceDue?: number;
+  paymentStatus?: 'unpaid' | 'partial' | 'paid';
+  invoiceNotes?: string;
+  paymentDueDate?: string;
+  payments?: PaymentRecord[];
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PaymentRecord {
+  id: string;
+  orderId: string;
+  amount: number;
+  paymentMethod: string;
+  reference?: string;
+  notes?: string;
+  paidAt: string;
+  createdAt?: string;
 }

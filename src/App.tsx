@@ -11,7 +11,7 @@ import ServiceGrid from './components/ServiceGrid';
 import ProductCard from './components/ProductCard';
 import OrderModal from './components/OrderModal';
 import AuthModal from './components/AuthModal';
-import AdminPanel from './components/AdminPanel';
+import AdminPanel, { WebsiteEditorPage } from './components/AdminPanel';
 import UserPanel from './components/UserPanel';
 import { SERVICES as CONSTANT_SERVICES } from './constants';
 import { ServiceCategory, Product, SiteSettings } from './types';
@@ -62,7 +62,7 @@ function AdminLoginPage() {
   }
 
   if (authenticated) {
-    return <AdminPanel />;
+    return window.location.pathname.startsWith('/admin/editor') ? <WebsiteEditorPage /> : <AdminPanel />;
   }
 
   return (
@@ -164,7 +164,8 @@ function AppContent() {
       
       <Navbar 
         onLogin={() => setShowAuthModal(true)} 
-        onViewDashboard={() => setView('dashboard')} 
+        onViewDashboard={() => setView('dashboard')}
+        settings={siteSettings.header}
       />
       
       <main>
@@ -282,7 +283,7 @@ function AppContent() {
                 <div className="text-[10px] uppercase tracking-[0.32em] font-black text-[#66A0AA]">{siteSettings.footer?.tagline || 'Creative Production Studio'}</div>
               </div>
               <p className="text-sm leading-loose opacity-70 max-w-sm font-medium tracking-wide">
-                Refined creative production with a focus on tactile excellence and tonal precision.
+                {siteSettings.footer?.description || 'Refined creative production with a focus on tactile excellence and tonal precision.'}
               </p>
             </div>
             

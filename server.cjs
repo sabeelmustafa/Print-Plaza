@@ -301,17 +301,51 @@ app.delete('/api/admin/products/:id', requireDb, requireAdmin, async (req, res, 
 app.get('/api/orders', requireDb, async (req, res, next) => {
   try {
     const userId = req.query.userId;
-    if (!userId && !isAdminRequest(req)) {
+    const adminRequest = isAdminRequest(req);
+    if (!userId && !adminRequest) {
       res.status(401).json({ error: 'Admin access required.' });
       return;
     }
 
-    const query = userId
-      ? 'SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC'
-      : 'SELECT * FROM orders ORDER BY created_at DESC';
+    const query = adminRequest
+      ? `SELECT o.*,
+           COALESCE((SELECT SUM(p.amount) FROM payment_records p WHERE p.order_id = o.id), 0) AS paid_amount
+         FROM orders o
+         ${userId ? 'WHERE o.user_id = ?' : ''}
+         ORDER BY o.created_at DESC`
+      : 'SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC';
     const params = userId ? [userId] : [];
     const [rows] = await pool.query(query, params);
+    let paymentsByOrder = {};
+    if (adminRequest && rows.length) {
+      const [paymentRows] = await pool.query(
+        'SELECT * FROM payment_records ORDER BY paid_at DESC, created_at DESC'
+      );
+      paymentsByOrder = paymentRows.reduce((result, payment) => {
+        const orderId = payment.order_id;
+        if (!result[orderId]) result[orderId] = [];
+        result[orderId].push({
+          id: payment.id,
+          orderId,
+          amount: Number(payment.amount),
+          paymentMethod: payment.payment_method,
+          reference: payment.reference || '',
+          notes: payment.notes || '',
+          paidAt: payment.paid_at,
+          createdAt: payment.created_at,
+        });
+        return result;
+      }, {});
+    }
     res.json(rows.map((row) => ({
+      ...(adminRequest ? {
+        costPrice: Number(row.cost_price || 0),
+        paidAmount: Number(row.paid_amount || 0),
+        balanceDue: Math.max(0, Number(row.sell_price || row.total_price || 0) - Number(row.paid_amount || 0)),
+        invoiceNotes: row.invoice_notes || '',
+        paymentDueDate: row.payment_due_date,
+        payments: paymentsByOrder[row.id] || [],
+      } : {}),
       id: row.id,
       userId: row.user_id,
       userName: row.user_name,
@@ -321,6 +355,10 @@ app.get('/api/orders', requireDb, async (req, res, next) => {
       quantity: Number(row.quantity),
       options: parseJson(row.options_json, {}),
       totalPrice: Number(row.total_price),
+      sellPrice: Number(row.sell_price || row.total_price || 0),
+      paymentStatus: Number(row.paid_amount || 0) >= Number(row.sell_price || row.total_price || 0) && Number(row.sell_price || row.total_price || 0) > 0
+        ? 'paid'
+        : Number(row.paid_amount || 0) > 0 ? 'partial' : 'unpaid',
       status: row.status,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -337,9 +375,9 @@ app.post('/api/orders', requireDb, async (req, res, next) => {
     await pool.query(
       `INSERT INTO orders (
          id, user_id, user_name, user_email, product_id, product_name,
-         quantity, options_json, total_price, status
+         quantity, options_json, total_price, sell_price, status
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
       [
         id,
         order.userId,
@@ -350,9 +388,71 @@ app.post('/api/orders', requireDb, async (req, res, next) => {
         Number(order.quantity || 1),
         JSON.stringify(order.options || {}),
         Number(order.totalPrice || 0),
+        Number(order.totalPrice || 0),
       ]
     );
     res.status(201).json({ id, status: 'pending' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch('/api/admin/orders/:id/finance', requireDb, requireAdmin, async (req, res, next) => {
+  try {
+    const costPrice = Math.max(0, Number(req.body.costPrice || 0));
+    const sellPrice = Math.max(0, Number(req.body.sellPrice || 0));
+    await pool.query(
+      `UPDATE orders
+       SET cost_price = ?, sell_price = ?, total_price = ?,
+           invoice_notes = ?, payment_due_date = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [
+        costPrice,
+        sellPrice,
+        sellPrice,
+        String(req.body.invoiceNotes || '').trim() || null,
+        req.body.paymentDueDate || null,
+        req.params.id,
+      ]
+    );
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/admin/orders/:id/payments', requireDb, requireAdmin, async (req, res, next) => {
+  try {
+    const amount = Number(req.body.amount || 0);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      res.status(400).json({ error: 'Payment amount must be greater than zero.' });
+      return;
+    }
+    const id = createId('payment');
+    await pool.query(
+      `INSERT INTO payment_records
+       (id, order_id, amount, payment_method, reference, notes, paid_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        req.params.id,
+        amount,
+        String(req.body.paymentMethod || 'bank_transfer'),
+        String(req.body.reference || '').trim() || null,
+        String(req.body.notes || '').trim() || null,
+        req.body.paidAt || new Date(),
+      ]
+    );
+    res.status(201).json({ id });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/admin/payments/:id', requireDb, requireAdmin, async (req, res, next) => {
+  try {
+    await pool.query('DELETE FROM payment_records WHERE id = ?', [req.params.id]);
+    res.json({ ok: true });
   } catch (error) {
     next(error);
   }

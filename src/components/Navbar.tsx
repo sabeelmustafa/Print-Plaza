@@ -8,13 +8,15 @@ import { User as UserIcon, LogOut, Terminal, Lock, Menu, X } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext';
 import { logOut } from '../lib/firebase';
 import { useState } from 'react';
+import { SiteSettings } from '../types';
 
 interface NavbarProps {
   onLogin: () => void;
   onViewDashboard: () => void;
+  settings?: SiteSettings['header'];
 }
 
-export default function Navbar({ onLogin, onViewDashboard }: NavbarProps) {
+export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarProps) {
   const { user, isAdmin } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -28,20 +30,22 @@ export default function Navbar({ onLogin, onViewDashboard }: NavbarProps) {
             window.scrollTo({ top: 0, behavior: 'smooth' });
             setIsMenuOpen(false);
           }}>
-            <div className="flex gap-1.5 relative">
-              <div className="w-2.5 h-7 bg-[#2D545E] transform -skew-x-12 group-hover:rotate-6 transition-all duration-300" />
-              <div className="w-2.5 h-7 bg-[#E17055] transform -skew-x-12 group-hover:-rotate-6 transition-all duration-300" />
-            </div>
+            {settings?.logoImage ? (
+              <img src={settings.logoImage} alt={settings.logoText || 'Print Plaza'} className="h-10 w-auto max-w-40 object-contain" />
+            ) : <div className="flex gap-1.5 relative">
+                <div className="w-2.5 h-7 bg-[#2D545E] transform -skew-x-12 group-hover:rotate-6 transition-all duration-300" />
+                <div className="w-2.5 h-7 bg-[#E17055] transform -skew-x-12 group-hover:-rotate-6 transition-all duration-300" />
+              </div>}
             <div className="flex flex-col">
-              <span className="font-display font-black text-2xl tracking-tighter leading-none">PRINT PLAZA</span>
-              <span className="text-[9px] uppercase tracking-[0.4em] font-extrabold mt-0.5 text-[#2D545E]">Industrial Print Production</span>
+              {!settings?.logoImage && <span className="font-display font-black text-2xl tracking-tighter leading-none">{settings?.logoText || 'PRINT PLAZA'}</span>}
+              <span className="text-[9px] uppercase tracking-[0.4em] font-extrabold mt-0.5 text-[#2D545E]">{settings?.tagline || 'Industrial Print Production'}</span>
             </div>
           </div>
           
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center space-x-8">
-            <a href="#services" className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/60 hover:text-[#2D545E] transition-colors">Services</a>
-            <a href="#products" className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/60 hover:text-[#2D545E] transition-colors">Production</a>
+            <a href="#services" className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/60 hover:text-[#2D545E] transition-colors">{settings?.servicesLabel || 'Services'}</a>
+            <a href="#products" className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/60 hover:text-[#2D545E] transition-colors">{settings?.productsLabel || 'Production'}</a>
             
             <div className="h-4 w-px bg-black/10" />
 
@@ -68,12 +72,12 @@ export default function Navbar({ onLogin, onViewDashboard }: NavbarProps) {
                 className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-black/40 hover:text-black transition-colors"
               >
                 <Lock className="w-3.5 h-3.5" />
-                Auth Registry
+                {settings?.loginLabel || 'Auth Registry'}
               </button>
             )}
 
             <button className="btn-studio bg-black text-white px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-[#2D545E] hover:shadow-[0_10px_20px_-5px_rgba(45,84,94,0.4)] transition-all">
-              Start Project
+              {settings?.buttonText || 'Start Project'}
             </button>
           </div>
 
