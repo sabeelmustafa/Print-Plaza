@@ -16,22 +16,22 @@ import { ChevronRight } from 'lucide-react';
 
 export default function ServiceGrid({ categories, onSelect }: ServiceGridProps) {
   return (
-    <section id="services" className="py-24 sm:py-40 bg-[#FDFCFB] relative overflow-hidden">
+    <section id="services" className="py-24 sm:py-36 bg-[#FDFCFB] relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-full bg-grainy opacity-[0.03] pointer-events-none" />
       
       <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 relative">
-        <div className="flex flex-col md:flex-row items-baseline justify-between mb-16 sm:mb-28 border-b border-black/10 pb-12 gap-8">
+        <div className="flex flex-col md:flex-row items-baseline justify-between mb-14 sm:mb-20 border-b border-black/10 pb-10 gap-8">
           <div className="max-w-xl">
-            <h2 className="text-4xl sm:text-6xl md:text-8xl font-display font-black tracking-tight mb-8 leading-[0.8] uppercase">
+            <h2 className="text-[2.8rem] sm:text-[4.8rem] md:text-[6rem] font-display font-black tracking-tight mb-7 leading-[0.85] uppercase">
               PRINT <br/>
               <span className="text-[#2D545E]">PRODUCTION.</span>
             </h2>
-            <p className="text-base sm:text-lg leading-relaxed text-black/60 font-medium font-sans">
+            <p className="text-[15px] sm:text-base leading-[1.8] text-black/62 font-medium font-sans">
               Specialized manufacturing across diverse substrates. <br/>
               <span className="font-serif italic text-[#E17055]">High-fidelity output engineered for scale.</span>
             </p>
           </div>
-          <div className="text-[10px] uppercase tracking-[0.4em] font-black text-[#2D545E] bg-[#EBEAE8] px-4 py-2 border-studio self-start">
+          <div className="text-[10px] uppercase tracking-[0.3em] font-black text-[#2D545E] bg-[#EBEAE8] px-4 py-2 border-studio self-start">
             EST. 2024 // CAPACITY_98%
           </div>
         </div>
@@ -45,19 +45,19 @@ export default function ServiceGrid({ categories, onSelect }: ServiceGridProps) 
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
               onClick={() => onSelect(category)}
-              className="group bg-[#FDFCFB] p-8 sm:p-10 cursor-pointer hover:bg-black transition-colors duration-500 flex flex-col h-auto sm:h-[480px]"
+              className="group bg-[#FDFCFB] p-7 sm:p-8 cursor-pointer hover:bg-black transition-colors duration-500 flex flex-col min-h-[300px] sm:min-h-[360px]"
             >
-              <div className="mb-10 sm:mb-14">
+              <div className="mb-8 sm:mb-10">
                 <span className="text-[9px] font-mono font-bold text-black/30 group-hover:text-white/40 block mb-4">
                   UNIT_0{index + 1}
                 </span>
-                <h3 className="text-3xl sm:text-4xl font-display font-black leading-[0.9] uppercase group-hover:text-white transition-colors">
+                <h3 className="text-[1.85rem] sm:text-[2.2rem] font-display font-black leading-[0.92] uppercase group-hover:text-white transition-colors">
                   {category.title.split(' ')[0]} <br/>
                   <span className="opacity-20 group-hover:opacity-40">{category.title.split(' ')[1] || 'UNIT'}</span>
                 </h3>
               </div>
               
-              <p className="text-[11px] sm:text-xs font-medium leading-relaxed text-black/50 group-hover:text-white/40 mb-10 sm:mb-12">
+              <p className="text-xs font-medium leading-relaxed text-black/54 group-hover:text-white/48 mb-8 sm:mb-10">
                 {category.description}
               </p>
               

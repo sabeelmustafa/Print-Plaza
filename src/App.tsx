@@ -170,25 +170,25 @@ function AppContent() {
       <main>
         <Hero settings={siteSettings.homepage} theme={siteSettings.theme} />
         
-        <section id="products" className="py-24 sm:py-40 bg-[#FDFCFB] relative overflow-hidden border-b border-black/5">
+        <section id="products" className="py-24 sm:py-36 bg-[#FDFCFB] relative overflow-hidden border-b border-black/5">
           <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 relative">
-            <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 sm:mb-28 gap-12">
+            <div className="flex flex-col md:flex-row md:items-end justify-between mb-14 sm:mb-20 gap-12">
               <div className="max-w-2xl">
-                <div className="text-[10px] font-black uppercase tracking-[0.4em] text-[#2D545E] mb-6 sm:mb-8 flex items-center gap-4">
+                <div className="text-[10px] font-black uppercase tracking-[0.32em] text-[#2D545E] mb-6 flex items-center gap-4">
                    <div className="w-8 h-px bg-[#2D545E]/30" /> Core Output
                 </div>
-                <h2 className="text-4xl sm:text-6xl md:text-8xl font-display font-black tracking-tight leading-[0.8] mb-8 sm:mb-12 uppercase">
+                <h2 className="text-[2.8rem] sm:text-[4.8rem] md:text-[6.4rem] font-display font-black tracking-tight leading-[0.84] mb-7 sm:mb-9 uppercase">
                   Production <br/>
                   <span className="text-black/10 italic font-serif lowercase">Unit.</span>
                 </h2>
-                <p className="text-base sm:text-lg font-medium leading-relaxed text-black/50 max-w-lg font-sans">
+                <p className="text-[15px] sm:text-base font-medium leading-[1.8] text-black/62 max-w-lg font-sans">
                   Browse our high-fidelity production lineup. Technical excellence across <span className="text-black/80 font-bold">bespoke formats.</span>
                 </p>
               </div>
               <div className="flex flex-col items-start md:items-end gap-4 overflow-hidden">
-                <div className="text-[10px] font-mono font-bold bg-[#EBEAE8] px-5 py-3 border border-black/10 flex items-center gap-4">
+                <div className="text-[10px] font-mono font-bold bg-[#EBEAE8] px-4 sm:px-5 py-3 border border-black/10 flex items-center gap-3 sm:gap-4 max-w-full">
                   <div className="w-2 h-2 rounded-full bg-[#E17055] animate-pulse" />
-                  LIVE_FEED: ACTIVE_JOBS(24) // {new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}
+                  <span className="truncate">LIVE_FEED: ACTIVE_JOBS(24) // {new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
                 <div className="text-[9px] font-mono opacity-30 uppercase tracking-widest">
                   Secure Connection Established
@@ -196,7 +196,7 @@ function AppContent() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-black/5 border border-black/5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-black/8 border border-black/8">
               {services.flatMap(s => s.products).slice(0, 6).map(product => (
                 <div key={product.id} className="bg-[#FDFCFB]">
                   <ProductCard 
@@ -207,7 +207,7 @@ function AppContent() {
               ))}
             </div>
             
-            <div className="mt-28 flex justify-center">
+            <div className="mt-20 sm:mt-24 flex justify-center">
               <button className="group flex flex-col items-center gap-6">
                 <span className="text-[10px] font-black uppercase tracking-[0.5em] text-black/30 group-hover:text-black transition-colors">Load Archive</span>
                 <div className="w-px h-16 bg-gradient-to-b from-black/20 to-transparent group-hover:from-[#2D545E] transition-colors" />
@@ -246,7 +246,7 @@ function AppContent() {
                     </h2>
                     <p className="text-base sm:text-lg font-medium leading-relaxed text-black/60 max-w-lg">{selectedCategory.description}</p>
                   </div>
-                  <div className="text-[10px] font-mono font-bold bg-[#E17055] text-white px-4 py-2 border-2 border-black brutal-shadow self-start md:self-end">
+                  <div className="text-[10px] font-mono font-bold bg-[#E17055] text-white px-4 py-2 border-2 border-black self-start md:self-end shadow-[6px_6px_0_rgba(0,0,0,0.12)]">
                     BATCH_REF: {selectedCategory.id.toUpperCase()}
                   </div>
                 </div>
@@ -278,17 +278,17 @@ function AppContent() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-16 md:gap-20">
             <div className="sm:col-span-2">
               <div className="mb-10 sm:mb-12">
-                <h6 className="font-display font-black text-4xl sm:text-5xl mb-4 tracking-tighter uppercase leading-none">{siteSettings.footer?.brandText || 'Print Plaza.'}</h6>
-                <div className="text-[10px] uppercase tracking-[0.4em] font-black text-[#2D545E]">{siteSettings.footer?.tagline || 'Creative Production Studio'}</div>
+                <h6 className="font-display font-black text-4xl sm:text-5xl mb-4 tracking-tight uppercase leading-none">{siteSettings.footer?.brandText || 'Print Plaza.'}</h6>
+                <div className="text-[10px] uppercase tracking-[0.32em] font-black text-[#66A0AA]">{siteSettings.footer?.tagline || 'Creative Production Studio'}</div>
               </div>
-              <p className="text-sm leading-loose opacity-60 max-w-sm font-medium tracking-wide">
+              <p className="text-sm leading-loose opacity-70 max-w-sm font-medium tracking-wide">
                 Refined creative production with a focus on tactile excellence and tonal precision.
               </p>
             </div>
             
             <div>
-              <h5 className="text-[10px] uppercase tracking-[0.3em] font-black mb-8 sm:mb-10 text-[#E17055]">The Archive</h5>
-              <ul className="space-y-4 sm:space-y-6 text-sm font-bold tracking-tight opacity-60">
+              <h5 className="text-[10px] uppercase tracking-[0.28em] font-black mb-8 sm:mb-10 text-[#E17055]">The Archive</h5>
+              <ul className="space-y-4 sm:space-y-6 text-sm font-bold tracking-tight opacity-70">
                 <li><a href="#" className="hover:text-[#E17055] transition-colors uppercase">Color History</a></li>
                 <li><a href="#" className="hover:text-[#E17055] transition-colors uppercase">Paper Lab</a></li>
                 <li><a href="#" className="hover:text-[#E17055] transition-colors uppercase">Digital Unit</a></li>
@@ -297,8 +297,8 @@ function AppContent() {
             </div>
             
             <div>
-              <h5 className="text-[10px] uppercase tracking-[0.3em] font-black mb-8 sm:mb-10 text-[#2D545E]">Plaza Studio</h5>
-              <ul className="space-y-4 sm:space-y-6 text-sm font-medium leading-relaxed opacity-60 font-mono">
+              <h5 className="text-[10px] uppercase tracking-[0.28em] font-black mb-8 sm:mb-10 text-[#66A0AA]">Plaza Studio</h5>
+              <ul className="space-y-4 sm:space-y-6 text-sm font-medium leading-relaxed opacity-70 font-mono">
                 <li>{siteSettings.footer?.email || 'hi@print.plaza'}</li>
                 <li>{siteSettings.footer?.phone || '+1 212 555 7788'}</li>
                 <li>{siteSettings.footer?.address || 'Studio Block A, Creative District, NY 10001'}</li>
@@ -306,8 +306,8 @@ function AppContent() {
             </div>
           </div>
           
-          <div className="mt-24 sm:mt-48 pt-12 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-8 text-[10px] font-black uppercase tracking-[0.4em] opacity-40 text-center md:text-left">
-            <p>© 2024 Print Plaza Hub. Creative Output.</p>
+          <div className="mt-24 sm:mt-40 pt-12 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-8 text-[10px] font-black uppercase tracking-[0.32em] opacity-50 text-center md:text-left">
+            <p>&copy; 2024 Print Plaza Hub. Creative Output.</p>
             <div className="flex gap-12">
               <a href="#" className="hover:opacity-100 italic">Consistency Report</a>
               <div className="flex gap-1">
