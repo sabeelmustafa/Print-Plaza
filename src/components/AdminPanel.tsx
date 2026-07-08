@@ -16,8 +16,12 @@ import {
 } from 'lucide-react';
 import { DataService } from '../lib/dataService';
 import { MediaAsset, Order, Product, ProductOption, ServiceCategory, SiteSettings } from '../types';
+import Hero from './Hero';
+import ProductCard from './ProductCard';
+import ServiceGrid from './ServiceGrid';
 
 type AdminTab = 'site' | 'products' | 'categories' | 'media' | 'orders';
+type WebsiteSection = 'hero' | 'products' | 'services' | 'footer' | 'theme';
 
 const fieldTypes: ProductOption['type'][] = ['text', 'textarea', 'number', 'select', 'checkbox', 'file'];
 
@@ -220,7 +224,16 @@ export default function AdminPanel() {
             </div>
           ) : (
             <>
-              {activeTab === 'site' && <SiteEditor settings={settings} setSettings={setSettings} onSave={saveSite} />}
+              {activeTab === 'site' && (
+                <LiveWebsiteEditor
+                  settings={settings}
+                  setSettings={setSettings}
+                  products={products}
+                  categories={categories}
+                  onEditProduct={setEditingProduct}
+                  onSave={saveSite}
+                />
+              )}
               {activeTab === 'products' && (
                 <ProductsEditor
                   products={products}
@@ -299,25 +312,252 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const inputClass = 'w-full bg-white border border-black/10 px-4 py-3 outline-none focus:border-black font-bold text-sm';
 const textareaClass = `${inputClass} min-h-28 resize-y`;
 
-function SiteEditor({ settings, setSettings, onSave }: { settings: SiteSettings; setSettings: (settings: SiteSettings) => void; onSave: () => void }) {
+function LiveWebsiteEditor({
+  settings,
+  setSettings,
+  products,
+  categories,
+  onEditProduct,
+  onSave,
+}: {
+  settings: SiteSettings;
+  setSettings: (settings: SiteSettings) => void;
+  products: Product[];
+  categories: ServiceCategory[];
+  onEditProduct: (product: Product) => void;
+  onSave: () => void;
+}) {
+  const [selectedSection, setSelectedSection] = useState<WebsiteSection>('hero');
+  const previewCategories = categories.map(category => ({
+    ...category,
+    products: products.filter(product => product.categoryId === category.id),
+  }));
+
+  return (
+    <div className="grid xl:grid-cols-[minmax(0,1fr)_390px] gap-6">
+      <div className="min-w-0">
+        <div className="bg-white border border-black/10 overflow-hidden">
+          <div className="h-12 border-b border-black/10 px-5 flex items-center justify-between bg-[#F8F7F4]">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#E17055]" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#E4C84A]" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#2D545E]" />
+            </div>
+            <div className="text-[9px] font-black uppercase tracking-[0.28em] text-black/35">Live Website Preview</div>
+          </div>
+
+          <div className="h-[calc(100vh-220px)] min-h-[680px] overflow-y-auto bg-[#FDFCFB]">
+            <EditorFrame label="Hero" active={selectedSection === 'hero'} onClick={() => setSelectedSection('hero')}>
+              <Hero settings={settings.homepage} theme={settings.theme} />
+            </EditorFrame>
+
+            <EditorFrame label="Products" active={selectedSection === 'products'} onClick={() => setSelectedSection('products')}>
+              <ProductsPreview products={products} onEdit={onEditProduct} />
+            </EditorFrame>
+
+            <EditorFrame label="Services" active={selectedSection === 'services'} onClick={() => setSelectedSection('services')}>
+              <ServiceGrid categories={previewCategories} onSelect={() => setSelectedSection('services')} />
+            </EditorFrame>
+
+            <EditorFrame label="Footer" active={selectedSection === 'footer'} onClick={() => setSelectedSection('footer')}>
+              <FooterPreview settings={settings} />
+            </EditorFrame>
+          </div>
+        </div>
+      </div>
+
+      <aside className="bg-white border border-black/10 h-fit xl:sticky xl:top-28">
+        <div className="p-5 border-b border-black/10">
+          <div className="text-[9px] font-black uppercase tracking-[0.3em] text-black/35 mb-2">Sections</div>
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              ['hero', 'Hero'],
+              ['products', 'Products'],
+              ['services', 'Services'],
+              ['footer', 'Footer'],
+              ['theme', 'Theme'],
+            ] as [WebsiteSection, string][]).map(([section, label]) => (
+              <button
+                key={section}
+                onClick={() => setSelectedSection(section)}
+                className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest border text-left ${
+                  selectedSection === section ? 'bg-black text-white border-black' : 'bg-white text-black/50 border-black/10 hover:border-black/40'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-5 max-h-[calc(100vh-260px)] overflow-y-auto">
+          <SectionSettings
+            selectedSection={selectedSection}
+            settings={settings}
+            setSettings={setSettings}
+            products={products}
+            categories={categories}
+            onEditProduct={onEditProduct}
+          />
+        </div>
+
+        <div className="p-5 border-t border-black/10 bg-[#F8F7F4]">
+          <button onClick={onSave} className="w-full bg-black text-white px-6 py-4 text-[10px] font-black uppercase tracking-[0.28em] flex items-center justify-center gap-3 hover:bg-[#2D545E]">
+            <Save className="w-4 h-4" /> Save Website
+          </button>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function EditorFrame({ label, active, onClick, children }: { label: string; active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <section onClick={onClick} className={`relative cursor-pointer ${active ? 'ring-2 ring-[#E17055] ring-inset' : 'hover:ring-2 hover:ring-black/20 hover:ring-inset'}`}>
+      <div className={`sticky top-0 z-20 w-fit px-4 py-2 text-[9px] font-black uppercase tracking-[0.25em] ${active ? 'bg-[#E17055] text-white' : 'bg-black text-white/70'}`}>
+        {label}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function ProductsPreview({ products, onEdit }: { products: Product[]; onEdit: (product: Product) => void }) {
+  return (
+    <section className="py-20 bg-[#FDFCFB] border-b border-black/5">
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-14 gap-8">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.32em] text-[#2D545E] mb-6">Core Output</div>
+            <h2 className="text-[2.8rem] sm:text-[4.8rem] font-display font-black tracking-tight leading-[0.84] uppercase">Production <br/><span className="text-black/10 italic font-serif lowercase">Unit.</span></h2>
+          </div>
+          <p className="text-[15px] leading-[1.8] text-black/62 max-w-md font-medium">Browse the production lineup. Select a product card here, then edit details in the product drawer.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-px bg-black/8 border border-black/8">
+          {products.slice(0, 6).map(product => (
+            <div key={product.id} onClick={(event) => { event.stopPropagation(); onEdit(product); }}>
+              <ProductCard product={product} onOrder={onEdit} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FooterPreview({ settings }: { settings: SiteSettings }) {
+  const footer = settings.footer || {};
+
+  return (
+    <footer className="bg-black text-white pt-20 pb-14 relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-2 flex">
+        <div className="flex-1 bg-[#2D545E]" />
+        <div className="flex-1 bg-[#E17055]" />
+      </div>
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 grid md:grid-cols-4 gap-12">
+        <div className="md:col-span-2">
+          <h6 className="font-display font-black text-4xl sm:text-5xl mb-4 tracking-tight uppercase leading-none">{footer.brandText || 'Print Plaza.'}</h6>
+          <div className="text-[10px] uppercase tracking-[0.32em] font-black text-[#66A0AA] mb-8">{footer.tagline || 'Creative Production Studio'}</div>
+          <p className="text-sm leading-loose opacity-70 max-w-sm font-medium">Refined creative production with a focus on tactile excellence and tonal precision.</p>
+        </div>
+        <div>
+          <h5 className="text-[10px] uppercase tracking-[0.28em] font-black mb-8 text-[#E17055]">The Archive</h5>
+          <ul className="space-y-4 text-sm font-bold opacity-70 uppercase">
+            <li>Color History</li>
+            <li>Paper Lab</li>
+            <li>Digital Unit</li>
+            <li>Dispatch</li>
+          </ul>
+        </div>
+        <div>
+          <h5 className="text-[10px] uppercase tracking-[0.28em] font-black mb-8 text-[#66A0AA]">Plaza Studio</h5>
+          <ul className="space-y-4 text-sm font-medium leading-relaxed opacity-70 font-mono">
+            <li>{footer.email || 'hi@print.plaza'}</li>
+            <li>{footer.phone || '+1 212 555 7788'}</li>
+            <li>{footer.address || 'Studio Block A, Creative District, NY 10001'}</li>
+          </ul>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+function SectionSettings({
+  selectedSection,
+  settings,
+  setSettings,
+  products,
+  categories,
+  onEditProduct,
+}: {
+  selectedSection: WebsiteSection;
+  settings: SiteSettings;
+  setSettings: (settings: SiteSettings) => void;
+  products: Product[];
+  categories: ServiceCategory[];
+  onEditProduct: (product: Product) => void;
+}) {
   const homepage = settings.homepage || {};
   const theme = settings.theme || {};
   const footer = settings.footer || {};
 
-  return (
-    <div className="space-y-8 max-w-5xl">
-      <Section title="Homepage">
+  if (selectedSection === 'hero') {
+    return (
+      <div className="space-y-5">
+        <PanelTitle title="Hero" />
         <Field label="Hero title"><input className={inputClass} value={homepage.heroTitle || ''} onChange={event => setSettings({ ...settings, homepage: { ...homepage, heroTitle: event.target.value } })} /></Field>
         <Field label="Hero subtitle"><textarea className={textareaClass} value={homepage.heroSubtitle || ''} onChange={event => setSettings({ ...settings, homepage: { ...homepage, heroSubtitle: event.target.value } })} /></Field>
-        <div className="grid md:grid-cols-2 gap-5">
-          <Field label="Primary button"><input className={inputClass} value={homepage.primaryButtonText || ''} onChange={event => setSettings({ ...settings, homepage: { ...homepage, primaryButtonText: event.target.value } })} /></Field>
-          <Field label="Secondary button"><input className={inputClass} value={homepage.secondaryButtonText || ''} onChange={event => setSettings({ ...settings, homepage: { ...homepage, secondaryButtonText: event.target.value } })} /></Field>
-        </div>
-        <Field label="Hero image URL"><input className={inputClass} value={homepage.heroImage || ''} onChange={event => setSettings({ ...settings, homepage: { ...homepage, heroImage: event.target.value } })} /></Field>
-      </Section>
+        <Field label="Primary button"><input className={inputClass} value={homepage.primaryButtonText || ''} onChange={event => setSettings({ ...settings, homepage: { ...homepage, primaryButtonText: event.target.value } })} /></Field>
+        <Field label="Secondary button"><input className={inputClass} value={homepage.secondaryButtonText || ''} onChange={event => setSettings({ ...settings, homepage: { ...homepage, secondaryButtonText: event.target.value } })} /></Field>
+        <ImageUploadField
+          label="Hero image"
+          value={homepage.heroImage || ''}
+          previewTitle="Hero image"
+          onChange={url => setSettings({ ...settings, homepage: { ...homepage, heroImage: url } })}
+        />
+      </div>
+    );
+  }
 
-      <Section title="Theme">
-        <div className="grid md:grid-cols-4 gap-5">
+  if (selectedSection === 'products') {
+    return (
+      <div className="space-y-5">
+        <PanelTitle title="Products" />
+        <p className="text-sm leading-relaxed text-black/55 font-medium">Click any product in the preview or use this list to edit product text, pricing, images, and quote fields.</p>
+        <div className="space-y-2">
+          {products.map(product => (
+            <button key={product.id} onClick={() => onEditProduct(product)} className="w-full text-left border border-black/10 p-4 hover:border-black bg-white">
+              <div className="text-[9px] font-black uppercase tracking-widest text-[#2D545E] mb-1">{categories.find(category => category.id === product.categoryId)?.title || product.categoryId}</div>
+              <div className="font-display font-black uppercase leading-tight">{product.name}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (selectedSection === 'services') {
+    return (
+      <div className="space-y-5">
+        <PanelTitle title="Services" />
+        <p className="text-sm leading-relaxed text-black/55 font-medium">Service cards are powered by categories. Open the Categories tab to add, rename, sort, or hide service sections.</p>
+        <div className="space-y-2">
+          {categories.map(category => (
+            <div key={category.id} className="border border-black/10 p-4 bg-white">
+              <div className="text-[9px] font-black uppercase tracking-widest text-black/30 mb-1">{category.id}</div>
+              <div className="font-display font-black uppercase leading-tight">{category.title}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (selectedSection === 'theme') {
+    return (
+      <div className="space-y-5">
+        <PanelTitle title="Theme" />
+        <div className="grid gap-5">
           {(['primaryColor', 'accentColor', 'backgroundColor', 'textColor'] as const).map(colorKey => (
             <div key={colorKey}>
               <Field label={colorKey.replace('Color', ' color')}>
@@ -329,21 +569,83 @@ function SiteEditor({ settings, setSettings, onSave }: { settings: SiteSettings;
             </div>
           ))}
         </div>
-      </Section>
+      </div>
+    );
+  }
 
-      <Section title="Footer">
-        <div className="grid md:grid-cols-2 gap-5">
-          <Field label="Brand text"><input className={inputClass} value={footer.brandText || ''} onChange={event => setSettings({ ...settings, footer: { ...footer, brandText: event.target.value } })} /></Field>
-          <Field label="Tagline"><input className={inputClass} value={footer.tagline || ''} onChange={event => setSettings({ ...settings, footer: { ...footer, tagline: event.target.value } })} /></Field>
-          <Field label="Email"><input className={inputClass} value={footer.email || ''} onChange={event => setSettings({ ...settings, footer: { ...footer, email: event.target.value } })} /></Field>
-          <Field label="Phone"><input className={inputClass} value={footer.phone || ''} onChange={event => setSettings({ ...settings, footer: { ...footer, phone: event.target.value } })} /></Field>
+  return (
+    <div className="space-y-5">
+      <PanelTitle title="Footer" />
+      <Field label="Brand text"><input className={inputClass} value={footer.brandText || ''} onChange={event => setSettings({ ...settings, footer: { ...footer, brandText: event.target.value } })} /></Field>
+      <Field label="Tagline"><input className={inputClass} value={footer.tagline || ''} onChange={event => setSettings({ ...settings, footer: { ...footer, tagline: event.target.value } })} /></Field>
+      <Field label="Email"><input className={inputClass} value={footer.email || ''} onChange={event => setSettings({ ...settings, footer: { ...footer, email: event.target.value } })} /></Field>
+      <Field label="Phone"><input className={inputClass} value={footer.phone || ''} onChange={event => setSettings({ ...settings, footer: { ...footer, phone: event.target.value } })} /></Field>
+      <Field label="Address"><textarea className={textareaClass} value={footer.address || ''} onChange={event => setSettings({ ...settings, footer: { ...footer, address: event.target.value } })} /></Field>
+    </div>
+  );
+}
+
+function PanelTitle({ title }: { title: string }) {
+  return (
+    <div>
+      <div className="text-[9px] font-black uppercase tracking-[0.3em] text-[#2D545E] mb-2">Edit Section</div>
+      <h2 className="text-2xl font-display font-black uppercase tracking-tight">{title}</h2>
+    </div>
+  );
+}
+
+function ImageUploadField({
+  label,
+  value,
+  onChange,
+  previewTitle,
+}: {
+  label: string;
+  value: string;
+  onChange: (url: string) => void;
+  previewTitle: string;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setUploadError('');
+    try {
+      const url = await DataService.uploadImage(file, previewTitle);
+      onChange(url);
+    } catch (caught) {
+      setUploadError(caught instanceof Error ? caught.message : 'Upload failed.');
+    } finally {
+      setUploading(false);
+      event.target.value = '';
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <Field label={label}>
+        <div className="border border-black/10 bg-white p-3">
+          <div className="aspect-video bg-black/5 overflow-hidden mb-3 flex items-center justify-center">
+            {value ? (
+              <img src={value} alt={previewTitle} className="w-full h-full object-cover" />
+            ) : (
+              <div className="text-[10px] font-black uppercase tracking-[0.25em] text-black/25">No image</div>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <label className="cursor-pointer bg-black text-white px-4 py-3 text-[10px] font-black uppercase tracking-widest hover:bg-[#2D545E]">
+              {uploading ? 'Uploading...' : 'Upload'}
+              <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={uploading} />
+            </label>
+            <input className={inputClass} value={value} onChange={event => onChange(event.target.value)} placeholder="/uploads/image.jpg" />
+          </div>
         </div>
-        <Field label="Address"><textarea className={textareaClass} value={footer.address || ''} onChange={event => setSettings({ ...settings, footer: { ...footer, address: event.target.value } })} /></Field>
-      </Section>
-
-      <button onClick={onSave} className="bg-black text-white px-8 py-5 text-[10px] font-black uppercase tracking-[0.35em] flex items-center gap-3 hover:bg-[#2D545E]">
-        <Save className="w-4 h-4" /> Save Website
-      </button>
+      </Field>
+      {uploadError && <p className="text-xs font-bold text-red-600">{uploadError}</p>}
     </div>
   );
 }
@@ -398,7 +700,12 @@ function ProductModal({ product, categories, setProduct, onClose, onSave, update
           <Field label="Sort order"><input type="number" className={inputClass} value={product.sortOrder || 0} onChange={event => setProduct({ ...product, sortOrder: Number(event.target.value) })} /></Field>
         </div>
         <Field label="Description"><textarea className={textareaClass} value={product.description || ''} onChange={event => setProduct({ ...product, description: event.target.value })} /></Field>
-        <Field label="Image URL"><input className={inputClass} value={product.image || ''} onChange={event => setProduct({ ...product, image: event.target.value })} /></Field>
+        <ImageUploadField
+          label="Product image"
+          value={product.image || ''}
+          previewTitle={product.name || 'Product image'}
+          onChange={url => setProduct({ ...product, image: url })}
+        />
 
         <Section title="Custom quote fields">
           <button type="button" onClick={() => setProduct({ ...product, options: [...(product.options || []), { id: `field-${Date.now()}`, label: '', type: 'text', required: true }] })} className="bg-black text-white px-4 py-3 text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-2"><Plus className="w-4 h-4" /> Add Field</button>
@@ -465,11 +772,18 @@ function CategoryModal({ category, setCategory, onClose, onSave }: { category: P
 function MediaEditor({ media, editingMedia, setEditingMedia, onSave }: { media: MediaAsset[]; editingMedia: Partial<MediaAsset>; setEditingMedia: (asset: Partial<MediaAsset>) => void; onSave: (event: React.FormEvent) => void }) {
   return (
     <div className="space-y-8">
-      <form onSubmit={onSave} className="bg-white border border-black/10 p-6 grid md:grid-cols-[1fr_1.5fr_1fr_auto] gap-4 items-end">
-        <Field label="Title"><input className={inputClass} value={editingMedia.title || ''} onChange={event => setEditingMedia({ ...editingMedia, title: event.target.value })} /></Field>
-        <Field label="Image/file URL"><input required className={inputClass} value={editingMedia.url || ''} onChange={event => setEditingMedia({ ...editingMedia, url: event.target.value })} /></Field>
-        <Field label="Alt text"><input className={inputClass} value={editingMedia.altText || ''} onChange={event => setEditingMedia({ ...editingMedia, altText: event.target.value })} /></Field>
-        <button type="submit" className="bg-black text-white h-12 px-5 text-[10px] font-black uppercase tracking-widest">Save</button>
+      <form onSubmit={onSave} className="bg-white border border-black/10 p-6 space-y-5">
+        <div className="grid md:grid-cols-2 gap-4">
+          <Field label="Title"><input className={inputClass} value={editingMedia.title || ''} onChange={event => setEditingMedia({ ...editingMedia, title: event.target.value })} /></Field>
+          <Field label="Alt text"><input className={inputClass} value={editingMedia.altText || ''} onChange={event => setEditingMedia({ ...editingMedia, altText: event.target.value })} /></Field>
+        </div>
+        <ImageUploadField
+          label="Upload image or paste URL"
+          value={editingMedia.url || ''}
+          previewTitle={editingMedia.title || 'Media asset'}
+          onChange={url => setEditingMedia({ ...editingMedia, url })}
+        />
+        <button type="submit" className="bg-black text-white h-12 px-5 text-[10px] font-black uppercase tracking-widest">Save Media</button>
       </form>
       <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-5">
         {media.map(asset => (

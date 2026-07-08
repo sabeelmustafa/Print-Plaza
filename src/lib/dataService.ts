@@ -21,6 +21,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Could not read selected file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
 function getLocalProducts(): Product[] {
   const stored = localStorage.getItem(PRODUCTS_KEY);
   if (stored) return JSON.parse(stored);
@@ -182,5 +191,21 @@ export const DataService = {
       body: JSON.stringify(asset),
     });
     return DataService.getMedia();
+  },
+
+  uploadImage: async (file: File, title?: string): Promise<string> => {
+    const dataUrl = await readFileAsDataUrl(file);
+    const [, data = ''] = dataUrl.split(',');
+    const result = await request<{ url: string }>('/api/admin/uploads', {
+      method: 'POST',
+      body: JSON.stringify({
+        fileName: file.name,
+        mimeType: file.type,
+        data,
+        title: title || file.name.replace(/\.[^.]+$/, ''),
+        altText: title || file.name.replace(/\.[^.]+$/, ''),
+      }),
+    });
+    return result.url;
   }
 };

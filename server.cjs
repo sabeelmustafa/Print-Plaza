@@ -1,5 +1,6 @@
 const path = require('path');
 const crypto = require('crypto');
+const fs = require('fs');
 const express = require('express');
 const mysql = require('mysql2/promise');
 require('dotenv').config();
@@ -7,9 +8,10 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 const distDir = path.join(__dirname, 'dist');
+const uploadDir = path.join(__dirname, 'uploads');
 
 app.disable('x-powered-by');
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '12mb' }));
 app.use(function securityHeaders(_req, res, next) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -165,6 +167,21 @@ function parseJson(value, fallback) {
 
 function createId(prefix) {
   return `${prefix}-${crypto.randomBytes(6).toString('hex')}`;
+}
+
+function ensureUploadDir() {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+function extensionForMime(mimeType) {
+  const allowed = {
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/webp': '.webp',
+    'image/gif': '.gif',
+    'image/svg+xml': '.svg',
+  };
+  return allowed[mimeType] || null;
 }
 
 app.get('/api/health', async (_req, res) => {
@@ -412,6 +429,58 @@ app.post('/api/admin/media', requireDb, requireAdmin, async (req, res, next) => 
     next(error);
   }
 });
+
+app.post('/api/admin/uploads', requireAdmin, async (req, res, next) => {
+  try {
+    const { fileName, mimeType, data, title, altText } = req.body;
+    const extension = extensionForMime(mimeType);
+
+    if (!extension || !data) {
+      res.status(400).json({ error: 'Only JPG, PNG, WebP, GIF, and SVG images can be uploaded.' });
+      return;
+    }
+
+    const buffer = Buffer.from(String(data), 'base64');
+    if (buffer.length > 8 * 1024 * 1024) {
+      res.status(413).json({ error: 'Image is too large. Please upload an image under 8MB.' });
+      return;
+    }
+
+    ensureUploadDir();
+    const safeName = String(fileName || 'image')
+      .toLowerCase()
+      .replace(/\.[a-z0-9]+$/i, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 48) || 'image';
+    const storedName = `${Date.now()}-${safeName}-${crypto.randomBytes(4).toString('hex')}${extension}`;
+    const filePath = path.join(uploadDir, storedName);
+    fs.writeFileSync(filePath, buffer);
+
+    const url = `/uploads/${storedName}`;
+
+    if (pool) {
+      const id = createId('media');
+      await pool.query(
+        `INSERT INTO media_assets (id, title, url, alt_text)
+         VALUES (?, ?, ?, ?)`,
+        [id, title || safeName, url, altText || title || safeName]
+      );
+    }
+
+    res.status(201).json({ url });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.use('/uploads', express.static(uploadDir, {
+  index: false,
+  setHeaders(res) {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  },
+}));
 
 app.use(express.static(distDir, {
   index: false,
