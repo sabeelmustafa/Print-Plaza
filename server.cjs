@@ -34,6 +34,34 @@ const dbConfig = {
 const hasDbConfig = Boolean(dbConfig.host && dbConfig.user && dbConfig.database);
 const pool = hasDbConfig ? mysql.createPool(dbConfig) : null;
 
+async function ensureBusinessSchema() {
+  if (!pool) return;
+  await pool.query(`
+    ALTER TABLE orders
+      ADD COLUMN IF NOT EXISTS cost_price DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER total_price,
+      ADD COLUMN IF NOT EXISTS sell_price DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER cost_price,
+      ADD COLUMN IF NOT EXISTS invoice_notes TEXT NULL AFTER sell_price,
+      ADD COLUMN IF NOT EXISTS payment_due_date DATE NULL AFTER invoice_notes
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS payment_records (
+      id VARCHAR(128) PRIMARY KEY,
+      order_id VARCHAR(128) NOT NULL,
+      amount DECIMAL(12,2) NOT NULL,
+      payment_method VARCHAR(80) NOT NULL DEFAULT 'bank_transfer',
+      reference VARCHAR(220) NULL,
+      notes TEXT NULL,
+      paid_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_payments_order (order_id),
+      INDEX idx_payments_paid_at (paid_at),
+      CONSTRAINT fk_payments_order FOREIGN KEY (order_id) REFERENCES orders(id)
+        ON UPDATE CASCADE ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+  await pool.query('UPDATE orders SET sell_price = total_price WHERE sell_price = 0 AND total_price > 0');
+}
+
 function requireDb(_req, res, next) {
   if (!pool) {
     res.status(503).json({ error: 'Database is not configured on this server.' });
@@ -397,6 +425,43 @@ app.post('/api/orders', requireDb, async (req, res, next) => {
   }
 });
 
+app.post('/api/admin/orders', requireDb, requireAdmin, async (req, res, next) => {
+  try {
+    const order = req.body;
+    const id = createId('order');
+    const allowedStatuses = ['pending', 'processing', 'completed', 'cancelled'];
+    const status = allowedStatuses.includes(order.status) ? order.status : 'pending';
+    const sellPrice = Math.max(0, Number(order.sellPrice || 0));
+    const costPrice = Math.max(0, Number(order.costPrice || 0));
+    await pool.query(
+      `INSERT INTO orders (
+         id, user_id, user_name, user_email, product_id, product_name,
+         quantity, options_json, total_price, cost_price, sell_price,
+         invoice_notes, payment_due_date, status
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        String(order.userId || order.userEmail || 'manual-customer'),
+        String(order.userName || '').trim() || null,
+        String(order.userEmail || '').trim(),
+        String(order.productId || 'manual-order'),
+        String(order.productName || 'Custom print order').trim(),
+        Math.max(1, Number(order.quantity || 1)),
+        JSON.stringify(order.options || {}),
+        sellPrice,
+        costPrice,
+        sellPrice,
+        String(order.invoiceNotes || '').trim() || null,
+        order.paymentDueDate || null,
+        status,
+      ]
+    );
+    res.status(201).json({ id });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.patch('/api/admin/orders/:id/finance', requireDb, requireAdmin, async (req, res, next) => {
   try {
     const costPrice = Math.max(0, Number(req.body.costPrice || 0));
@@ -600,6 +665,10 @@ app.use((error, _req, res, _next) => {
   res.status(500).json({ error: 'Server error.' });
 });
 
-app.listen(port, () => {
-  console.log(`Print Plaza server running on port ${port}`);
-});
+ensureBusinessSchema()
+  .catch((error) => console.error('Business schema setup failed:', error.message))
+  .finally(() => {
+    app.listen(port, () => {
+      console.log(`PlazaHQ server running on port ${port}`);
+    });
+  });

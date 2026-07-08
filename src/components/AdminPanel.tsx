@@ -97,6 +97,7 @@ export default function AdminPanel() {
   const [editingCategory, setEditingCategory] = useState<Partial<ServiceCategory> | null>(null);
   const [editingMedia, setEditingMedia] = useState<Partial<MediaAsset>>({ title: '', url: '', altText: '' });
   const [businessOrder, setBusinessOrder] = useState<Order | null>(null);
+  const [creatingOrder, setCreatingOrder] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -191,10 +192,18 @@ export default function AdminPanel() {
 
   return (
     <div className="min-h-screen bg-[#F6F5F2] text-black flex">
-      <aside className="hidden lg:flex w-72 bg-black text-white p-8 flex-col">
-        <div className="mb-12">
-          <div className="text-3xl font-display font-black tracking-tight uppercase">Print Plaza</div>
-          <div className="text-[9px] uppercase tracking-[0.4em] text-white/30 mt-2">Control Panel</div>
+      <aside className="hidden lg:flex w-72 bg-[#101415] text-white p-7 flex-col border-r-4 border-[#2D545E]">
+        <div className="mb-10 border-b border-white/10 pb-8">
+          <div className="flex items-center gap-4">
+            <div className="flex gap-1">
+              <span className="w-2.5 h-9 bg-[#2D545E] -skew-x-12" />
+              <span className="w-2.5 h-9 bg-[#E17055] -skew-x-12" />
+            </div>
+            <div>
+              <div className="text-3xl font-display font-black tracking-tight leading-none"><span className="text-white">Plaza</span><span className="text-[#E17055]">HQ</span></div>
+              <div className="text-[8px] uppercase tracking-[0.32em] text-[#66A0AA] font-black mt-2">Business Command</div>
+            </div>
+          </div>
         </div>
         <nav className="space-y-3 flex-1">
           <TabButton tab="site" activeTab={activeTab} onClick={setActiveTab} icon={<LayoutDashboard />} label="Website" />
@@ -220,7 +229,7 @@ export default function AdminPanel() {
               {activeTab === 'orders' && 'Order Queue'}
               {activeTab === 'business' && 'Business Manager'}
             </h1>
-            <p className="text-[10px] uppercase tracking-[0.25em] text-black/40 font-bold mt-2">MySQL-backed CMS</p>
+            <p className="text-[10px] uppercase tracking-[0.25em] text-[#2D545E] font-black mt-2">PlazaHQ / Business operating system</p>
           </div>
           <div className="flex lg:hidden gap-2 overflow-x-auto">
             {(['site', 'products', 'categories', 'media', 'orders', 'business'] as AdminTab[]).map(tab => (
@@ -280,10 +289,15 @@ export default function AdminPanel() {
                 <MediaEditor media={media} editingMedia={editingMedia} setEditingMedia={setEditingMedia} onSave={saveMedia} />
               )}
               {activeTab === 'orders' && (
-                <OrdersEditor orders={orders} onStatus={async (id, status) => {
-                  await DataService.updateOrderStatus(id, status);
-                  await loadAll();
-                }} />
+                <OrdersEditor
+                  orders={orders}
+                  onCreate={() => setCreatingOrder(true)}
+                  onManage={setBusinessOrder}
+                  onStatus={async (id, status) => {
+                    await DataService.updateOrderStatus(id, status);
+                    await loadAll();
+                  }}
+                />
               )}
               {activeTab === 'business' && (
                 <BusinessEditor orders={orders} onManage={setBusinessOrder} />
@@ -321,6 +335,19 @@ export default function AdminPanel() {
             await loadAll();
             setBusinessOrder(null);
             flash('Business records updated.');
+          }}
+        />
+      )}
+
+      {creatingOrder && (
+        <CreateOrderModal
+          products={products}
+          onClose={() => setCreatingOrder(false)}
+          onSave={async order => {
+            await DataService.createAdminOrder(order);
+            setCreatingOrder(false);
+            await loadAll();
+            flash('Order created.');
           }}
         />
       )}
@@ -1177,24 +1204,94 @@ function printInvoice(order: Order) {
   invoice.document.close();
 }
 
-function OrdersEditor({ orders, onStatus }: { orders: Order[]; onStatus: (id: string, status: string) => void }) {
+function CreateOrderModal({ products, onClose, onSave }: { products: Product[]; onClose: () => void; onSave: (order: Partial<Order>) => Promise<void> }) {
+  const [order, setOrder] = useState<Partial<Order>>({
+    userName: '',
+    userEmail: '',
+    productId: products[0]?.id || 'manual-order',
+    productName: products[0]?.name || '',
+    quantity: 1,
+    costPrice: 0,
+    sellPrice: 0,
+    status: 'pending',
+    paymentDueDate: '',
+    invoiceNotes: '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const chooseProduct = (productId: string) => {
+    const product = products.find(item => item.id === productId);
+    setOrder({
+      ...order,
+      productId: productId || 'manual-order',
+      productName: product?.name || order.productName || '',
+      sellPrice: product ? Number(product.price) * Number(order.quantity || 1) : order.sellPrice,
+    });
+  };
+
   return (
-    <div className="grid gap-px bg-black/5 border border-black/10">
-      {orders.map(order => (
-        <article key={order.id} className="bg-white p-6 flex flex-col xl:flex-row gap-6 xl:items-center">
-          <div className="flex-1">
-            <div className="text-[9px] font-black uppercase tracking-widest text-[#2D545E] mb-2">{order.id}</div>
-            <h3 className="text-2xl font-display font-black uppercase">{order.productName}</h3>
-            <p className="text-sm text-black/50 mt-2">{order.userName || order.userEmail} / Qty {order.quantity} / ${order.totalPrice.toFixed(2)}</p>
-          </div>
-          <select value={order.status} onChange={event => onStatus(order.id, event.target.value)} className={inputClass}>
-            <option value="pending">Pending</option>
-            <option value="processing">Processing</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
+    <div className="fixed inset-0 z-[90] bg-black/65 flex justify-end">
+      <form onSubmit={async event => { event.preventDefault(); setSaving(true); await onSave(order); }} className="bg-white h-full w-full max-w-2xl overflow-y-auto p-7 md:p-10 space-y-6">
+        <div className="flex items-start justify-between">
+          <div><div className="text-[9px] font-black uppercase tracking-[0.25em] text-[#E17055] mb-2">PlazaHQ Orders</div><h2 className="text-3xl font-display font-black uppercase">Create order</h2></div>
+          <button type="button" onClick={onClose}><X className="w-6 h-6" /></button>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-5">
+          <Field label="Customer name"><input required className={inputClass} value={order.userName || ''} onChange={event => setOrder({ ...order, userName: event.target.value })} /></Field>
+          <Field label="Customer email"><input required type="email" className={inputClass} value={order.userEmail || ''} onChange={event => setOrder({ ...order, userEmail: event.target.value })} /></Field>
+        </div>
+        <Field label="Product">
+          <select className={inputClass} value={order.productId || ''} onChange={event => chooseProduct(event.target.value)}>
+            <option value="manual-order">Custom/manual order</option>
+            {products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
           </select>
-        </article>
-      ))}
+        </Field>
+        <Field label="Order title"><input required className={inputClass} value={order.productName || ''} onChange={event => setOrder({ ...order, productName: event.target.value })} placeholder="Business cards - 1,000 units" /></Field>
+        <div className="grid sm:grid-cols-3 gap-5">
+          <Field label="Quantity"><input type="number" min="1" className={inputClass} value={order.quantity || 1} onChange={event => setOrder({ ...order, quantity: Number(event.target.value) })} /></Field>
+          <Field label="Cost price"><input type="number" min="0" step="0.01" className={inputClass} value={order.costPrice || 0} onChange={event => setOrder({ ...order, costPrice: Number(event.target.value) })} /></Field>
+          <Field label="Sell price"><input type="number" min="0" step="0.01" className={inputClass} value={order.sellPrice || 0} onChange={event => setOrder({ ...order, sellPrice: Number(event.target.value), totalPrice: Number(event.target.value) })} /></Field>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-5">
+          <Field label="Status"><select className={inputClass} value={order.status} onChange={event => setOrder({ ...order, status: event.target.value as Order['status'] })}><option value="pending">Pending</option><option value="processing">Processing</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></Field>
+          <Field label="Payment due"><input type="date" className={inputClass} value={order.paymentDueDate || ''} onChange={event => setOrder({ ...order, paymentDueDate: event.target.value })} /></Field>
+        </div>
+        <Field label="Invoice notes"><textarea className={textareaClass} value={order.invoiceNotes || ''} onChange={event => setOrder({ ...order, invoiceNotes: event.target.value })} /></Field>
+        <button disabled={saving} className="w-full bg-[#2D545E] text-white py-5 text-[10px] font-black uppercase tracking-[0.28em] hover:bg-black">{saving ? 'Creating...' : 'Create order'}</button>
+      </form>
+    </div>
+  );
+}
+
+function OrdersEditor({ orders, onStatus, onCreate, onManage }: { orders: Order[]; onStatus: (id: string, status: string) => void; onCreate: () => void; onManage: (order: Order) => void }) {
+  return (
+    <div className="space-y-6">
+      <button onClick={onCreate} className="bg-[#2D545E] text-white px-6 py-4 text-[10px] font-black uppercase tracking-[0.28em] inline-flex items-center gap-3 hover:bg-black"><Plus className="w-4 h-4" /> Add order</button>
+      {orders.length === 0 ? (
+        <div className="bg-white border border-black/10 py-20 px-8 text-center">
+          <div className="w-14 h-14 bg-[#EAF0F1] text-[#2D545E] mx-auto flex items-center justify-center mb-6"><ShoppingBag className="w-6 h-6" /></div>
+          <h2 className="text-2xl font-display font-black uppercase">No orders yet</h2>
+          <p className="text-sm text-black/45 mt-3">Create your first manual order or wait for a storefront quote request.</p>
+          <button onClick={onCreate} className="mt-7 border border-black/15 px-5 py-3 text-[9px] font-black uppercase tracking-widest">Create first order</button>
+        </div>
+      ) : <div className="grid gap-px bg-black/5 border border-black/10">
+        {orders.map(order => (
+          <article key={order.id} className="bg-white p-6 flex flex-col xl:flex-row gap-6 xl:items-center">
+            <div className="flex-1">
+              <div className="text-[9px] font-black uppercase tracking-widest text-[#2D545E] mb-2">{order.id}</div>
+              <h3 className="text-2xl font-display font-black uppercase">{order.productName}</h3>
+              <p className="text-sm text-black/50 mt-2">{order.userName || order.userEmail} / Qty {order.quantity} / {money(Number(order.sellPrice ?? order.totalPrice))}</p>
+            </div>
+            <select value={order.status} onChange={event => onStatus(order.id, event.target.value)} className={`${inputClass} xl:w-48`}>
+              <option value="pending">Pending</option>
+              <option value="processing">Processing</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <button onClick={() => onManage(order)} className="border border-black/15 px-5 py-3 text-[9px] font-black uppercase tracking-widest hover:bg-black hover:text-white">Manage</button>
+          </article>
+        ))}
+      </div>}
     </div>
   );
 }

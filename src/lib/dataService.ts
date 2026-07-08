@@ -145,6 +145,14 @@ export const DataService = {
     }
   },
 
+  createAdminOrder: async (order: Partial<Order>) => {
+    await request('/api/admin/orders', {
+      method: 'POST',
+      body: JSON.stringify(order),
+    });
+    return DataService.getOrders();
+  },
+
   updateOrderStatus: async (orderId: string, status: string) => {
     try {
       await request(`/api/admin/orders/${encodeURIComponent(orderId)}/status`, {
