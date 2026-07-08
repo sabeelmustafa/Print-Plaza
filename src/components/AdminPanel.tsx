@@ -18,15 +18,16 @@ import {
   Settings,
   ShoppingBag,
   Trash2,
+  Users,
   X,
 } from 'lucide-react';
 import { DataService } from '../lib/dataService';
-import { MediaAsset, Order, Product, ProductOption, ServiceCategory, SiteSettings } from '../types';
+import { MediaAsset, NavMenuItem, Order, OrderItem, Product, ProductOption, ServiceCategory, SiteSettings } from '../types';
 import Hero from './Hero';
 import ProductCard from './ProductCard';
 import ServiceGrid from './ServiceGrid';
 
-type AdminTab = 'site' | 'products' | 'categories' | 'media' | 'orders' | 'business';
+type AdminTab = 'site' | 'products' | 'categories' | 'media' | 'orders' | 'customers' | 'business';
 type WebsiteSection = 'header' | 'hero' | 'products' | 'services' | 'footer' | 'theme';
 
 const fieldTypes: ProductOption['type'][] = ['text', 'textarea', 'number', 'select', 'checkbox', 'file'];
@@ -56,12 +57,19 @@ const blankCategory: Partial<ServiceCategory> = {
 const defaultSettings: SiteSettings = {
   header: {
     logoText: 'PRINT PLAZA',
-    logoImage: '',
+    logoImage: '/brand/print-plaza-logo.png',
+    logoSize: 36,
     tagline: 'Industrial Print Production',
     servicesLabel: 'Services',
     productsLabel: 'Production',
     loginLabel: 'Auth Registry',
+    navItems: [
+      { id: 'services', label: 'Services', url: '#services' },
+      { id: 'products', label: 'Production', url: '#products' },
+    ],
+    navMenuFontSize: 10,
     buttonText: 'Start Project',
+    buttonUrl: '#products',
   },
   theme: {
     primaryColor: '#2D545E',
@@ -211,6 +219,7 @@ export default function AdminPanel() {
           <TabButton tab="categories" activeTab={activeTab} onClick={setActiveTab} icon={<ListTree />} label="Categories" />
           <TabButton tab="media" activeTab={activeTab} onClick={setActiveTab} icon={<ImageIcon />} label="Media URLs" />
           <TabButton tab="orders" activeTab={activeTab} onClick={setActiveTab} icon={<ShoppingBag />} label="Orders" />
+          <TabButton tab="customers" activeTab={activeTab} onClick={setActiveTab} icon={<Users />} label="Customers" />
           <TabButton tab="business" activeTab={activeTab} onClick={setActiveTab} icon={<ReceiptText />} label="Business" />
         </nav>
         <button onClick={logout} className="flex items-center gap-3 text-[10px] uppercase tracking-[0.3em] text-white/40 hover:text-white">
@@ -227,12 +236,13 @@ export default function AdminPanel() {
               {activeTab === 'categories' && 'Category Editor'}
               {activeTab === 'media' && 'Media Library'}
               {activeTab === 'orders' && 'Order Queue'}
+              {activeTab === 'customers' && 'Customer Ledger'}
               {activeTab === 'business' && 'Business Manager'}
             </h1>
             <p className="text-[10px] uppercase tracking-[0.25em] text-[#2D545E] font-black mt-2">PlazaHQ / Business operating system</p>
           </div>
           <div className="flex lg:hidden gap-2 overflow-x-auto">
-            {(['site', 'products', 'categories', 'media', 'orders', 'business'] as AdminTab[]).map(tab => (
+            {(['site', 'products', 'categories', 'media', 'orders', 'customers', 'business'] as AdminTab[]).map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-3 text-[10px] font-black uppercase tracking-widest border ${activeTab === tab ? 'bg-black text-white' : 'bg-white text-black/50'}`}>
                 {tab}
               </button>
@@ -301,6 +311,9 @@ export default function AdminPanel() {
               )}
               {activeTab === 'business' && (
                 <BusinessEditor orders={orders} onManage={setBusinessOrder} />
+              )}
+              {activeTab === 'customers' && (
+                <CustomersEditor orders={orders} onManage={setBusinessOrder} />
               )}
             </>
           )}
@@ -482,6 +495,23 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const inputClass = 'w-full bg-white border border-black/10 px-4 py-3 outline-none focus:border-black font-bold text-sm';
 const textareaClass = `${inputClass} min-h-28 resize-y`;
 
+function fallbackNavItems(header: SiteSettings['header'] = {}): NavMenuItem[] {
+  return header.navItems?.length
+    ? header.navItems
+    : [
+        { id: 'services', label: header.servicesLabel || 'Services', url: '#services' },
+        { id: 'products', label: header.productsLabel || 'Production', url: '#products' },
+      ];
+}
+
+function createNavItem(): NavMenuItem {
+  return {
+    id: `menu-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    label: 'New link',
+    url: '/',
+  };
+}
+
 function LiveWebsiteEditor({
   settings,
   setSettings,
@@ -605,16 +635,22 @@ function LiveWebsiteEditor({
 }
 
 function HeaderPreview({ settings }: { settings?: SiteSettings['header'] }) {
+  const logoSize = Math.min(Math.max(Number(settings?.logoSize || 36), 24), 96);
+  const navFontSize = Math.min(Math.max(Number(settings?.navMenuFontSize || 10), 9), 16);
+  const navItems = fallbackNavItems(settings);
+
   return (
     <div className="h-20 px-8 flex items-center justify-between border-b border-black/10 bg-white">
       <div className="flex items-center gap-3">
-        {settings?.logoImage ? <img src={settings.logoImage} alt="" className="h-10 max-w-40 object-contain" /> : <>
+        {settings?.logoImage ? <img src={settings.logoImage} alt="" className="max-w-52 object-contain" style={{ height: `${logoSize}px` }} /> : <>
           <div className="flex gap-1"><span className="w-2 h-7 bg-[#2D545E] -skew-x-12" /><span className="w-2 h-7 bg-[#E17055] -skew-x-12" /></div>
           <div><div className="font-display font-black text-xl leading-none">{settings?.logoText || 'PRINT PLAZA'}</div><div className="text-[7px] font-black uppercase tracking-[0.3em] text-[#2D545E] mt-1">{settings?.tagline || 'Industrial Print Production'}</div></div>
         </>}
       </div>
       <div className="flex items-center gap-6 text-[9px] font-black uppercase tracking-widest">
-        <span>{settings?.servicesLabel || 'Services'}</span><span>{settings?.productsLabel || 'Production'}</span><span className="text-black/40">{settings?.loginLabel || 'Auth Registry'}</span><span className="bg-black text-white px-5 py-3">{settings?.buttonText || 'Start Project'}</span>
+        {navItems.map(item => <span key={item.id} style={{ fontSize: `${navFontSize}px` }}>{item.label || 'Menu item'}</span>)}
+        <span className="text-black/40" style={{ fontSize: `${navFontSize}px` }}>{settings?.loginLabel || 'Auth Registry'}</span>
+        <span className="bg-black text-white px-5 py-3">{settings?.buttonText || 'Start Project'}</span>
       </div>
     </div>
   );
@@ -716,6 +752,13 @@ function SectionSettings({
   const theme = settings.theme || {};
   const footer = settings.footer || {};
   const header = settings.header || {};
+  const headerNavItems = fallbackNavItems(header);
+  const updateHeader = (updates: SiteSettings['header']) => setSettings({ ...settings, header: { ...header, ...updates } });
+  const updateNavItem = (id: string, updates: Partial<NavMenuItem>) => {
+    updateHeader({
+      navItems: headerNavItems.map(item => item.id === id ? { ...item, ...updates } : item),
+    });
+  };
 
   if (selectedSection === 'header') {
     return (
@@ -725,14 +768,95 @@ function SectionSettings({
           label="Logo image"
           value={header.logoImage || ''}
           previewTitle="Website logo"
-          onChange={url => setSettings({ ...settings, header: { ...header, logoImage: url } })}
+          onChange={url => updateHeader({ logoImage: url })}
         />
-        <Field label="Logo text"><input className={inputClass} value={header.logoText || ''} onChange={event => setSettings({ ...settings, header: { ...header, logoText: event.target.value } })} /></Field>
-        <Field label="Tagline"><input className={inputClass} value={header.tagline || ''} onChange={event => setSettings({ ...settings, header: { ...header, tagline: event.target.value } })} /></Field>
-        <Field label="Services link"><input className={inputClass} value={header.servicesLabel || ''} onChange={event => setSettings({ ...settings, header: { ...header, servicesLabel: event.target.value } })} /></Field>
-        <Field label="Products link"><input className={inputClass} value={header.productsLabel || ''} onChange={event => setSettings({ ...settings, header: { ...header, productsLabel: event.target.value } })} /></Field>
-        <Field label="Login link"><input className={inputClass} value={header.loginLabel || ''} onChange={event => setSettings({ ...settings, header: { ...header, loginLabel: event.target.value } })} /></Field>
-        <Field label="Action button"><input className={inputClass} value={header.buttonText || ''} onChange={event => setSettings({ ...settings, header: { ...header, buttonText: event.target.value } })} /></Field>
+        <Field label="Logo size">
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min="24"
+              max="96"
+              value={header.logoSize || 36}
+              onChange={event => updateHeader({ logoSize: Number(event.target.value) })}
+              className="w-full accent-[#2D545E]"
+            />
+            <input
+              type="number"
+              min="24"
+              max="96"
+              className={`${inputClass} w-24`}
+              value={header.logoSize || 36}
+              onChange={event => updateHeader({ logoSize: Number(event.target.value) })}
+            />
+          </div>
+        </Field>
+        <Field label="Logo text"><input className={inputClass} value={header.logoText || ''} onChange={event => updateHeader({ logoText: event.target.value })} /></Field>
+        <Field label="Tagline"><input className={inputClass} value={header.tagline || ''} onChange={event => updateHeader({ tagline: event.target.value })} /></Field>
+
+        <div className="border border-black/10 bg-white">
+          <div className="p-4 border-b border-black/10 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[9px] font-black uppercase tracking-[0.3em] text-black/35">Navigation menu</div>
+              <p className="mt-2 text-xs font-bold text-black/45">Use section links like #products or full links like https://example.com.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => updateHeader({ navItems: [...headerNavItems, createNavItem()] })}
+              className="h-10 px-3 bg-black text-white text-[9px] font-black uppercase tracking-widest flex items-center gap-2"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add
+            </button>
+          </div>
+          <div className="p-4 space-y-4">
+            <Field label="Menu text size">
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min="9"
+                  max="16"
+                  value={header.navMenuFontSize || 10}
+                  onChange={event => updateHeader({ navMenuFontSize: Number(event.target.value) })}
+                  className="w-full accent-[#2D545E]"
+                />
+                <input
+                  type="number"
+                  min="9"
+                  max="16"
+                  className={`${inputClass} w-24`}
+                  value={header.navMenuFontSize || 10}
+                  onChange={event => updateHeader({ navMenuFontSize: Number(event.target.value) })}
+                />
+              </div>
+            </Field>
+            {headerNavItems.map((item, index) => (
+              <div key={item.id} className="border border-black/10 p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-black uppercase tracking-[0.24em] text-[#2D545E]">Menu item {index + 1}</span>
+                  <button
+                    type="button"
+                    onClick={() => updateHeader({ navItems: headerNavItems.filter(menuItem => menuItem.id !== item.id) })}
+                    className="text-red-500"
+                    title="Remove menu item"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+                <Field label="Label"><input className={inputClass} value={item.label || ''} onChange={event => updateNavItem(item.id, { label: event.target.value })} /></Field>
+                <Field label="Link"><input className={inputClass} value={item.url || ''} onChange={event => updateNavItem(item.id, { url: event.target.value })} placeholder="#products or https://..." /></Field>
+                <label className="flex items-center gap-3 text-xs font-black uppercase tracking-widest text-black/50">
+                  <input type="checkbox" checked={Boolean(item.openInNewTab)} onChange={event => updateNavItem(item.id, { openInNewTab: event.target.checked })} />
+                  Open in new tab
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <Field label="Login link text"><input className={inputClass} value={header.loginLabel || ''} onChange={event => updateHeader({ loginLabel: event.target.value })} /></Field>
+        <div className="grid grid-cols-1 gap-4">
+          <Field label="Action button text"><input className={inputClass} value={header.buttonText || ''} onChange={event => updateHeader({ buttonText: event.target.value })} /></Field>
+          <Field label="Action button link"><input className={inputClass} value={header.buttonUrl || ''} onChange={event => updateHeader({ buttonUrl: event.target.value })} placeholder="#products" /></Field>
+        </div>
       </div>
     );
   }
@@ -1039,20 +1163,60 @@ function MediaEditor({ media, editingMedia, setEditingMedia, onSave }: { media: 
   );
 }
 
-function money(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value || 0);
+const supportedCurrencies = [
+  { code: 'USD', label: 'USD - US Dollar' },
+  { code: 'AED', label: 'AED - UAE Dirham' },
+  { code: 'SAR', label: 'SAR - Saudi Riyal' },
+  { code: 'QAR', label: 'QAR - Qatari Riyal' },
+  { code: 'KWD', label: 'KWD - Kuwaiti Dinar' },
+  { code: 'BHD', label: 'BHD - Bahraini Dinar' },
+  { code: 'OMR', label: 'OMR - Omani Rial' },
+  { code: 'PKR', label: 'PKR - Pakistani Rupee' },
+  { code: 'GBP', label: 'GBP - British Pound' },
+  { code: 'EUR', label: 'EUR - Euro' },
+  { code: 'CAD', label: 'CAD - Canadian Dollar' },
+  { code: 'AUD', label: 'AUD - Australian Dollar' },
+];
+
+function normalizeCurrencyCode(currency?: string) {
+  const code = String(currency || 'USD').trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(code) ? code : 'USD';
+}
+
+function money(value: number, currency = 'USD') {
+  const currencyCode = normalizeCurrencyCode(currency);
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode }).format(value || 0);
+  } catch (_error) {
+    return `${currencyCode} ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+}
+
+function summarizeByCurrency(orders: Order[], selector: (order: Order) => number) {
+  return orders.reduce<Record<string, number>>((result, order) => {
+    const currency = normalizeCurrencyCode(order.currency);
+    result[currency] = (result[currency] || 0) + selector(order);
+    return result;
+  }, {});
+}
+
+function formatCurrencySummary(summary: Record<string, number>) {
+  const entries = Object.entries(summary).filter(([, value]) => Math.abs(value) > 0.0001);
+  if (!entries.length) return money(0);
+  return entries.map(([currency, value]) => money(value, currency)).join(' / ');
 }
 
 function BusinessEditor({ orders, onManage }: { orders: Order[]; onManage: (order: Order) => void }) {
   const activeOrders = orders.filter(order => order.status !== 'cancelled');
-  const revenue = activeOrders.reduce((sum, order) => sum + Number(order.sellPrice ?? order.totalPrice ?? 0), 0);
-  const costs = activeOrders.reduce((sum, order) => sum + Number(order.costPrice || 0), 0);
-  const paid = activeOrders.reduce((sum, order) => sum + Number(order.paidAmount || 0), 0);
+  const revenue = summarizeByCurrency(activeOrders, order => Number(order.sellPrice ?? order.totalPrice ?? 0));
+  const costs = summarizeByCurrency(activeOrders, order => Number(order.costPrice || 0));
+  const outstanding = summarizeByCurrency(activeOrders, order => Math.max(0, Number(order.sellPrice ?? order.totalPrice ?? 0) - Number(order.paidAmount || 0)));
+  const profit = summarizeByCurrency(activeOrders, order => Number(order.sellPrice ?? order.totalPrice ?? 0) - Number(order.costPrice || 0));
   const metrics = [
     { label: 'Revenue', value: revenue, icon: <ReceiptText /> },
     { label: 'Cost', value: costs, icon: <CreditCard /> },
-    { label: 'Gross profit', value: revenue - costs, icon: <TrendingUp /> },
-    { label: 'Outstanding', value: Math.max(0, revenue - paid), icon: <ShoppingBag /> },
+    { label: 'Gross profit', value: profit, icon: <TrendingUp /> },
+    { label: 'Outstanding', value: outstanding, icon: <ShoppingBag /> },
   ];
 
   return (
@@ -1064,7 +1228,7 @@ function BusinessEditor({ orders, onManage }: { orders: Order[]; onManage: (orde
               <span className="text-[9px] font-black uppercase tracking-[0.25em]">{metric.label}</span>
               {React.cloneElement(metric.icon, { className: 'w-4 h-4' })}
             </div>
-            <div className="text-3xl font-display font-black tracking-tight">{money(metric.value)}</div>
+            <div className="text-2xl font-display font-black tracking-tight leading-tight">{formatCurrencySummary(metric.value)}</div>
           </article>
         ))}
       </div>
@@ -1081,14 +1245,15 @@ function BusinessEditor({ orders, onManage }: { orders: Order[]; onManage: (orde
             {orders.map(order => {
               const sell = Number(order.sellPrice ?? order.totalPrice ?? 0);
               const cost = Number(order.costPrice || 0);
+              const currency = normalizeCurrencyCode(order.currency);
               return (
                 <tr key={order.id} className="border-t border-black/8 text-sm">
                   <td className="p-4"><div className="font-black">{order.productName}</div><div className="text-[9px] text-black/35 mt-1 uppercase tracking-widest">{order.id}</div></td>
                   <td className="p-4"><div className="font-bold">{order.userName || 'Customer'}</div><div className="text-xs text-black/45">{order.userEmail}</div></td>
-                  <td className="p-4 font-bold">{money(sell)}</td>
-                  <td className="p-4 text-black/55">{money(cost)}</td>
-                  <td className={`p-4 font-black ${sell - cost < 0 ? 'text-red-600' : 'text-green-700'}`}>{money(sell - cost)}</td>
-                  <td className="p-4"><PaymentBadge status={order.paymentStatus || 'unpaid'} /><div className="text-xs text-black/45 mt-2">{money(order.paidAmount || 0)} paid</div></td>
+                  <td className="p-4 font-bold">{money(sell, currency)}</td>
+                  <td className="p-4 text-black/55">{money(cost, currency)}</td>
+                  <td className={`p-4 font-black ${sell - cost < 0 ? 'text-red-600' : 'text-green-700'}`}>{money(sell - cost, currency)}</td>
+                  <td className="p-4"><PaymentBadge status={order.paymentStatus || 'unpaid'} /><div className="text-xs text-black/45 mt-2">{money(order.paidAmount || 0, currency)} paid</div></td>
                   <td className="p-4"><button onClick={() => onManage(order)} className="bg-black text-white px-4 py-3 text-[9px] font-black uppercase tracking-widest">Manage</button></td>
                 </tr>
               );
@@ -1096,6 +1261,156 @@ function BusinessEditor({ orders, onManage }: { orders: Order[]; onManage: (orde
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function CustomersEditor({ orders, onManage }: { orders: Order[]; onManage: (order: Order) => void }) {
+  const [selectedEmail, setSelectedEmail] = useState('');
+  const customers = Object.values(orders.reduce<Record<string, {
+    email: string;
+    name: string;
+    orders: Order[];
+    invoiced: Record<string, number>;
+    paid: Record<string, number>;
+    balance: Record<string, number>;
+  }>>((result, order) => {
+    const email = (order.userEmail || 'unknown-customer').toLowerCase();
+    const currency = normalizeCurrencyCode(order.currency);
+    if (!result[email]) {
+      result[email] = {
+        email,
+        name: order.userName || 'Customer',
+        orders: [],
+        invoiced: {},
+        paid: {},
+        balance: {},
+      };
+    }
+    const sell = Number(order.sellPrice ?? order.totalPrice ?? 0);
+    const paid = Number(order.paidAmount || 0);
+    result[email].orders.push(order);
+    result[email].name = order.userName || result[email].name;
+    result[email].invoiced[currency] = (result[email].invoiced[currency] || 0) + sell;
+    result[email].paid[currency] = (result[email].paid[currency] || 0) + paid;
+    result[email].balance[currency] = (result[email].balance[currency] || 0) + Math.max(0, sell - paid);
+    return result;
+  }, {})).sort((left, right) => right.orders.length - left.orders.length);
+
+  const selected = customers.find(customer => customer.email === selectedEmail) || customers[0];
+  const selectedOrders = selected?.orders || [];
+  const paymentHistory = selectedOrders.flatMap(order => (order.payments || []).map(payment => ({ ...payment, order })));
+
+  if (!customers.length) {
+    return (
+      <div className="bg-white border border-black/10 py-20 px-8 text-center">
+        <div className="w-14 h-14 bg-[#EAF0F1] text-[#2D545E] mx-auto flex items-center justify-center mb-6"><Users className="w-6 h-6" /></div>
+        <h2 className="text-2xl font-display font-black uppercase">No customers yet</h2>
+        <p className="text-sm text-black/45 mt-3">Create an order first, then PlazaHQ will build the customer ledger automatically.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid xl:grid-cols-[360px_minmax(0,1fr)] gap-6">
+      <div className="bg-white border border-black/10 overflow-hidden">
+        <div className="p-5 border-b border-black/10">
+          <h2 className="text-xl font-display font-black uppercase">Customers</h2>
+          <p className="text-sm text-black/45 mt-2">Balances are grouped by currency.</p>
+        </div>
+        <div className="divide-y divide-black/10">
+          {customers.map(customer => (
+            <button key={customer.email} onClick={() => setSelectedEmail(customer.email)} className={`w-full text-left p-5 hover:bg-[#F6F5F2] ${selected?.email === customer.email ? 'bg-[#EAF0F1]' : 'bg-white'}`}>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="font-display font-black uppercase leading-tight">{customer.name}</div>
+                  <div className="text-xs text-black/45 mt-1">{customer.email}</div>
+                </div>
+                <span className="text-[9px] font-black uppercase tracking-widest text-[#2D545E]">{customer.orders.length} orders</span>
+              </div>
+              <div className="mt-4 text-sm font-black">{formatCurrencySummary(customer.balance)} due</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {selected && (
+        <div className="space-y-6">
+          <section className="bg-white border border-black/10 p-6">
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+              <div>
+                <div className="text-[9px] font-black uppercase tracking-[0.25em] text-[#2D545E] mb-2">Customer ledger</div>
+                <h2 className="text-3xl font-display font-black uppercase">{selected.name}</h2>
+                <p className="text-sm text-black/45 mt-2">{selected.email}</p>
+              </div>
+              <div className="grid sm:grid-cols-3 gap-3 min-w-[min(100%,520px)]">
+                <LedgerMetric label="Invoiced" value={formatCurrencySummary(selected.invoiced)} />
+                <LedgerMetric label="Paid" value={formatCurrencySummary(selected.paid)} />
+                <LedgerMetric label="Balance" value={formatCurrencySummary(selected.balance)} tone="strong" />
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-white border border-black/10 overflow-x-auto">
+            <div className="p-5 border-b border-black/10">
+              <h3 className="text-xl font-display font-black uppercase">Work and invoice history</h3>
+            </div>
+            <table className="w-full min-w-[920px] text-left">
+              <thead className="bg-[#F6F5F2] text-[9px] uppercase tracking-[0.2em] text-black/40">
+                <tr><th className="p-4">Order</th><th className="p-4">Date</th><th className="p-4">Invoice</th><th className="p-4">Paid</th><th className="p-4">Balance</th><th className="p-4">Status</th><th className="p-4" /></tr>
+              </thead>
+              <tbody>
+                {selectedOrders.map(order => {
+                  const sell = Number(order.sellPrice ?? order.totalPrice ?? 0);
+                  const paid = Number(order.paidAmount || 0);
+                  const currency = normalizeCurrencyCode(order.currency);
+                  return (
+                    <tr key={order.id} className="border-t border-black/8 text-sm">
+                      <td className="p-4"><div className="font-black">{order.productName}</div><div className="text-[9px] text-black/35 mt-1 uppercase tracking-widest">{order.id}</div></td>
+                      <td className="p-4 text-black/55">{new Date(order.createdAt).toLocaleDateString()}</td>
+                      <td className="p-4 font-bold">{money(sell, currency)}</td>
+                      <td className="p-4 text-black/55">{money(paid, currency)}</td>
+                      <td className="p-4 font-black">{money(Math.max(0, sell - paid), currency)}</td>
+                      <td className="p-4"><PaymentBadge status={order.paymentStatus || 'unpaid'} /></td>
+                      <td className="p-4">
+                        <div className="flex gap-2">
+                          <button onClick={() => onManage(order)} className="bg-black text-white px-4 py-3 text-[9px] font-black uppercase tracking-widest">Manage</button>
+                          <button onClick={() => printInvoice(order)} className="border border-black/15 px-4 py-3 text-[9px] font-black uppercase tracking-widest">Invoice</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </section>
+
+          <section className="bg-white border border-black/10 p-6">
+            <h3 className="text-xl font-display font-black uppercase mb-5">Payment history</h3>
+            <div className="space-y-3">
+              {!paymentHistory.length && <p className="text-sm text-black/45">No payments recorded for this customer.</p>}
+              {paymentHistory.map(record => (
+                <div key={record.id} className="border border-black/10 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1">
+                    <div className="font-black">{money(record.amount, record.order.currency)}</div>
+                    <div className="text-xs text-black/45 mt-1">{record.order.productName} / {record.paymentMethod.replace('_', ' ')} / {new Date(record.paidAt).toLocaleDateString()} {record.reference && `/ ${record.reference}`}</div>
+                  </div>
+                  <button onClick={() => onManage(record.order)} className="border border-black/15 px-4 py-3 text-[9px] font-black uppercase tracking-widest">Open order</button>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LedgerMetric({ label, value, tone }: { label: string; value: string; tone?: 'strong' }) {
+  return (
+    <div className={`p-4 border ${tone === 'strong' ? 'border-[#2D545E] bg-[#EAF0F1]' : 'border-black/10 bg-[#F6F5F2]'}`}>
+      <div className="text-[9px] font-black uppercase tracking-[0.25em] text-black/35">{label}</div>
+      <div className="text-base font-display font-black mt-2 leading-tight">{value}</div>
     </div>
   );
 }
@@ -1108,6 +1423,7 @@ function PaymentBadge({ status }: { status: 'unpaid' | 'partial' | 'paid' }) {
 function BusinessOrderModal({ order, onClose, onChanged }: { order: Order; onClose: () => void; onChanged: () => Promise<void> }) {
   const [costPrice, setCostPrice] = useState(Number(order.costPrice || 0));
   const [sellPrice, setSellPrice] = useState(Number(order.sellPrice ?? order.totalPrice ?? 0));
+  const [currency, setCurrency] = useState(normalizeCurrencyCode(order.currency));
   const [invoiceNotes, setInvoiceNotes] = useState(order.invoiceNotes || '');
   const [paymentDueDate, setPaymentDueDate] = useState(order.paymentDueDate?.slice(0, 10) || '');
   const [payment, setPayment] = useState({ amount: Math.max(0, Number(order.balanceDue || 0)), paymentMethod: 'bank_transfer', reference: '', notes: '', paidAt: new Date().toISOString().slice(0, 10) });
@@ -1116,7 +1432,7 @@ function BusinessOrderModal({ order, onClose, onChanged }: { order: Order; onClo
   const saveFinance = async (event: React.FormEvent) => {
     event.preventDefault();
     setSaving(true);
-    await DataService.updateOrderFinance(order.id, { costPrice, sellPrice, invoiceNotes, paymentDueDate });
+    await DataService.updateOrderFinance(order.id, { costPrice, sellPrice, currency, invoiceNotes, paymentDueDate });
     await onChanged();
   };
 
@@ -1139,13 +1455,14 @@ function BusinessOrderModal({ order, onClose, onChanged }: { order: Order; onClo
             <div className="grid sm:grid-cols-2 gap-5">
               <Field label="Cost price (internal)"><input type="number" min="0" step="0.01" className={inputClass} value={costPrice} onChange={event => setCostPrice(Number(event.target.value))} /></Field>
               <Field label="Sell price (invoice)"><input type="number" min="0" step="0.01" className={inputClass} value={sellPrice} onChange={event => setSellPrice(Number(event.target.value))} /></Field>
+              <Field label="Currency"><select className={inputClass} value={currency} onChange={event => setCurrency(event.target.value)}>{supportedCurrencies.map(option => <option key={option.code} value={option.code}>{option.label}</option>)}</select></Field>
               <Field label="Payment due date"><input type="date" className={inputClass} value={paymentDueDate} onChange={event => setPaymentDueDate(event.target.value)} /></Field>
-              <div className="bg-[#F6F5F2] p-4"><div className="text-[9px] font-black uppercase tracking-widest text-black/35">Expected profit</div><div className="text-2xl font-black mt-2">{money(sellPrice - costPrice)}</div></div>
+              <div className="bg-[#F6F5F2] p-4"><div className="text-[9px] font-black uppercase tracking-widest text-black/35">Expected profit</div><div className="text-2xl font-black mt-2">{money(sellPrice - costPrice, currency)}</div></div>
             </div>
             <Field label="Invoice notes"><textarea className={textareaClass} value={invoiceNotes} onChange={event => setInvoiceNotes(event.target.value)} placeholder="Payment terms or customer note" /></Field>
             <div className="flex flex-wrap gap-3">
               <button disabled={saving} className="bg-black text-white px-5 py-4 text-[9px] font-black uppercase tracking-widest">Save finances</button>
-              <button type="button" onClick={() => printInvoice({ ...order, sellPrice, invoiceNotes, paymentDueDate })} className="border border-black/15 px-5 py-4 text-[9px] font-black uppercase tracking-widest flex items-center gap-2"><ReceiptText className="w-4 h-4" /> Print invoice</button>
+              <button type="button" onClick={() => printInvoice({ ...order, sellPrice, currency, invoiceNotes, paymentDueDate })} className="border border-black/15 px-5 py-4 text-[9px] font-black uppercase tracking-widest flex items-center gap-2"><ReceiptText className="w-4 h-4" /> Print invoice</button>
             </div>
           </form>
 
@@ -1167,7 +1484,7 @@ function BusinessOrderModal({ order, onClose, onChanged }: { order: Order; onClo
               {(order.payments || []).length === 0 && <p className="text-sm text-black/45">No payments recorded.</p>}
               {(order.payments || []).map(record => (
                 <div key={record.id} className="border border-black/10 p-4 flex items-center gap-4">
-                  <div className="flex-1"><div className="font-black">{money(record.amount)}</div><div className="text-xs text-black/45 mt-1">{record.paymentMethod.replace('_', ' ')} / {new Date(record.paidAt).toLocaleDateString()} {record.reference && `/ ${record.reference}`}</div></div>
+                  <div className="flex-1"><div className="font-black">{money(record.amount, currency)}</div><div className="text-xs text-black/45 mt-1">{record.paymentMethod.replace('_', ' ')} / {new Date(record.paidAt).toLocaleDateString()} {record.reference && `/ ${record.reference}`}</div></div>
                   <button onClick={async () => { if (!confirm('Delete this payment record?')) return; await DataService.deletePayment(record.id); await onChanged(); }} className="text-red-500 p-2"><Trash2 className="w-4 h-4" /></button>
                 </div>
               ))}
@@ -1187,7 +1504,19 @@ function printInvoice(order: Order) {
   const invoice = window.open('', '_blank', 'width=900,height=900');
   if (!invoice) return;
   const sell = Number(order.sellPrice ?? order.totalPrice ?? 0);
-  const unitPrice = order.quantity ? sell / order.quantity : sell;
+  const currency = normalizeCurrencyCode(order.currency);
+  const invoiceItems = order.items?.length ? order.items : [{
+    productId: order.productId,
+    productName: order.productName,
+    quantity: order.quantity,
+    options: order.options || {},
+    totalPrice: sell,
+  }];
+  const rows = invoiceItems.map(item => {
+    const lineTotal = Number(item.totalPrice || 0);
+    const unitPrice = item.quantity ? lineTotal / item.quantity : lineTotal;
+    return `<tr><td><strong>${escapeInvoice(item.productName)}</strong></td><td>${escapeInvoice(item.quantity)}</td><td class="right">${money(unitPrice, currency)}</td><td class="right">${money(lineTotal, currency)}</td></tr>`;
+  }).join('');
   invoice.document.write(`<!doctype html><html><head><title>Invoice ${escapeInvoice(order.id)}</title><style>
     body{font-family:Arial,sans-serif;color:#111;margin:0;padding:48px}header{display:flex;justify-content:space-between;border-bottom:3px solid #111;padding-bottom:28px;margin-bottom:38px}
     h1{font-size:40px;margin:0}.muted{color:#666;font-size:12px;line-height:1.6}.bill{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:40px}
@@ -1197,41 +1526,67 @@ function printInvoice(order: Order) {
     <header><div><h1>PRINT PLAZA</h1><div class="muted">Industrial Print Production</div></div><div class="right"><strong>INVOICE</strong><div class="muted"># ${escapeInvoice(order.id)}<br>Date: ${new Date(order.createdAt).toLocaleDateString()}<br>Due: ${escapeInvoice(order.paymentDueDate || 'On receipt')}</div></div></header>
     <div class="bill"><div><strong>Bill to</strong><div class="muted">${escapeInvoice(order.userName || 'Customer')}<br>${escapeInvoice(order.userEmail)}</div></div><div class="right"><strong>Order status</strong><div class="muted">${escapeInvoice(order.status)}</div></div></div>
     <table><thead><tr><th>Description</th><th>Quantity</th><th class="right">Unit price</th><th class="right">Amount</th></tr></thead>
-    <tbody><tr><td><strong>${escapeInvoice(order.productName)}</strong></td><td>${escapeInvoice(order.quantity)}</td><td class="right">${money(unitPrice)}</td><td class="right">${money(sell)}</td></tr>
-    <tr><td colspan="3" class="right total">Total</td><td class="right total">${money(sell)}</td></tr></tbody></table>
+    <tbody>${rows}
+    <tr><td colspan="3" class="right total">Total</td><td class="right total">${money(sell, currency)}</td></tr></tbody></table>
     ${order.invoiceNotes ? `<div class="notes"><strong>Notes</strong><br><br>${escapeInvoice(order.invoiceNotes)}</div>` : ''}
     <script>window.onload=()=>window.print();<\/script></body></html>`);
   invoice.document.close();
 }
 
 function CreateOrderModal({ products, onClose, onSave }: { products: Product[]; onClose: () => void; onSave: (order: Partial<Order>) => Promise<void> }) {
+  const firstItem: OrderItem = {
+    productId: products[0]?.id || 'manual-item',
+    productName: products[0]?.name || '',
+    quantity: 1,
+    options: {},
+    totalPrice: products[0]?.price || 0,
+  };
   const [order, setOrder] = useState<Partial<Order>>({
     userName: '',
     userEmail: '',
-    productId: products[0]?.id || 'manual-order',
-    productName: products[0]?.name || '',
-    quantity: 1,
     costPrice: 0,
-    sellPrice: 0,
+    currency: 'USD',
     status: 'pending',
     paymentDueDate: '',
     invoiceNotes: '',
   });
+  const [items, setItems] = useState<OrderItem[]>([firstItem]);
   const [saving, setSaving] = useState(false);
+  const sellTotal = items.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0);
+  const totalQuantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 1;
 
-  const chooseProduct = (productId: string) => {
+  const updateItem = (index: number, updates: Partial<OrderItem>) => {
+    setItems(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...updates } : item));
+  };
+
+  const chooseProduct = (index: number, productId: string) => {
     const product = products.find(item => item.id === productId);
-    setOrder({
-      ...order,
+    updateItem(index, {
       productId: productId || 'manual-order',
-      productName: product?.name || order.productName || '',
-      sellPrice: product ? Number(product.price) * Number(order.quantity || 1) : order.sellPrice,
+      productName: product?.name || items[index]?.productName || '',
+      totalPrice: product ? Number(product.price) * Number(items[index]?.quantity || 1) : items[index]?.totalPrice || 0,
     });
   };
 
   return (
     <div className="fixed inset-0 z-[90] bg-black/65 flex justify-end">
-      <form onSubmit={async event => { event.preventDefault(); setSaving(true); await onSave(order); }} className="bg-white h-full w-full max-w-2xl overflow-y-auto p-7 md:p-10 space-y-6">
+      <form
+        onSubmit={async event => {
+          event.preventDefault();
+          setSaving(true);
+          const cleanItems = items.filter(item => item.productName.trim());
+          await onSave({
+            ...order,
+            items: cleanItems,
+            productId: cleanItems[0]?.productId || 'manual-order',
+            productName: cleanItems.length > 1 ? `${cleanItems[0].productName} + ${cleanItems.length - 1} more` : cleanItems[0]?.productName || 'Custom print order',
+            quantity: totalQuantity,
+            sellPrice: sellTotal,
+            totalPrice: sellTotal,
+          });
+        }}
+        className="bg-white h-full w-full max-w-3xl overflow-y-auto p-7 md:p-10 space-y-6"
+      >
         <div className="flex items-start justify-between">
           <div><div className="text-[9px] font-black uppercase tracking-[0.25em] text-[#E17055] mb-2">PlazaHQ Orders</div><h2 className="text-3xl font-display font-black uppercase">Create order</h2></div>
           <button type="button" onClick={onClose}><X className="w-6 h-6" /></button>
@@ -1240,17 +1595,44 @@ function CreateOrderModal({ products, onClose, onSave }: { products: Product[]; 
           <Field label="Customer name"><input required className={inputClass} value={order.userName || ''} onChange={event => setOrder({ ...order, userName: event.target.value })} /></Field>
           <Field label="Customer email"><input required type="email" className={inputClass} value={order.userEmail || ''} onChange={event => setOrder({ ...order, userEmail: event.target.value })} /></Field>
         </div>
-        <Field label="Product">
-          <select className={inputClass} value={order.productId || ''} onChange={event => chooseProduct(event.target.value)}>
-            <option value="manual-order">Custom/manual order</option>
-            {products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
-          </select>
-        </Field>
-        <Field label="Order title"><input required className={inputClass} value={order.productName || ''} onChange={event => setOrder({ ...order, productName: event.target.value })} placeholder="Business cards - 1,000 units" /></Field>
+        <section className="border border-black/10 p-5 space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="text-xl font-display font-black uppercase">Invoice items</h3>
+              <p className="text-sm text-black/45 mt-1">Add all products/services for this one customer order.</p>
+            </div>
+            <button type="button" onClick={() => setItems([...items, { productId: 'manual-item', productName: '', quantity: 1, options: {}, totalPrice: 0 }])} className="bg-black text-white px-4 py-3 text-[9px] font-black uppercase tracking-widest flex items-center gap-2"><Plus className="w-3.5 h-3.5" /> Add item</button>
+          </div>
+          <div className="space-y-4">
+            {items.map((item, index) => (
+              <div key={index} className="bg-[#F6F5F2] border border-black/10 p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-black uppercase tracking-[0.25em] text-[#2D545E]">Item {index + 1}</span>
+                  {items.length > 1 && <button type="button" onClick={() => setItems(items.filter((_, itemIndex) => itemIndex !== index))} className="text-red-500"><Trash2 className="w-4 h-4" /></button>}
+                </div>
+                <Field label="Product">
+                  <select className={inputClass} value={item.productId || ''} onChange={event => chooseProduct(index, event.target.value)}>
+                    <option value="manual-item">Custom/manual item</option>
+                    {products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
+                  </select>
+                </Field>
+                <Field label="Item title"><input required className={inputClass} value={item.productName || ''} onChange={event => updateItem(index, { productName: event.target.value })} placeholder="Business cards - 1,000 units" /></Field>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <Field label="Quantity"><input type="number" min="1" className={inputClass} value={item.quantity || 1} onChange={event => updateItem(index, { quantity: Number(event.target.value) })} /></Field>
+                  <Field label="Line total"><input type="number" min="0" step="0.01" className={inputClass} value={item.totalPrice || 0} onChange={event => updateItem(index, { totalPrice: Number(event.target.value) })} /></Field>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="bg-white border border-black/10 p-4 flex items-center justify-between">
+            <span className="text-[9px] font-black uppercase tracking-[0.25em] text-black/35">Invoice total</span>
+            <span className="text-2xl font-display font-black">{money(sellTotal, order.currency)}</span>
+          </div>
+        </section>
         <div className="grid sm:grid-cols-3 gap-5">
-          <Field label="Quantity"><input type="number" min="1" className={inputClass} value={order.quantity || 1} onChange={event => setOrder({ ...order, quantity: Number(event.target.value) })} /></Field>
           <Field label="Cost price"><input type="number" min="0" step="0.01" className={inputClass} value={order.costPrice || 0} onChange={event => setOrder({ ...order, costPrice: Number(event.target.value) })} /></Field>
-          <Field label="Sell price"><input type="number" min="0" step="0.01" className={inputClass} value={order.sellPrice || 0} onChange={event => setOrder({ ...order, sellPrice: Number(event.target.value), totalPrice: Number(event.target.value) })} /></Field>
+          <Field label="Currency"><select className={inputClass} value={order.currency || 'USD'} onChange={event => setOrder({ ...order, currency: event.target.value })}>{supportedCurrencies.map(option => <option key={option.code} value={option.code}>{option.label}</option>)}</select></Field>
+          <div className="bg-[#F6F5F2] p-4"><div className="text-[9px] font-black uppercase tracking-widest text-black/35">Profit</div><div className="text-2xl font-black mt-2">{money(sellTotal - Number(order.costPrice || 0), order.currency)}</div></div>
         </div>
         <div className="grid sm:grid-cols-2 gap-5">
           <Field label="Status"><select className={inputClass} value={order.status} onChange={event => setOrder({ ...order, status: event.target.value as Order['status'] })}><option value="pending">Pending</option><option value="processing">Processing</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></Field>
@@ -1280,7 +1662,7 @@ function OrdersEditor({ orders, onStatus, onCreate, onManage }: { orders: Order[
             <div className="flex-1">
               <div className="text-[9px] font-black uppercase tracking-widest text-[#2D545E] mb-2">{order.id}</div>
               <h3 className="text-2xl font-display font-black uppercase">{order.productName}</h3>
-              <p className="text-sm text-black/50 mt-2">{order.userName || order.userEmail} / Qty {order.quantity} / {money(Number(order.sellPrice ?? order.totalPrice))}</p>
+              <p className="text-sm text-black/50 mt-2">{order.userName || order.userEmail} / Qty {order.quantity} / {money(Number(order.sellPrice ?? order.totalPrice), order.currency)}</p>
             </div>
             <select value={order.status} onChange={event => onStatus(order.id, event.target.value)} className={`${inputClass} xl:w-48`}>
               <option value="pending">Pending</option>

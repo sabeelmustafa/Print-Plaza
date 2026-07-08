@@ -1,7 +1,9 @@
 ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS cost_price DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER total_price,
   ADD COLUMN IF NOT EXISTS sell_price DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER cost_price,
-  ADD COLUMN IF NOT EXISTS invoice_notes TEXT NULL AFTER sell_price,
+  ADD COLUMN IF NOT EXISTS currency_code VARCHAR(8) NOT NULL DEFAULT 'USD' AFTER sell_price,
+  ADD COLUMN IF NOT EXISTS items_json JSON NULL AFTER currency_code,
+  ADD COLUMN IF NOT EXISTS invoice_notes TEXT NULL AFTER items_json,
   ADD COLUMN IF NOT EXISTS payment_due_date DATE NULL AFTER invoice_notes;
 
 UPDATE orders

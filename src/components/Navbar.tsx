@@ -8,7 +8,7 @@ import { User as UserIcon, LogOut, Terminal, Lock, Menu, X } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext';
 import { logOut } from '../lib/firebase';
 import { useState } from 'react';
-import { SiteSettings } from '../types';
+import { NavMenuItem, SiteSettings } from '../types';
 
 interface NavbarProps {
   onLogin: () => void;
@@ -19,8 +19,19 @@ interface NavbarProps {
 export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarProps) {
   const { user, isAdmin } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const logoImage = settings?.logoImage || '/brand/print-plaza-logo.png';
+  const logoSize = Math.min(Math.max(Number(settings?.logoSize || 36), 24), 96);
+  const navFontSize = Math.min(Math.max(Number(settings?.navMenuFontSize || 10), 9), 16);
+  const navItems: NavMenuItem[] = settings?.navItems?.length
+    ? settings.navItems
+    : [
+        { id: 'services', label: settings?.servicesLabel || 'Services', url: '#services' },
+        { id: 'products', label: settings?.productsLabel || 'Production', url: '#products' },
+      ];
+  const actionUrl = settings?.buttonUrl || '#products';
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
+  const closeMenu = () => setIsMenuOpen(false);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass-morphism border-b border-black/10">
@@ -30,22 +41,39 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
             window.scrollTo({ top: 0, behavior: 'smooth' });
             setIsMenuOpen(false);
           }}>
-            {settings?.logoImage ? (
-              <img src={settings.logoImage} alt={settings.logoText || 'Print Plaza'} className="h-10 w-auto max-w-40 object-contain" />
+            {logoImage ? (
+              <img
+                src={logoImage}
+                alt={settings?.logoText || 'Print Plaza'}
+                className="w-auto object-contain"
+                style={{ height: `${logoSize}px`, maxWidth: `${Math.max(160, logoSize * 5)}px` }}
+              />
             ) : <div className="flex gap-1.5 relative">
                 <div className="w-2.5 h-7 bg-[#2D545E] transform -skew-x-12 group-hover:rotate-6 transition-all duration-300" />
                 <div className="w-2.5 h-7 bg-[#E17055] transform -skew-x-12 group-hover:-rotate-6 transition-all duration-300" />
               </div>}
-            <div className="flex flex-col">
-              {!settings?.logoImage && <span className="font-display font-black text-2xl tracking-tighter leading-none">{settings?.logoText || 'PRINT PLAZA'}</span>}
-              <span className="text-[9px] uppercase tracking-[0.4em] font-extrabold mt-0.5 text-[#2D545E]">{settings?.tagline || 'Industrial Print Production'}</span>
-            </div>
+            {!logoImage && (
+              <div className="flex flex-col">
+                <span className="font-display font-black text-2xl tracking-tighter leading-none">{settings?.logoText || 'PRINT PLAZA'}</span>
+                <span className="text-[9px] uppercase tracking-[0.4em] font-extrabold mt-0.5 text-[#2D545E]">{settings?.tagline || 'Industrial Print Production'}</span>
+              </div>
+            )}
           </div>
           
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center space-x-8">
-            <a href="#services" className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/60 hover:text-[#2D545E] transition-colors">{settings?.servicesLabel || 'Services'}</a>
-            <a href="#products" className="text-[10px] font-bold uppercase tracking-[0.2em] text-black/60 hover:text-[#2D545E] transition-colors">{settings?.productsLabel || 'Production'}</a>
+            {navItems.map(item => (
+              <a
+                key={item.id}
+                href={item.url || '#'}
+                target={item.openInNewTab ? '_blank' : undefined}
+                rel={item.openInNewTab ? 'noreferrer' : undefined}
+                className="font-bold uppercase tracking-[0.2em] text-black/60 hover:text-[#2D545E] transition-colors"
+                style={{ fontSize: `${navFontSize}px` }}
+              >
+                {item.label || 'Menu item'}
+              </a>
+            ))}
             
             <div className="h-4 w-px bg-black/10" />
 
@@ -76,9 +104,9 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
               </button>
             )}
 
-            <button className="btn-studio bg-black text-white px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-[#2D545E] hover:shadow-[0_10px_20px_-5px_rgba(45,84,94,0.4)] transition-all">
+            <a href={actionUrl} className="btn-studio bg-black text-white px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-[#2D545E] hover:shadow-[0_10px_20px_-5px_rgba(45,84,94,0.4)] transition-all">
               {settings?.buttonText || 'Start Project'}
-            </button>
+            </a>
           </div>
 
           {/* Mobile Toggle */}
@@ -103,20 +131,19 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
             className="md:hidden bg-white border-t border-black/5 overflow-hidden"
           >
             <div className="flex flex-col p-6 space-y-6">
-              <a 
-                href="#services" 
-                onClick={() => setIsMenuOpen(false)}
-                className="text-[12px] font-black uppercase tracking-[0.3em] text-black/60 py-2"
-              >
-                Services
-              </a>
-              <a 
-                href="#products" 
-                onClick={() => setIsMenuOpen(false)}
-                className="text-[12px] font-black uppercase tracking-[0.3em] text-black/60 py-2"
-              >
-                Production
-              </a>
+              {navItems.map(item => (
+                <a
+                  key={item.id}
+                  href={item.url || '#'}
+                  target={item.openInNewTab ? '_blank' : undefined}
+                  rel={item.openInNewTab ? 'noreferrer' : undefined}
+                  onClick={closeMenu}
+                  className="font-black uppercase tracking-[0.3em] text-black/60 py-2"
+                  style={{ fontSize: `${Math.max(12, navFontSize)}px` }}
+                >
+                  {item.label || 'Menu item'}
+                </a>
+              ))}
               
               <div className="h-px w-full bg-black/5" />
 
@@ -152,13 +179,13 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
                   className="flex items-center gap-4 text-[12px] font-black uppercase tracking-[0.3em] text-black/60 py-2"
                 >
                   <Lock className="w-5 h-5" />
-                  Auth Registry
+                  {settings?.loginLabel || 'Auth Registry'}
                 </button>
               )}
 
-              <button className="w-full bg-black text-white py-5 text-[12px] font-black uppercase tracking-[0.3em] hover:bg-[#2D545E]">
-                Start Project
-              </button>
+              <a href={actionUrl} onClick={closeMenu} className="w-full bg-black text-white py-5 text-[12px] font-black uppercase tracking-[0.3em] hover:bg-[#2D545E] text-center">
+                {settings?.buttonText || 'Start Project'}
+              </a>
             </div>
           </motion.div>
         )}

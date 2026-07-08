@@ -172,6 +172,7 @@ export const DataService = {
   updateOrderFinance: async (orderId: string, details: {
     costPrice: number;
     sellPrice: number;
+    currency?: string;
     invoiceNotes?: string;
     paymentDueDate?: string;
   }) => {

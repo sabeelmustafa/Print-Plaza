@@ -45,15 +45,26 @@ export interface MediaAsset {
   altText?: string;
 }
 
+export interface NavMenuItem {
+  id: string;
+  label: string;
+  url: string;
+  openInNewTab?: boolean;
+}
+
 export interface SiteSettings {
   header?: {
     logoText?: string;
     logoImage?: string;
+    logoSize?: number;
     tagline?: string;
     servicesLabel?: string;
     productsLabel?: string;
     loginLabel?: string;
+    navItems?: NavMenuItem[];
+    navMenuFontSize?: number;
     buttonText?: string;
+    buttonUrl?: string;
   };
   theme?: {
     primaryColor?: string;
@@ -94,8 +105,10 @@ export interface Order {
   productId: string;
   productName: string;
   quantity: number;
+  items?: OrderItem[];
   options: Record<string, string | number | boolean>;
   totalPrice: number;
+  currency?: string;
   costPrice?: number;
   sellPrice?: number;
   paidAmount?: number;

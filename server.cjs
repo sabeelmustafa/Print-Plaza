@@ -40,7 +40,9 @@ async function ensureBusinessSchema() {
     ALTER TABLE orders
       ADD COLUMN IF NOT EXISTS cost_price DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER total_price,
       ADD COLUMN IF NOT EXISTS sell_price DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER cost_price,
-      ADD COLUMN IF NOT EXISTS invoice_notes TEXT NULL AFTER sell_price,
+      ADD COLUMN IF NOT EXISTS currency_code VARCHAR(8) NOT NULL DEFAULT 'USD' AFTER sell_price,
+      ADD COLUMN IF NOT EXISTS items_json JSON NULL AFTER currency_code,
+      ADD COLUMN IF NOT EXISTS invoice_notes TEXT NULL AFTER items_json,
       ADD COLUMN IF NOT EXISTS payment_due_date DATE NULL AFTER invoice_notes
   `);
   await pool.query(`
@@ -195,6 +197,37 @@ function parseJson(value, fallback) {
 
 function createId(prefix) {
   return `${prefix}-${crypto.randomBytes(6).toString('hex')}`;
+}
+
+function normalizeCurrency(value) {
+  const currency = String(value || 'USD').trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(currency) ? currency : 'USD';
+}
+
+function normalizeOrderItems(order) {
+  const rawItems = Array.isArray(order.items) && order.items.length
+    ? order.items
+    : [{
+        productId: order.productId,
+        productName: order.productName,
+        quantity: order.quantity,
+        options: order.options || {},
+        totalPrice: order.totalPrice,
+      }];
+
+  return rawItems.map((item) => ({
+    productId: String(item.productId || 'manual-item'),
+    productName: String(item.productName || 'Custom print item').trim(),
+    quantity: Math.max(1, Number(item.quantity || 1)),
+    options: item.options || {},
+    totalPrice: Math.max(0, Number(item.totalPrice || 0)),
+  })).filter((item) => item.productName);
+}
+
+function summarizeOrderTitle(items, fallback = 'Custom print order') {
+  if (!items.length) return fallback;
+  if (items.length === 1) return items[0].productName;
+  return `${items[0].productName} + ${items.length - 1} more`;
 }
 
 function ensureUploadDir() {
@@ -381,8 +414,10 @@ app.get('/api/orders', requireDb, async (req, res, next) => {
       productId: row.product_id,
       productName: row.product_name,
       quantity: Number(row.quantity),
+      items: parseJson(row.items_json, []),
       options: parseJson(row.options_json, {}),
       totalPrice: Number(row.total_price),
+      currency: normalizeCurrency(row.currency_code),
       sellPrice: Number(row.sell_price || row.total_price || 0),
       paymentStatus: Number(row.paid_amount || 0) >= Number(row.sell_price || row.total_price || 0) && Number(row.sell_price || row.total_price || 0) > 0
         ? 'paid'
@@ -400,23 +435,29 @@ app.post('/api/orders', requireDb, async (req, res, next) => {
   try {
     const order = req.body;
     const id = createId('order');
+    const items = normalizeOrderItems(order);
+    const totalPrice = items.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0);
+    const quantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 1;
+    const productName = summarizeOrderTitle(items, order.productName);
     await pool.query(
       `INSERT INTO orders (
          id, user_id, user_name, user_email, product_id, product_name,
-         quantity, options_json, total_price, sell_price, status
+         quantity, options_json, items_json, total_price, sell_price, currency_code, status
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
       [
         id,
         order.userId,
         order.userName || null,
         order.userEmail || '',
-        order.productId,
-        order.productName,
-        Number(order.quantity || 1),
+        items[0]?.productId || order.productId,
+        productName,
+        quantity,
         JSON.stringify(order.options || {}),
-        Number(order.totalPrice || 0),
-        Number(order.totalPrice || 0),
+        JSON.stringify(items),
+        totalPrice,
+        totalPrice,
+        normalizeCurrency(order.currency),
       ]
     );
     res.status(201).json({ id, status: 'pending' });
@@ -431,26 +472,32 @@ app.post('/api/admin/orders', requireDb, requireAdmin, async (req, res, next) =>
     const id = createId('order');
     const allowedStatuses = ['pending', 'processing', 'completed', 'cancelled'];
     const status = allowedStatuses.includes(order.status) ? order.status : 'pending';
-    const sellPrice = Math.max(0, Number(order.sellPrice || 0));
+    const items = normalizeOrderItems(order);
+    const itemsSellPrice = items.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0);
+    const sellPrice = Math.max(0, Number(order.sellPrice || itemsSellPrice || 0));
     const costPrice = Math.max(0, Number(order.costPrice || 0));
+    const quantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || Math.max(1, Number(order.quantity || 1));
+    const productName = summarizeOrderTitle(items, order.productName);
     await pool.query(
       `INSERT INTO orders (
          id, user_id, user_name, user_email, product_id, product_name,
-         quantity, options_json, total_price, cost_price, sell_price,
+         quantity, options_json, items_json, total_price, cost_price, sell_price, currency_code,
          invoice_notes, payment_due_date, status
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         String(order.userId || order.userEmail || 'manual-customer'),
         String(order.userName || '').trim() || null,
         String(order.userEmail || '').trim(),
-        String(order.productId || 'manual-order'),
-        String(order.productName || 'Custom print order').trim(),
-        Math.max(1, Number(order.quantity || 1)),
+        String(items[0]?.productId || order.productId || 'manual-order'),
+        productName,
+        quantity,
         JSON.stringify(order.options || {}),
+        JSON.stringify(items),
         sellPrice,
         costPrice,
         sellPrice,
+        normalizeCurrency(order.currency),
         String(order.invoiceNotes || '').trim() || null,
         order.paymentDueDate || null,
         status,
@@ -468,13 +515,14 @@ app.patch('/api/admin/orders/:id/finance', requireDb, requireAdmin, async (req, 
     const sellPrice = Math.max(0, Number(req.body.sellPrice || 0));
     await pool.query(
       `UPDATE orders
-       SET cost_price = ?, sell_price = ?, total_price = ?,
+       SET cost_price = ?, sell_price = ?, total_price = ?, currency_code = ?,
            invoice_notes = ?, payment_due_date = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
       [
         costPrice,
         sellPrice,
         sellPrice,
+        normalizeCurrency(req.body.currency),
         String(req.body.invoiceNotes || '').trim() || null,
         req.body.paymentDueDate || null,
         req.params.id,
