@@ -61,6 +61,7 @@ const defaultSettings: SiteSettings = {
     logoImageDark: '/brand/print-plaza-logo.png',
     logoImageLight: '/brand/print-plaza-logo.png',
     logoSize: 36,
+    useTransparentHeader: true,
     tagline: 'Industrial Print Production',
     servicesLabel: 'Services',
     productsLabel: 'Production',
@@ -785,6 +786,24 @@ function SectionSettings({
     return (
       <div className="space-y-5">
         <PanelTitle title="Header" />
+        <div className="border border-black/10 bg-white p-4 flex items-center justify-between gap-4">
+          <div>
+            <div className="text-[9px] font-black uppercase tracking-[0.3em] text-black/35">Transparent hero header</div>
+            <p className="mt-2 text-xs font-bold text-black/45">Show the header over the hero, then switch to the normal background on scroll.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => updateHeader({ useTransparentHeader: header.useTransparentHeader === false })}
+            className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${header.useTransparentHeader === false ? 'bg-black/15' : 'bg-[#2D545E]'}`}
+            aria-pressed={header.useTransparentHeader !== false}
+          >
+            <span
+              className={`absolute left-0 top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                header.useTransparentHeader === false ? 'translate-x-1' : 'translate-x-7'
+              }`}
+            />
+          </button>
+        </div>
         <ImageUploadField
           label="Logo for light header"
           value={header.logoImageDark || header.logoImage || ''}

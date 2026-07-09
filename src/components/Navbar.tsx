@@ -20,9 +20,10 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
   const { user, isAdmin } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const useTransparentHeader = settings?.useTransparentHeader !== false;
   const normalLogo = settings?.logoImageDark || settings?.logoImage || '/brand/print-plaza-logo.png';
   const heroLogo = settings?.logoImageLight || normalLogo;
-  const logoImage = isScrolled || isMenuOpen ? normalLogo : heroLogo;
+  const logoImage = !useTransparentHeader || isScrolled || isMenuOpen ? normalLogo : heroLogo;
   const logoSize = Math.min(Math.max(Number(settings?.logoSize || 36), 24), 96);
   const navFontSize = Math.min(Math.max(Number(settings?.navMenuFontSize || 10), 9), 16);
   const navItems: NavMenuItem[] = settings?.navItems?.length
@@ -35,7 +36,7 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const closeMenu = () => setIsMenuOpen(false);
-  const headerIsTransparent = !isScrolled && !isMenuOpen;
+  const headerIsTransparent = useTransparentHeader && !isScrolled && !isMenuOpen;
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 24);
