@@ -21,7 +21,7 @@ export default function Hero({ settings, theme }: HeroProps) {
 
   return (
     <section
-      className="relative min-h-[620px] h-[78svh] max-h-[820px] overflow-hidden bg-[#202425] text-white border-b border-black/10"
+      className="relative min-h-[560px] h-[calc(100svh-5rem)] sm:h-[calc(100svh-6.5rem)] overflow-hidden bg-[#202425] text-white border-b border-black/10"
       aria-labelledby="hero-title"
     >
       {!imageFailed ? (
@@ -36,18 +36,18 @@ export default function Hero({ settings, theme }: HeroProps) {
         <div className="absolute inset-0 bg-[#202425]" />
       )}
 
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(9,12,13,0.92)_0%,rgba(9,12,13,0.72)_48%,rgba(9,12,13,0.2)_100%)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(9,12,13,0.86)_0%,transparent_45%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(9,12,13,0.5)_0%,rgba(9,12,13,0.82)_78%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(9,12,13,0.82)_0%,transparent_48%)]" />
       <div className="absolute inset-0 bg-grainy opacity-[0.06] pointer-events-none" />
 
-      <div className="relative z-10 max-w-7xl h-full mx-auto px-6 sm:px-8 lg:px-12 flex flex-col justify-end pt-28 sm:pt-32 pb-24 sm:pb-28">
+      <div className="relative z-10 max-w-7xl h-full mx-auto px-6 sm:px-8 lg:px-12 flex flex-col items-center justify-center pt-12 pb-24 sm:pb-28">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: 'easeOut' }}
-          className="max-w-4xl"
+          className="w-full max-w-5xl text-center flex flex-col items-center"
         >
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center justify-center gap-4 mb-6">
             <span className="w-10 h-1" style={{ backgroundColor: accentColor }} />
             <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/75">
               Packaging / Print / Large format
@@ -56,7 +56,7 @@ export default function Hero({ settings, theme }: HeroProps) {
 
           <h1
             id="hero-title"
-            className="max-w-4xl text-[3rem] sm:text-[4.6rem] lg:text-[6rem] font-display font-black uppercase leading-[0.94] mb-7"
+            className="max-w-5xl text-[2.8rem] sm:text-[4.3rem] lg:text-[5.6rem] font-display font-black uppercase leading-[0.94] mb-7"
           >
             {settings?.heroTitle || 'Industrial Print Production.'}
           </h1>
@@ -65,7 +65,7 @@ export default function Hero({ settings, theme }: HeroProps) {
             {settings?.heroSubtitle || 'High-fidelity manufacturing for the modern brand. From offset lithography to large-scale signage, we deliver chromatic precision and material excellence.'}
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 sm:items-center mt-9">
+          <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-center mt-9">
             <a
               href="#products"
               className="w-full sm:w-auto min-h-12 px-7 py-4 text-[10px] font-black uppercase tracking-[0.18em] flex items-center justify-center gap-3 transition-colors hover:bg-white hover:text-black"
