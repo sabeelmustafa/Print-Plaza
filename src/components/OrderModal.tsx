@@ -87,7 +87,7 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                 <div className="w-2 h-2 bg-[#E17055]" />
                 <div className="w-2 h-2 bg-white/20" />
              </div>
-             <div className="text-[10px] font-mono font-bold text-white/40 tracking-[0.3em] uppercase">Ref_Order_v02</div>
+             <div className="text-[10px] font-mono font-bold text-white/40 tracking-[0.3em] uppercase">Ref_Quote_v02</div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-8 md:p-12 lg:p-16 space-y-10 scrollbar-none">
@@ -136,7 +136,7 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
           {/* Bottom Total Bar (Sticky-like or anchored) */}
           <div className="p-8 md:p-10 lg:p-12 bg-white/5 border-t border-white/10 mt-auto">
             <div className="flex flex-col gap-3">
-              <span className="text-[9px] uppercase tracking-[0.4em] font-black text-white/30">Consolidated Projection</span>
+              <span className="text-[9px] uppercase tracking-[0.4em] font-black text-white/30">Estimated Quote Range</span>
               <div className="flex items-baseline justify-between">
                 <div className="flex items-baseline gap-3">
                   <span className="text-4xl lg:text-6xl font-display font-black text-white tracking-tighter">
@@ -168,7 +168,7 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                 Quote <br/>Configuration.
               </h4>
               <p className="text-sm font-medium text-black/50 font-sans max-w-md leading-relaxed border-l-2 border-black/5 pl-6">
-                Establish parameters for high-precision project estimation. Our algorithm calculates cost based on substrate variables and production frequency.
+                Share the details we need to prepare a quotation. This does not start production or confirm an order until our team reviews and approves it with you.
               </p>
             </header>
             
@@ -268,7 +268,7 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                   <div className="flex items-center gap-4 mb-10">
                      <span className="text-[#E17055] font-mono text-sm font-black opacity-30">0{product.options.length + 1}</span>
                      <label className="text-[10px] uppercase tracking-[0.4em] font-black text-black/30">
-                       Project Volume / Impulse Frequency
+                       Quote Quantity / Estimated Volume
                      </label>
                   </div>
                   
@@ -303,7 +303,7 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                     </div>
                     
                     <div className="sm:w-40 text-[10px] font-mono font-bold text-black/30 uppercase tracking-[0.15em] leading-relaxed">
-                      Enter the total volume required for this production cycle.
+                      Enter the quantity you want us to quote. Final price is confirmed after review.
                     </div>
                   </div>
                 </motion.div>
@@ -326,7 +326,7 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                       </>
                     ) : isSubmitting ? (
                       <>
-                        <span className="animate-pulse">Transmission in Progress...</span>
+                        <span className="animate-pulse">Sending Quote Request...</span>
                         <div className="w-4 h-4 border-2 border-white/20 border-t-white animate-spin rounded-full" />
                       </>
                     ) : (
@@ -345,8 +345,8 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                     </div>
                   </div>
                   <p className="text-[11px] font-medium leading-relaxed tracking-tight text-black/50 font-sans text-center sm:text-left">
-                    Quote validation sequence typically completes within <span className="text-black font-bold">120-240m</span>. 
-                    All technical variables will be scrutinized by our lead developers for architectural integrity.
+                    Quote review typically completes within <span className="text-black font-bold">120-240m</span>. 
+                    No production begins until you approve the final quotation.
                   </p>
                 </div>
               </div>

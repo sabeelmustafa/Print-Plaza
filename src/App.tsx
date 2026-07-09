@@ -345,10 +345,10 @@ function AppContent() {
               <div className="bg-black p-2">
                 <CheckCircle2 className="w-6 h-6 text-[#E17055]" />
               </div>
-              <span className="text-sm font-black uppercase tracking-[0.3em]">Project Launched.</span>
+              <span className="text-sm font-black uppercase tracking-[0.3em]">Quote Request Sent.</span>
             </div>
             <p className="text-[11px] font-bold text-white/80 tracking-widest leading-relaxed max-w-[240px]">
-              Production is active. Creative review starting now.
+              We received your quotation request. Our team will review it before any project starts.
             </p>
             <div className="mt-2 flex gap-1">
               <div className="w-full h-1 bg-white/20 overflow-hidden">
