@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS orders (
   total_price DECIMAL(12,2) NOT NULL DEFAULT 0,
   cost_price DECIMAL(12,2) NOT NULL DEFAULT 0,
   sell_price DECIMAL(12,2) NOT NULL DEFAULT 0,
-  currency_code VARCHAR(8) NOT NULL DEFAULT 'USD',
+  currency_code VARCHAR(8) NOT NULL DEFAULT 'PKR',
   items_json JSON NULL,
   invoice_notes TEXT NULL,
   payment_due_date DATE NULL,

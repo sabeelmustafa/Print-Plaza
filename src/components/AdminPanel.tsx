@@ -1180,6 +1180,7 @@ function MediaEditor({ media, editingMedia, setEditingMedia, onSave }: { media: 
 }
 
 const supportedCurrencies = [
+  { code: 'PKR', label: 'PKR - Pakistani Rupee' },
   { code: 'USD', label: 'USD - US Dollar' },
   { code: 'AED', label: 'AED - UAE Dirham' },
   { code: 'SAR', label: 'SAR - Saudi Riyal' },
@@ -1187,7 +1188,6 @@ const supportedCurrencies = [
   { code: 'KWD', label: 'KWD - Kuwaiti Dinar' },
   { code: 'BHD', label: 'BHD - Bahraini Dinar' },
   { code: 'OMR', label: 'OMR - Omani Rial' },
-  { code: 'PKR', label: 'PKR - Pakistani Rupee' },
   { code: 'GBP', label: 'GBP - British Pound' },
   { code: 'EUR', label: 'EUR - Euro' },
   { code: 'CAD', label: 'CAD - Canadian Dollar' },
@@ -1195,14 +1195,20 @@ const supportedCurrencies = [
 ];
 
 function normalizeCurrencyCode(currency?: string) {
-  const code = String(currency || 'USD').trim().toUpperCase();
-  return /^[A-Z]{3}$/.test(code) ? code : 'USD';
+  const code = String(currency || 'PKR').trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(code) ? code : 'PKR';
 }
 
-function money(value: number, currency = 'USD') {
+function money(value: number, currency = 'PKR') {
   const currencyCode = normalizeCurrencyCode(currency);
   try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode }).format(value || 0);
+    return new Intl.NumberFormat('en-PK', {
+      style: 'currency',
+      currency: currencyCode,
+      currencyDisplay: 'code',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value || 0).replace(/\u00a0/g, ' ');
   } catch (_error) {
     return `${currencyCode} ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
@@ -1563,23 +1569,23 @@ function printInvoice(order: Order, settings?: SiteSettings) {
   }).join('');
   invoice.document.write(`<!doctype html><html><head><title>Invoice ${escapeInvoice(order.id)}</title><style>
     *{box-sizing:border-box}
-    body{font-family:Inter,Arial,sans-serif;color:#111;margin:0;background:#edecea;padding:28px}
-    .sheet{max-width:920px;min-height:1120px;margin:0 auto;background:#fff;box-shadow:0 24px 70px rgba(0,0,0,.12);position:relative;overflow:hidden}
-    .stripe{display:flex;height:10px}.stripe span:first-child{flex:1;background:${escapeInvoice(primary)}}.stripe span:last-child{flex:1;background:${escapeInvoice(accent)}}
-    .inner{padding:54px 58px 42px}
-    header{display:grid;grid-template-columns:1fr 260px;gap:40px;align-items:start;margin-bottom:42px}
-    .brand{display:flex;gap:20px;align-items:center}.logo{width:210px;max-height:78px;object-fit:contain;object-position:left center}
-    .brand-text h1{font-size:36px;line-height:.9;margin:0;text-transform:uppercase;letter-spacing:-1px}.tagline{font-size:10px;text-transform:uppercase;letter-spacing:4px;color:${escapeInvoice(primary)};font-weight:800;margin-top:10px}
-    .invoice-card{background:#111;color:#fff;padding:24px;text-align:right;position:relative}.invoice-card:before{content:"";position:absolute;left:0;top:0;width:7px;height:100%;background:${escapeInvoice(accent)}}.invoice-card h2{margin:0 0 16px;font-size:28px;text-transform:uppercase;letter-spacing:-.5px}.meta{font-size:12px;line-height:1.9;color:rgba(255,255,255,.72)}.meta strong{color:#fff}
-    .panels{display:grid;grid-template-columns:1.25fr .75fr;gap:18px;margin-bottom:36px}.panel{border:1px solid #ddd;background:#faf9f7;padding:22px}.panel-title{font-size:10px;text-transform:uppercase;letter-spacing:3px;color:#888;font-weight:900;margin-bottom:13px}.panel h3{margin:0 0 8px;font-size:20px}.panel p{margin:0;color:#555;font-size:13px;line-height:1.7}
-    table{width:100%;border-collapse:collapse;margin-top:8px}th{background:#111;color:#fff;text-align:left;padding:15px 16px;font-size:10px;text-transform:uppercase;letter-spacing:2px}td{padding:18px 16px;border-bottom:1px solid #e4e0dc;font-size:14px}td strong{font-size:15px}.right{text-align:right}
-    .summary{display:grid;grid-template-columns:1fr 310px;gap:34px;margin-top:30px;align-items:start}.notes{background:#faf9f7;border-left:5px solid ${escapeInvoice(primary)};padding:20px;min-height:110px;white-space:pre-wrap;color:#555;font-size:13px;line-height:1.7}.notes strong{display:block;color:#111;text-transform:uppercase;font-size:10px;letter-spacing:2px;margin-bottom:10px}
-    .totals{border:1px solid #ddd}.total-row{display:flex;justify-content:space-between;gap:20px;padding:14px 18px;border-bottom:1px solid #eee;font-size:13px}.grand{background:#111;color:#fff;border-bottom:0;font-size:24px;font-weight:900}.grand span:first-child{font-size:13px;text-transform:uppercase;letter-spacing:2px;align-self:center}.balance{color:${escapeInvoice(accent)};font-weight:900}
-    footer{margin-top:54px;padding-top:24px;border-top:1px solid #ddd;display:grid;grid-template-columns:1fr 1fr;gap:24px;color:#666;font-size:11px;line-height:1.7}.foot-title{font-weight:900;color:#111;text-transform:uppercase;letter-spacing:2px;font-size:10px;margin-bottom:8px}.report{font-family:monospace;text-align:right;color:#999}
-    @media print{body{background:#fff;padding:0}.sheet{box-shadow:none;max-width:none;min-height:0}.inner{padding:42px 46px}@page{margin:0.35in}}
+    body{font-family:Arial,Helvetica,sans-serif;color:#171717;margin:0;background:#eee;padding:24px}
+    .sheet{max-width:850px;min-height:1100px;margin:0 auto;background:#fff;box-shadow:0 8px 30px rgba(0,0,0,.1)}
+    .stripe{height:4px;background:${escapeInvoice(primary)}}
+    .inner{padding:46px 52px 36px}
+    header{display:grid;grid-template-columns:1fr 245px;gap:36px;align-items:start;padding-bottom:28px;border-bottom:2px solid #222;margin-bottom:30px}
+    .brand{display:flex;align-items:flex-start}.logo{width:210px;max-height:72px;object-fit:contain;object-position:left top}
+    .brand-text h1{font-size:32px;line-height:1;margin:0;text-transform:uppercase}.tagline{font-size:10px;text-transform:uppercase;color:${escapeInvoice(primary)};font-weight:700;margin-top:8px}
+    .invoice-card{text-align:right;border-right:4px solid ${escapeInvoice(accent)};padding:2px 14px 2px 0}.invoice-card h2{margin:0 0 12px;font-size:26px;text-transform:uppercase}.meta{font-size:11px;line-height:1.8;color:#555}.meta strong{color:#111}
+    .panels{display:grid;grid-template-columns:1.25fr .75fr;gap:30px;margin-bottom:32px}.panel{padding:0}.panel-title{font-size:9px;text-transform:uppercase;letter-spacing:2px;color:${escapeInvoice(primary)};font-weight:700;margin-bottom:9px}.panel h3{margin:0 0 6px;font-size:17px}.panel p{margin:0;color:#555;font-size:12px;line-height:1.6}
+    table{width:100%;border-collapse:collapse;margin-top:8px;border-top:2px solid #222}th{text-align:left;padding:12px 10px;border-bottom:1px solid #999;font-size:9px;text-transform:uppercase;letter-spacing:1.5px}td{padding:15px 10px;border-bottom:1px solid #ddd;font-size:12px}td strong{font-size:13px}.right{text-align:right}
+    .summary{display:grid;grid-template-columns:1fr 290px;gap:42px;margin-top:26px;align-items:start}.notes{border-left:3px solid ${escapeInvoice(primary)};padding:3px 0 3px 14px;white-space:pre-wrap;color:#555;font-size:11px;line-height:1.7}.notes strong{display:block;color:#111;text-transform:uppercase;font-size:9px;letter-spacing:1.5px;margin-bottom:8px}
+    .totals{border-top:1px solid #999}.total-row{display:flex;justify-content:space-between;gap:20px;padding:10px 4px;border-bottom:1px solid #ddd;font-size:12px}.grand{border-top:2px solid #222;border-bottom:3px double #222;font-size:20px;font-weight:700}.grand span:first-child{font-size:11px;text-transform:uppercase;align-self:center}.balance{color:#111;font-weight:700}
+    footer{margin-top:50px;padding-top:17px;border-top:1px solid #bbb;display:grid;grid-template-columns:1fr 1fr;gap:24px;color:#666;font-size:9px;line-height:1.7}.foot-title{font-weight:700;color:#111;text-transform:uppercase;letter-spacing:1.5px;font-size:9px;margin-bottom:5px}.report{font-family:monospace;text-align:right;color:#888}
+    @media print{body{background:#fff;padding:0}.sheet{box-shadow:none;max-width:none;min-height:0}.inner{padding:26px 34px}@page{size:A4;margin:0.45in}}
   </style></head><body>
     <main class="sheet">
-      <div class="stripe"><span></span><span></span></div>
+      <div class="stripe"></div>
       <div class="inner">
         <header>
           <div class="brand">
@@ -1626,7 +1632,7 @@ function CreateOrderModal({ products, onClose, onSave }: { products: Product[]; 
     userName: '',
     userEmail: '',
     costPrice: 0,
-    currency: 'USD',
+    currency: 'PKR',
     status: 'pending',
     paymentDueDate: '',
     invoiceNotes: '',
@@ -1712,7 +1718,7 @@ function CreateOrderModal({ products, onClose, onSave }: { products: Product[]; 
         </section>
         <div className="grid sm:grid-cols-3 gap-5">
           <Field label="Cost price"><input type="number" min="0" step="0.01" className={inputClass} value={order.costPrice || 0} onChange={event => setOrder({ ...order, costPrice: Number(event.target.value) })} /></Field>
-          <Field label="Currency"><select className={inputClass} value={order.currency || 'USD'} onChange={event => setOrder({ ...order, currency: event.target.value })}>{supportedCurrencies.map(option => <option key={option.code} value={option.code}>{option.label}</option>)}</select></Field>
+          <Field label="Currency"><select className={inputClass} value={order.currency || 'PKR'} onChange={event => setOrder({ ...order, currency: event.target.value })}>{supportedCurrencies.map(option => <option key={option.code} value={option.code}>{option.label}</option>)}</select></Field>
           <div className="bg-[#F6F5F2] p-4"><div className="text-[9px] font-black uppercase tracking-widest text-black/35">Profit</div><div className="text-2xl font-black mt-2">{money(sellTotal - Number(order.costPrice || 0), order.currency)}</div></div>
         </div>
         <div className="grid sm:grid-cols-2 gap-5">
