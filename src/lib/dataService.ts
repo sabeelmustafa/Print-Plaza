@@ -113,9 +113,12 @@ export const DataService = {
     }
   },
 
-  getOrders: async (userId?: string): Promise<Order[]> => {
+  getOrders: async (userId?: string, userEmail?: string | null): Promise<Order[]> => {
     try {
-      const query = userId ? `?userId=${encodeURIComponent(userId)}` : '';
+      const params = new URLSearchParams();
+      if (userId) params.set('userId', userId);
+      if (userEmail) params.set('userEmail', userEmail);
+      const query = params.toString() ? `?${params.toString()}` : '';
       return await request<Order[]>(`/api/orders${query}`);
     } catch (_error) {
       return getLocalOrders(userId);

@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth } from './firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -19,31 +18,11 @@ const AuthContext = createContext<AuthContextType>({
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
-      if (user) {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          setProfile(userDoc.data());
-        } else {
-          // Create profile for new user
-          const newProfile = {
-            id: user.uid,
-            email: user.email,
-            displayName: user.displayName,
-            role: user.email === 'sabeelchakwal@gmail.com' ? 'admin' : 'client',
-            createdAt: serverTimestamp()
-          };
-          await setDoc(doc(db, 'users', user.uid), newProfile);
-          setProfile(newProfile);
-        }
-      } else {
-        setProfile(null);
-      }
       setLoading(false);
     });
 
@@ -53,9 +32,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <AuthContext.Provider value={{ 
       user, 
-      profile, 
+      profile: user ? {
+        id: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        role: user.email === 'sabeelchakwal@gmail.com' ? 'admin' : 'client',
+      } : null, 
       loading, 
-      isAdmin: profile?.role === 'admin' 
+      isAdmin: user?.email === 'sabeelchakwal@gmail.com' 
     }}>
       {children}
     </AuthContext.Provider>

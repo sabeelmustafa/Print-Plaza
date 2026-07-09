@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Mail, LogIn } from 'lucide-react';
 import { signInWithGoogle } from '../lib/firebase';
@@ -9,12 +9,20 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
   const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setError('');
     try {
       await signInWithGoogle();
       onClose();
     } catch (error) {
       console.error('Sign in failed:', error);
+      setError(error instanceof Error ? error.message : 'Google sign in failed.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -59,11 +67,18 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
               <button 
                 onClick={handleGoogleSignIn}
-                className="w-full flex items-center justify-center gap-4 bg-black text-white py-6 mb-4 text-[10px] font-black uppercase tracking-[0.4em] hover:bg-[#2D545E] transition-all hover:scale-[1.02]"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-4 bg-black text-white py-6 mb-4 text-[10px] font-black uppercase tracking-[0.4em] hover:bg-[#2D545E] transition-all hover:scale-[1.02] disabled:opacity-60 disabled:hover:scale-100"
               >
                 <LogIn className="w-4 h-4" />
-                Sign In With Google
+                {loading ? 'Connecting...' : 'Sign In With Google'}
               </button>
+
+              {error && (
+                <p className="mb-4 text-[10px] font-bold leading-relaxed text-red-600">
+                  {error}
+                </p>
+              )}
 
               <p className="text-[10px] font-medium text-black/30 max-w-[200px] mx-auto leading-relaxed">
                 By entering, you establish a secure link with our production servers.

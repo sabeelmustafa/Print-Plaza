@@ -365,26 +365,38 @@ app.delete('/api/admin/products/:id', requireDb, requireAdmin, async (req, res, 
 
 app.get('/api/orders', requireDb, async (req, res, next) => {
   try {
-    const userId = req.query.userId;
+    const userId = String(req.query.userId || '').trim();
+    const userEmail = String(req.query.userEmail || '').trim().toLowerCase();
     const adminRequest = isAdminRequest(req);
-    if (!userId && !adminRequest) {
+    if (!userId && !userEmail && !adminRequest) {
       res.status(401).json({ error: 'Admin access required.' });
       return;
     }
 
-    const query = adminRequest
-      ? `SELECT o.*,
-           COALESCE((SELECT SUM(p.amount) FROM payment_records p WHERE p.order_id = o.id), 0) AS paid_amount
-         FROM orders o
-         ${userId ? 'WHERE o.user_id = ?' : ''}
-         ORDER BY o.created_at DESC`
-      : 'SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC';
-    const params = userId ? [userId] : [];
+    const filters = [];
+    const params = [];
+    if (userId) {
+      filters.push('o.user_id = ?');
+      params.push(userId);
+    }
+    if (userEmail) {
+      filters.push('LOWER(o.user_email) = ?');
+      params.push(userEmail);
+    }
+
+    const query = `SELECT o.*,
+        COALESCE((SELECT SUM(p.amount) FROM payment_records p WHERE p.order_id = o.id), 0) AS paid_amount
+      FROM orders o
+      ${filters.length ? `WHERE (${filters.join(' OR ')})` : ''}
+      ORDER BY o.created_at DESC`;
     const [rows] = await pool.query(query, params);
     let paymentsByOrder = {};
-    if (adminRequest && rows.length) {
+    if (rows.length) {
       const [paymentRows] = await pool.query(
-        'SELECT * FROM payment_records ORDER BY paid_at DESC, created_at DESC'
+        `SELECT * FROM payment_records
+         ${adminRequest ? '' : `WHERE order_id IN (${rows.map(() => '?').join(',')})`}
+         ORDER BY paid_at DESC, created_at DESC`,
+        adminRequest ? [] : rows.map((row) => row.id)
       );
       paymentsByOrder = paymentRows.reduce((result, payment) => {
         const orderId = payment.order_id;
@@ -405,12 +417,12 @@ app.get('/api/orders', requireDb, async (req, res, next) => {
     res.json(rows.map((row) => ({
       ...(adminRequest ? {
         costPrice: Number(row.cost_price || 0),
-        paidAmount: Number(row.paid_amount || 0),
-        balanceDue: Math.max(0, Number(row.sell_price || row.total_price || 0) - Number(row.paid_amount || 0)),
-        invoiceNotes: row.invoice_notes || '',
-        paymentDueDate: row.payment_due_date,
-        payments: paymentsByOrder[row.id] || [],
       } : {}),
+      paidAmount: Number(row.paid_amount || 0),
+      balanceDue: Math.max(0, Number(row.sell_price || row.total_price || 0) - Number(row.paid_amount || 0)),
+      invoiceNotes: row.invoice_notes || '',
+      paymentDueDate: row.payment_due_date,
+      payments: paymentsByOrder[row.id] || [],
       id: row.id,
       userId: row.user_id,
       userName: row.user_name,

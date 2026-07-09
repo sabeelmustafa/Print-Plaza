@@ -108,7 +108,7 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
                   }`}
                 >
                   {isAdmin ? <Terminal className="w-4 h-4" /> : <UserIcon className="w-4 h-4" />}
-                  {isAdmin ? 'System Panel' : 'Archive'}
+                  {isAdmin ? 'System Panel' : 'Client Area'}
                 </button>
                 <button 
                   onClick={() => logOut()}
@@ -187,7 +187,7 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
                     className="flex items-center gap-4 text-[12px] font-black uppercase tracking-[0.3em] text-[#2D545E] py-2"
                   >
                     {isAdmin ? <Terminal className="w-5 h-5" /> : <UserIcon className="w-5 h-5" />}
-                    {isAdmin ? 'System Panel' : 'My Archive'}
+                    {isAdmin ? 'System Panel' : 'Client Area'}
                   </button>
                   <button 
                     onClick={() => {
