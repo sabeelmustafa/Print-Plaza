@@ -40,35 +40,35 @@ export default function Hero({ settings, theme }: HeroProps) {
       <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(9,12,13,0.82)_0%,transparent_48%)]" />
       <div className="absolute inset-0 bg-grainy opacity-[0.06] pointer-events-none" />
 
-      <div className="relative z-10 max-w-7xl h-full mx-auto px-6 sm:px-8 lg:px-12 flex flex-col items-center justify-center pt-12 pb-24 sm:pb-28">
+      <div className="relative z-10 max-w-7xl h-full mx-auto px-6 sm:px-10 lg:px-16 flex flex-col items-center justify-center pt-20 sm:pt-24 lg:pt-20 pb-28 sm:pb-32">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: 'easeOut' }}
-          className="w-full max-w-5xl text-center flex flex-col items-center"
+          className="w-full max-w-[980px] text-center flex flex-col items-center"
         >
-          <div className="flex items-center justify-center gap-4 mb-6">
-            <span className="w-10 h-1" style={{ backgroundColor: accentColor }} />
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white/75">
+          <div className="flex flex-wrap items-center justify-center gap-4 mb-7 sm:mb-8">
+            <span className="w-12 h-1" style={{ backgroundColor: accentColor }} />
+            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-[0.28em] text-white/78">
               Packaging / Print / Large format
             </span>
           </div>
 
           <h1
             id="hero-title"
-            className="max-w-5xl text-[2.8rem] sm:text-[4.3rem] lg:text-[5.6rem] font-display font-black uppercase leading-[0.94] mb-7"
+            className="max-w-[1040px] text-[2.65rem] sm:text-[4rem] lg:text-[5rem] xl:text-[5.35rem] font-display font-black uppercase leading-[0.95] mb-7 sm:mb-8"
           >
             {settings?.heroTitle || 'Industrial Print Production.'}
           </h1>
 
-          <p className="max-w-2xl text-[15px] sm:text-lg leading-[1.75] text-white/78 font-medium">
+          <p className="max-w-[760px] text-[15px] sm:text-[18px] leading-[1.8] text-white/80 font-medium">
             {settings?.heroSubtitle || 'High-fidelity manufacturing for the modern brand. From offset lithography to large-scale signage, we deliver chromatic precision and material excellence.'}
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-center mt-9">
+          <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-center mt-10">
             <a
               href="#products"
-              className="w-full sm:w-auto min-h-12 px-7 py-4 text-[10px] font-black uppercase tracking-[0.18em] flex items-center justify-center gap-3 transition-colors hover:bg-white hover:text-black"
+              className="w-full sm:w-auto min-h-12 px-8 py-4 text-[10px] font-black uppercase tracking-[0.18em] flex items-center justify-center gap-3 transition-colors hover:bg-white hover:text-black"
               style={{ backgroundColor: accentColor }}
             >
               {settings?.primaryButtonText || 'Launch Production'}
@@ -76,7 +76,7 @@ export default function Hero({ settings, theme }: HeroProps) {
             </a>
             <a
               href="#services"
-              className="w-full sm:w-auto min-h-12 px-7 py-4 border border-white/45 text-[10px] font-black uppercase tracking-[0.18em] flex items-center justify-center transition-colors hover:bg-white hover:text-black"
+              className="w-full sm:w-auto min-h-12 px-8 py-4 border border-white/45 text-[10px] font-black uppercase tracking-[0.18em] flex items-center justify-center transition-colors hover:bg-white hover:text-black"
             >
               {settings?.secondaryButtonText || 'Substrate Catalog'}
             </a>
@@ -85,7 +85,7 @@ export default function Hero({ settings, theme }: HeroProps) {
       </div>
 
       <div className="absolute z-20 bottom-0 left-0 right-0 border-t border-white/18 bg-black/35 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 grid grid-cols-3 divide-x divide-white/15">
+        <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 grid grid-cols-3 divide-x divide-white/15">
           {[
             ['01', 'Packaging'],
             ['02', 'Commercial print'],
