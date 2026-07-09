@@ -21,7 +21,7 @@ export default function Hero({ settings, theme }: HeroProps) {
 
   return (
     <section
-      className="relative min-h-[560px] h-[calc(100svh-5rem)] sm:h-[calc(100svh-6.5rem)] overflow-hidden bg-[#202425] text-white border-b border-black/10"
+      className="relative min-h-[680px] h-screen overflow-hidden bg-[#202425] text-white border-b border-black/10"
       aria-labelledby="hero-title"
     >
       {!imageFailed ? (
@@ -40,12 +40,12 @@ export default function Hero({ settings, theme }: HeroProps) {
       <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(9,12,13,0.82)_0%,transparent_48%)]" />
       <div className="absolute inset-0 bg-grainy opacity-[0.06] pointer-events-none" />
 
-      <div className="relative z-10 max-w-7xl h-full mx-auto px-6 sm:px-10 lg:px-16 flex flex-col items-center justify-center pt-20 sm:pt-24 lg:pt-20 pb-28 sm:pb-32">
+      <div className="relative z-10 max-w-7xl h-full mx-auto px-6 sm:px-10 lg:px-16 flex flex-col items-center justify-center pt-32 sm:pt-36 lg:pt-32 pb-32 sm:pb-36">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: 'easeOut' }}
-          className="w-full max-w-[980px] text-center flex flex-col items-center"
+          className="w-full max-w-[960px] text-center flex flex-col items-center"
         >
           <div className="flex flex-wrap items-center justify-center gap-4 mb-7 sm:mb-8">
             <span className="w-12 h-1" style={{ backgroundColor: accentColor }} />
@@ -56,7 +56,7 @@ export default function Hero({ settings, theme }: HeroProps) {
 
           <h1
             id="hero-title"
-            className="max-w-[1040px] text-[2.65rem] sm:text-[4rem] lg:text-[5rem] xl:text-[5.35rem] font-display font-black uppercase leading-[0.95] mb-7 sm:mb-8"
+            className="max-w-[1000px] text-[2.65rem] sm:text-[3.9rem] lg:text-[4.8rem] xl:text-[5.15rem] font-display font-black uppercase leading-[0.95] mb-7 sm:mb-8"
           >
             {settings?.heroTitle || 'Industrial Print Production.'}
           </h1>

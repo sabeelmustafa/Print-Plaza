@@ -58,6 +58,8 @@ const defaultSettings: SiteSettings = {
   header: {
     logoText: 'PRINT PLAZA',
     logoImage: '/brand/print-plaza-logo.png',
+    logoImageDark: '/brand/print-plaza-logo.png',
+    logoImageLight: '/brand/print-plaza-logo.png',
     logoSize: 36,
     tagline: 'Industrial Print Production',
     servicesLabel: 'Services',
@@ -93,7 +95,7 @@ const defaultSettings: SiteSettings = {
     address: 'Studio Block A, Creative District, NY 10001',
   },
   documents: {
-    invoiceLogo: '',
+    invoiceLogo: '/brand/print-plaza-logo.png',
     companyName: 'Print Plaza',
     tagline: 'Industrial Print Production',
     accentColor: '#E17055',
@@ -654,11 +656,12 @@ function HeaderPreview({ settings }: { settings?: SiteSettings['header'] }) {
   const logoSize = Math.min(Math.max(Number(settings?.logoSize || 36), 24), 96);
   const navFontSize = Math.min(Math.max(Number(settings?.navMenuFontSize || 10), 9), 16);
   const navItems = fallbackNavItems(settings);
+  const previewLogo = settings?.logoImageDark || settings?.logoImage;
 
   return (
     <div className="h-20 px-8 flex items-center justify-between border-b border-black/10 bg-white">
       <div className="flex items-center gap-3">
-        {settings?.logoImage ? <img src={settings.logoImage} alt="" className="max-w-52 object-contain" style={{ height: `${logoSize}px` }} /> : <>
+        {previewLogo ? <img src={previewLogo} alt="" className="max-w-52 object-contain" style={{ height: `${logoSize}px` }} /> : <>
           <div className="flex gap-1"><span className="w-2 h-7 bg-[#2D545E] -skew-x-12" /><span className="w-2 h-7 bg-[#E17055] -skew-x-12" /></div>
           <div><div className="font-display font-black text-xl leading-none">{settings?.logoText || 'PRINT PLAZA'}</div><div className="text-[7px] font-black uppercase tracking-[0.3em] text-[#2D545E] mt-1">{settings?.tagline || 'Industrial Print Production'}</div></div>
         </>}
@@ -768,8 +771,10 @@ function SectionSettings({
   const theme = settings.theme || {};
   const footer = settings.footer || {};
   const header = settings.header || {};
+  const documents = settings.documents || {};
   const headerNavItems = fallbackNavItems(header);
   const updateHeader = (updates: SiteSettings['header']) => setSettings({ ...settings, header: { ...header, ...updates } });
+  const updateDocuments = (updates: SiteSettings['documents']) => setSettings({ ...settings, documents: { ...documents, ...updates } });
   const updateNavItem = (id: string, updates: Partial<NavMenuItem>) => {
     updateHeader({
       navItems: headerNavItems.map(item => item.id === id ? { ...item, ...updates } : item),
@@ -781,10 +786,22 @@ function SectionSettings({
       <div className="space-y-5">
         <PanelTitle title="Header" />
         <ImageUploadField
-          label="Logo image"
-          value={header.logoImage || ''}
-          previewTitle="Website logo"
-          onChange={url => updateHeader({ logoImage: url })}
+          label="Logo for light header"
+          value={header.logoImageDark || header.logoImage || ''}
+          previewTitle="Logo for light header"
+          onChange={url => updateHeader({ logoImageDark: url, logoImage: url })}
+        />
+        <ImageUploadField
+          label="Logo for transparent dark header"
+          value={header.logoImageLight || header.logoImageDark || header.logoImage || ''}
+          previewTitle="Logo for dark hero header"
+          onChange={url => updateHeader({ logoImageLight: url })}
+        />
+        <ImageUploadField
+          label="Document logo"
+          value={documents.invoiceLogo || header.logoImageDark || header.logoImage || ''}
+          previewTitle="Document logo"
+          onChange={url => updateDocuments({ invoiceLogo: url })}
         />
         <Field label="Logo size">
           <div className="flex items-center gap-3">
@@ -986,6 +1003,21 @@ function ImageUploadField({
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [mediaLibrary, setMediaLibrary] = useState<MediaAsset[]>([]);
+  const [showLibrary, setShowLibrary] = useState(true);
+
+  const loadMediaLibrary = async () => {
+    try {
+      const assets = await DataService.getMedia();
+      setMediaLibrary(assets.filter(asset => Boolean(asset.url)));
+    } catch (_error) {
+      setMediaLibrary([]);
+    }
+  };
+
+  useEffect(() => {
+    loadMediaLibrary();
+  }, []);
 
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -996,6 +1028,7 @@ function ImageUploadField({
     try {
       const url = await DataService.uploadImage(file, previewTitle);
       onChange(url);
+      await loadMediaLibrary();
     } catch (caught) {
       setUploadError(caught instanceof Error ? caught.message : 'Upload failed.');
     } finally {
@@ -1015,9 +1048,45 @@ function ImageUploadField({
               <div className="text-[10px] font-black uppercase tracking-[0.25em] text-black/25">No image</div>
             )}
           </div>
+
+          {mediaLibrary.length > 0 && (
+            <div className="mb-3 border border-black/10 bg-[#F6F5F2]">
+              <button
+                type="button"
+                onClick={() => setShowLibrary(!showLibrary)}
+                className="w-full px-3 py-3 text-left text-[9px] font-black uppercase tracking-[0.25em] text-black/55 flex items-center justify-between"
+              >
+                Uploaded media
+                <span>{showLibrary ? 'Hide' : 'Show'}</span>
+              </button>
+              {showLibrary && (
+                <div className="grid grid-cols-3 gap-2 p-3 pt-0 max-h-56 overflow-y-auto">
+                  {mediaLibrary.map(asset => {
+                    const assetTitle = asset.title || asset.altText || asset.alt_text || 'Media image';
+                    const selected = asset.url === value;
+                    return (
+                      <button
+                        key={asset.id}
+                        type="button"
+                        onClick={() => onChange(asset.url)}
+                        className={`relative aspect-square overflow-hidden border bg-white ${
+                          selected ? 'border-[#E17055] ring-2 ring-[#E17055]/30' : 'border-black/10 hover:border-black'
+                        }`}
+                        title={assetTitle}
+                      >
+                        <img src={asset.url} alt={assetTitle} className="w-full h-full object-cover" />
+                        {selected && <span className="absolute inset-x-0 bottom-0 bg-[#E17055] text-white text-[8px] font-black uppercase tracking-widest py-1">Selected</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-2">
             <label className="cursor-pointer bg-black text-white px-4 py-3 text-[10px] font-black uppercase tracking-widest hover:bg-[#2D545E]">
-              {uploading ? 'Uploading...' : 'Upload'}
+              {uploading ? 'Uploading...' : 'Upload new'}
               <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={uploading} />
             </label>
             <input className={inputClass} value={value} onChange={event => onChange(event.target.value)} placeholder="/uploads/image.jpg" />

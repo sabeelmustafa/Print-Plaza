@@ -56,6 +56,8 @@ export interface SiteSettings {
   header?: {
     logoText?: string;
     logoImage?: string;
+    logoImageDark?: string;
+    logoImageLight?: string;
     logoSize?: number;
     tagline?: string;
     servicesLabel?: string;
