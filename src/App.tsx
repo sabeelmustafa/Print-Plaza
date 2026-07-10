@@ -13,6 +13,7 @@ import OrderModal from './components/OrderModal';
 import AuthModal from './components/AuthModal';
 import AdminPanel, { WebsiteEditorPage } from './components/AdminPanel';
 import UserPanel from './components/UserPanel';
+import { PrivacyPolicyPage, ServiceLinksSection, ServicePage, SERVICE_PAGES } from './components/SeoPages';
 import { SERVICES as CONSTANT_SERVICES } from './constants';
 import { ServiceCategory, Product, SiteSettings } from './types';
 import { CheckCircle2, ChevronLeft } from 'lucide-react';
@@ -99,6 +100,62 @@ function AdminLoginPage() {
   );
 }
 
+function SiteFooter({ siteSettings }: { siteSettings: SiteSettings }) {
+  return (
+    <footer id="about" className="bg-black text-white pt-24 sm:pt-32 pb-16 relative overflow-hidden bg-grainy/5">
+      {/* Duo-tone border top */}
+      <div className="absolute top-0 left-0 w-full h-2 flex">
+        <div className="flex-1 bg-[#2D545E]" />
+        <div className="flex-1 bg-[#E17055]" />
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-16 md:gap-20">
+          <div className="sm:col-span-2">
+            <div className="mb-10 sm:mb-12">
+              <h6 className="font-display font-black text-4xl sm:text-5xl mb-4 tracking-tight uppercase leading-none">{siteSettings.footer?.brandText || 'Print Plaza.'}</h6>
+              <div className="text-[10px] uppercase tracking-[0.32em] font-black text-[#66A0AA]">{siteSettings.footer?.tagline || 'Creative Production Studio'}</div>
+            </div>
+            <p className="text-sm leading-loose opacity-70 max-w-sm font-medium tracking-wide">
+              {siteSettings.footer?.description || 'High quality printing, packaging, labels, signage, and business print production with a focus on tactile excellence and tonal precision.'}
+            </p>
+          </div>
+
+          <div>
+            <h5 className="text-[10px] uppercase tracking-[0.28em] font-black mb-8 sm:mb-10 text-[#E17055]">Services</h5>
+            <ul className="space-y-4 sm:space-y-6 text-sm font-bold tracking-tight opacity-70">
+              <li><a href="/custom-packaging-printing" className="hover:text-[#E17055] transition-colors uppercase">Packaging</a></li>
+              <li><a href="/product-label-printing" className="hover:text-[#E17055] transition-colors uppercase">Labels</a></li>
+              <li><a href="/business-card-printing" className="hover:text-[#E17055] transition-colors uppercase">Business Cards</a></li>
+              <li><a href="/privacy-policy" className="hover:text-[#E17055] transition-colors uppercase">Privacy Policy</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h5 className="text-[10px] uppercase tracking-[0.28em] font-black mb-8 sm:mb-10 text-[#66A0AA]">Plaza Studio</h5>
+            <ul className="space-y-4 sm:space-y-6 text-sm font-medium leading-relaxed opacity-70 font-mono">
+              <li>{siteSettings.footer?.email || 'hi@print.plaza'}</li>
+              <li>{siteSettings.footer?.phone || '+1 212 555 7788'}</li>
+              <li>{siteSettings.footer?.address || 'Studio Block A, Creative District, NY 10001'}</li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="mt-24 sm:mt-40 pt-12 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-8 text-[10px] font-black uppercase tracking-[0.32em] opacity-50 text-center md:text-left">
+          <p>&copy; 2024 Print Plaza Hub. Creative Output.</p>
+          <div className="flex gap-12">
+            <a href="/privacy-policy" className="hover:opacity-100 italic">Privacy Policy</a>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-[#2D545E]" />
+              <div className="w-2 h-2 bg-[#E17055]" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 function AppContent() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const [services, setServices] = useState<ServiceCategory[]>(CONSTANT_SERVICES);
@@ -156,6 +213,29 @@ function AppContent() {
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 5000);
   };
+
+  const currentPath = window.location.pathname.replace(/\/$/, '') || '/';
+  const servicePage = SERVICE_PAGES.find(page => page.path === currentPath);
+  const isPrivacyPolicy = currentPath === '/privacy-policy';
+
+  if (servicePage || isPrivacyPolicy) {
+    return (
+      <div className="min-h-screen bg-[#FDFCFB] font-sans text-black selection:bg-[#2D545E] selection:text-white relative">
+        <div className="fixed inset-0 bg-grainy opacity-[0.03] pointer-events-none z-50 overflow-hidden" />
+
+        <Navbar
+          onLogin={() => setShowAuthModal(true)}
+          onViewDashboard={() => setView('dashboard')}
+          settings={{ ...siteSettings.header, useTransparentHeader: false }}
+        />
+
+        {servicePage ? <ServicePage page={servicePage} /> : <PrivacyPolicyPage />}
+
+        <SiteFooter siteSettings={siteSettings} />
+        <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FDFCFB] font-sans text-black selection:bg-[#2D545E] selection:text-white relative">
@@ -222,6 +302,8 @@ function AppContent() {
           onSelect={setSelectedCategory} 
         />
 
+        <ServiceLinksSection />
+
         <AnimatePresence>
           {selectedCategory && (
             <motion.section 
@@ -268,57 +350,7 @@ function AppContent() {
         </AnimatePresence>
       </main>
 
-      <footer id="about" className="bg-black text-white pt-24 sm:pt-32 pb-16 relative overflow-hidden bg-grainy/5">
-        {/* Duo-tone border top */}
-        <div className="absolute top-0 left-0 w-full h-2 flex">
-          <div className="flex-1 bg-[#2D545E]" />
-          <div className="flex-1 bg-[#E17055]" />
-        </div>
-
-        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-16 md:gap-20">
-            <div className="sm:col-span-2">
-              <div className="mb-10 sm:mb-12">
-                <h6 className="font-display font-black text-4xl sm:text-5xl mb-4 tracking-tight uppercase leading-none">{siteSettings.footer?.brandText || 'Print Plaza.'}</h6>
-                <div className="text-[10px] uppercase tracking-[0.32em] font-black text-[#66A0AA]">{siteSettings.footer?.tagline || 'Creative Production Studio'}</div>
-              </div>
-              <p className="text-sm leading-loose opacity-70 max-w-sm font-medium tracking-wide">
-                {siteSettings.footer?.description || 'High quality printing, packaging, labels, signage, and business print production with a focus on tactile excellence and tonal precision.'}
-              </p>
-            </div>
-            
-            <div>
-              <h5 className="text-[10px] uppercase tracking-[0.28em] font-black mb-8 sm:mb-10 text-[#E17055]">The Archive</h5>
-              <ul className="space-y-4 sm:space-y-6 text-sm font-bold tracking-tight opacity-70">
-                <li><a href="#" className="hover:text-[#E17055] transition-colors uppercase">Color History</a></li>
-                <li><a href="#" className="hover:text-[#E17055] transition-colors uppercase">Paper Lab</a></li>
-                <li><a href="#" className="hover:text-[#E17055] transition-colors uppercase">Digital Unit</a></li>
-                <li><a href="#" className="hover:text-[#E17055] transition-colors uppercase">Dispatch</a></li>
-              </ul>
-            </div>
-            
-            <div>
-              <h5 className="text-[10px] uppercase tracking-[0.28em] font-black mb-8 sm:mb-10 text-[#66A0AA]">Plaza Studio</h5>
-              <ul className="space-y-4 sm:space-y-6 text-sm font-medium leading-relaxed opacity-70 font-mono">
-                <li>{siteSettings.footer?.email || 'hi@print.plaza'}</li>
-                <li>{siteSettings.footer?.phone || '+1 212 555 7788'}</li>
-                <li>{siteSettings.footer?.address || 'Studio Block A, Creative District, NY 10001'}</li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="mt-24 sm:mt-40 pt-12 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-8 text-[10px] font-black uppercase tracking-[0.32em] opacity-50 text-center md:text-left">
-            <p>&copy; 2024 Print Plaza Hub. Creative Output.</p>
-            <div className="flex gap-12">
-              <a href="#" className="hover:opacity-100 italic">Consistency Report</a>
-              <div className="flex gap-1">
-                <div className="w-2 h-2 bg-[#2D545E]" />
-                <div className="w-2 h-2 bg-[#E17055]" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter siteSettings={siteSettings} />
 
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
 
