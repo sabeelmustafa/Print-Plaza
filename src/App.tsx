@@ -13,7 +13,7 @@ import OrderModal from './components/OrderModal';
 import AuthModal from './components/AuthModal';
 import AdminPanel, { WebsiteEditorPage } from './components/AdminPanel';
 import UserPanel from './components/UserPanel';
-import { PrivacyPolicyPage, ServiceLinksSection, ServicePage, SERVICE_PAGES } from './components/SeoPages';
+import { PrivacyPolicyPage, ServicePage, SERVICE_PAGES } from './components/SeoPages';
 import { SERVICES as CONSTANT_SERVICES } from './constants';
 import { ServiceCategory, Product, SiteSettings } from './types';
 import { CheckCircle2, ChevronLeft } from 'lucide-react';
@@ -311,8 +311,6 @@ function AppContent() {
           categories={services} 
           onSelect={setSelectedCategory} 
         />
-
-        <ServiceLinksSection />
 
         <AnimatePresence>
           {selectedCategory && (
