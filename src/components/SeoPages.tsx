@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect } from 'react';
+import { ArrowLeft, ChevronRight, Clock, FileCheck2, Layers, Settings, ShieldCheck } from 'lucide-react';
 
 export interface ServiceSeoPage {
   path: string;
@@ -199,6 +200,35 @@ export function ServiceLinksSection() {
   );
 }
 
+function getServiceSpecs(page: ServiceSeoPage) {
+  const materialMap: Record<string, string[]> = {
+    '/custom-packaging-printing': ['Cardboard stocks', 'Kraft and art card', 'Corrugated options'],
+    '/product-label-printing': ['Paper labels', 'Synthetic label stock', 'Water-resistant options'],
+    '/business-card-printing': ['Premium card stock', 'Textured paper', 'Matte and gloss stocks'],
+    '/brochure-printing': ['Silk paper', 'Gloss art paper', 'Uncoated paper'],
+    '/flyer-printing': ['Economy paper', 'Premium art paper', 'Gloss or matte finish'],
+    '/poster-printing': ['Poster paper', 'Photo paper', 'Indoor display stock'],
+    '/banner-printing': ['Flex banner', 'Vinyl media', 'Indoor and outdoor stock'],
+    '/sticker-printing': ['Sticker vinyl', 'Paper sticker stock', 'Custom cut media'],
+  };
+
+  return {
+    equipment: 'Digital, offset, and large format production workflow',
+    resolution: 'Artwork reviewed for sharp output, clean color, and print-safe sizing',
+    materials: materialMap[page.path] || ['Premium paper', 'Specialty media', 'Custom substrates'],
+    workflow: ['Quote review', 'Artwork check', 'Material selection', 'Print production', 'Finish and dispatch'],
+    capabilities: page.highlights.slice(0, 4),
+  };
+}
+
+function splitServiceTitle(title: string) {
+  const parts = title.split(' ');
+  return {
+    lead: parts[0],
+    rest: parts.slice(1).join(' ') || 'Production',
+  };
+}
+
 export function ServicePage({ page }: { page: ServiceSeoPage }) {
   useSeo(page.metaTitle, page.description, page.path, {
     '@context': 'https://schema.org',
@@ -215,112 +245,225 @@ export function ServicePage({ page }: { page: ServiceSeoPage }) {
     url: `https://printplaza.net${page.path}`,
   });
 
+  const specs = getServiceSpecs(page);
+  const titleParts = splitServiceTitle(page.title);
+
   return (
-    <main className="bg-[#FDFCFB] text-black overflow-hidden">
-      <section className="relative pt-32 sm:pt-40 pb-16 sm:pb-24 bg-black text-white">
-        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_18%_20%,#2D545E_0,transparent_32%),radial-gradient(circle_at_82%_10%,#E17055_0,transparent_24%)]" />
-        <div className="absolute inset-x-0 bottom-0 h-px bg-white/15" />
-        <div className="relative max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
-          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-16 items-end">
-            <div>
-              <div className="flex items-center gap-5 text-[10px] font-black uppercase tracking-[0.34em] text-white/70 mb-8">
-                <span className="h-1 w-14 bg-[#E17055]" />
-                {page.eyebrow}
-              </div>
-              <h1 className="font-display font-black uppercase tracking-tight text-[3.4rem] sm:text-[6.2rem] lg:text-[7.7rem] leading-[0.78] max-w-5xl">
-                {page.title}.
-              </h1>
-            </div>
+    <main className="min-h-screen bg-[#FDFCFB] pt-24 pb-24 sm:pb-32 text-black overflow-hidden">
+      <div className="absolute top-0 left-0 w-full h-2 flex z-40">
+        <div className="flex-1 bg-[#2D545E]" />
+        <div className="flex-1 bg-[#E17055]" />
+      </div>
 
-            <aside className="border border-white/15 bg-white/[0.04] p-6 sm:p-8 backdrop-blur-sm">
-              <div className="flex gap-2 mb-8">
-                <span className="h-2 w-8 bg-[#2D545E]" />
-                <span className="h-2 w-8 bg-[#E17055]" />
-                <span className="h-2 w-8 bg-white" />
-              </div>
-              <p className="text-lg sm:text-xl leading-[1.65] font-semibold text-white/76">{page.intro}</p>
-              <div className="mt-9 grid grid-cols-3 gap-px bg-white/15 text-center">
-                {['Quote', 'Proof', 'Print'].map((step, index) => (
-                  <div key={step} className="bg-black/70 py-5">
-                    <div className="text-[10px] font-mono text-white/35 mb-2">0{index + 1}</div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.24em]">{step}</div>
-                  </div>
-                ))}
-              </div>
-            </aside>
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+        <div className="mb-12 sm:mb-20 flex flex-wrap items-center justify-between gap-6 border-b border-black/5 pb-8">
+          <a
+            href="/"
+            className="inline-flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] text-black/50 hover:text-white transition-all group py-3 px-6 bg-black/5 hover:bg-black"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1.5 transition-transform" />
+            Back to Home
+          </a>
+
+          <div className="flex items-center gap-2 text-[10px] font-mono font-bold text-black/30">
+            <span>PRINT PLAZA</span>
+            <ChevronRight className="w-3 h-3" />
+            <span className="text-[#2D545E]">SERVICES</span>
+            <ChevronRight className="w-3 h-3" />
+            <span className="text-black uppercase">{page.title}</span>
           </div>
         </div>
-      </section>
 
-      <section className="bg-[#F6F5F2] border-b border-black/10">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 grid lg:grid-cols-3 gap-px bg-black/10">
-          {page.highlights.slice(0, 3).map((item, index) => (
-            <div key={item} className="bg-[#F6F5F2] min-h-[150px] p-7 sm:p-9 flex items-end">
-              <div>
-                <div className="text-[10px] font-mono font-black text-[#E17055] mb-4">SPEC_0{index + 1}</div>
-                <p className="font-display font-black uppercase tracking-tight text-2xl sm:text-3xl leading-[0.96]">{item}</p>
-              </div>
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-24 mb-20 sm:mb-32 items-start">
+          <div className="lg:col-span-7 space-y-8">
+            <div className="inline-flex items-center gap-4">
+              <span className="h-[2px] w-12 bg-[#2D545E]" />
+              <span className="text-[10px] font-black uppercase tracking-[0.4em] text-[#2D545E] font-mono">
+                PRODUCTION UNIT // {page.path.replace(/\//g, '').slice(0, 14).toUpperCase()}
+              </span>
             </div>
-          ))}
-        </div>
-      </section>
 
-      <section className="py-20 sm:py-28">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 grid lg:grid-cols-[0.9fr_1.1fr] gap-12 lg:gap-20 items-start">
-          <div className="lg:sticky lg:top-28">
-            <div className="text-[10px] font-black uppercase tracking-[0.34em] text-[#2D545E] mb-6">Production Scope</div>
-            <h2 className="font-display font-black uppercase tracking-tight text-5xl sm:text-7xl leading-[0.84]">
-              Built for brand output.
-            </h2>
-            <p className="mt-8 text-base sm:text-lg leading-8 font-semibold text-black/58 max-w-md">
-              These pages help customers understand what Print Plaza can produce before they request a quote. Every project still gets reviewed before production begins.
+            <h1 className="text-5xl sm:text-7xl md:text-8xl font-display font-black tracking-tight leading-[0.85] uppercase text-black">
+              {titleParts.lead} <br />
+              <span className="text-black/10 italic font-serif lowercase">{titleParts.rest}</span>
+            </h1>
+
+            <p className="text-lg sm:text-xl font-medium leading-relaxed text-black/60 font-sans max-w-2xl border-l-4 border-[#2D545E]/20 pl-6">
+              {page.intro}
             </p>
-            <div className="mt-10 flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-4">
-              <a href="/#products" className="bg-black text-white px-8 py-5 text-[10px] font-black uppercase tracking-[0.28em] text-center hover:bg-[#2D545E] transition-colors">Request Quote</a>
-              <a href="/" className="border border-black/20 px-8 py-5 text-[10px] font-black uppercase tracking-[0.28em] text-center hover:border-black transition-colors">Back Home</a>
+
+            <div className="flex flex-wrap gap-4 pt-4">
+              {specs.capabilities.map((capability) => (
+                <span key={capability} className="text-[9px] font-mono font-bold bg-[#EBEAE8] border border-black/10 text-black/70 py-2.5 px-5 uppercase tracking-widest">
+                  {capability}
+                </span>
+              ))}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 pt-3">
+              <a href="/#products" className="bg-black text-white px-8 py-5 text-[10px] font-black uppercase tracking-[0.28em] text-center hover:bg-[#2D545E] transition-colors">
+                Request Quote
+              </a>
+              <a href="#service-products" className="border border-black/20 px-8 py-5 text-[10px] font-black uppercase tracking-[0.28em] text-center hover:border-black transition-colors">
+                View Output
+              </a>
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-px bg-black/10 border border-black/10">
-            <div className="sm:col-span-2 bg-white p-8 sm:p-10">
-              <div className="text-[10px] font-black uppercase tracking-[0.32em] text-[#E17055] mb-5">What we make</div>
-              <div className="grid sm:grid-cols-2 gap-4">
-                {page.highlights.map((item) => (
-                  <div key={item} className="bg-[#F6F5F2] border border-black/5 p-6 min-h-[120px] flex items-end">
-                    <p className="font-black uppercase tracking-tight text-xl leading-[1.02]">{item}</p>
+          <div className="lg:col-span-5 relative w-full group">
+            <div className="aspect-[4/3] sm:aspect-[16/10] lg:aspect-[4/3] bg-neutral-900 border-2 border-black/10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15)] overflow-hidden relative">
+              <div className="absolute inset-0 bg-[linear-gradient(135deg,#111_0%,#1f2930_42%,#121212_100%)]" />
+              <div className="absolute inset-0 opacity-55 bg-[radial-gradient(circle_at_24%_20%,#2D545E_0,transparent_30%),radial-gradient(circle_at_76%_80%,#E17055_0,transparent_26%)]" />
+              <div className="absolute inset-x-0 h-[1px] bg-white/10 top-1/3 pointer-events-none" />
+              <div className="absolute inset-x-0 h-[1px] bg-white/10 top-2/3 pointer-events-none" />
+              <div className="absolute inset-y-0 w-[1px] bg-white/10 left-1/3 pointer-events-none" />
+              <div className="absolute inset-y-0 w-[1px] bg-white/10 left-2/3 pointer-events-none" />
+
+              <div className="absolute left-8 right-8 bottom-8 top-8 border border-white/15 p-6 flex flex-col justify-between bg-white/[0.03] backdrop-blur-[1px]">
+                <div className="flex gap-2">
+                  <span className="h-2 w-9 bg-[#2D545E]" />
+                  <span className="h-2 w-9 bg-[#E17055]" />
+                  <span className="h-2 w-9 bg-white" />
+                </div>
+                <div>
+                  <div className="text-[10px] font-mono font-black uppercase tracking-[0.42em] text-white/35 mb-5">Print Service</div>
+                  <div className="text-4xl sm:text-5xl font-display font-black uppercase tracking-tight leading-[0.86] text-white">
+                    {titleParts.lead}<br />{titleParts.rest}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="absolute -bottom-5 -right-3 sm:-right-5 bg-[#E17055] text-white text-[10px] font-black px-6 py-4 uppercase tracking-[0.2em] shadow-xl rotate-3">
+              QUOTE_READY // PP
+            </div>
+          </div>
+        </section>
+
+        <section className="mb-24 sm:mb-36">
+          <div className="text-[10px] font-black uppercase tracking-[0.4em] text-[#E17055] mb-12 flex items-center gap-4">
+            <div className="w-8 h-px bg-[#E17055]/30" /> Service Specifications
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-black/10 border border-black/10">
+            <div className="bg-[#FDFCFB] p-8 md:p-10 space-y-4">
+              <div className="w-10 h-10 flex items-center justify-center bg-[#2D545E]/10 mb-6">
+                <Settings className="w-5 h-5 text-[#2D545E]" />
+              </div>
+              <h4 className="text-xs uppercase tracking-widest font-black text-black/40">Production Setup</h4>
+              <p className="text-lg font-display font-black text-black uppercase leading-tight">{specs.equipment}</p>
+            </div>
+
+            <div className="bg-[#FDFCFB] p-8 md:p-10 space-y-4">
+              <div className="w-10 h-10 flex items-center justify-center bg-[#2D545E]/10 mb-6">
+                <FileCheck2 className="w-5 h-5 text-[#2D545E]" />
+              </div>
+              <h4 className="text-xs uppercase tracking-widest font-black text-black/40">Artwork Check</h4>
+              <p className="text-lg font-display font-black text-black uppercase leading-tight">{specs.resolution}</p>
+            </div>
+
+            <div className="bg-[#FDFCFB] p-8 md:p-10 space-y-4">
+              <div className="w-10 h-10 flex items-center justify-center bg-[#2D545E]/10 mb-6">
+                <Layers className="w-5 h-5 text-[#2D545E]" />
+              </div>
+              <h4 className="text-xs uppercase tracking-widest font-black text-black/40">Supported Materials</h4>
+              <div className="space-y-2">
+                {specs.materials.map((material) => (
+                  <div key={material} className="flex items-center gap-3">
+                    <span className="w-1.5 h-1.5 bg-[#E17055]" />
+                    <span className="text-xs font-mono font-bold text-black/75 uppercase">{material}</span>
                   </div>
                 ))}
               </div>
             </div>
-
-            {page.uses.map((item, index) => (
-              <div key={item} className="bg-[#FDFCFB] p-7 sm:p-8 min-h-[135px] flex flex-col justify-between">
-                <span className="text-[10px] font-mono font-black text-black/28">USE_{String(index + 1).padStart(2, '0')}</span>
-                <p className="font-display font-black uppercase tracking-tight text-2xl leading-none">{item}</p>
-              </div>
-            ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="pb-24 sm:pb-32">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
-          <div className="bg-black text-white p-8 sm:p-12 lg:p-14 grid lg:grid-cols-[0.8fr_1.2fr] gap-10 lg:gap-16">
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.34em] text-[#E17055] mb-6">Questions</div>
-              <h2 className="font-display font-black uppercase tracking-tight text-4xl sm:text-6xl leading-[0.86]">Before you print.</h2>
+        <section className="mb-24 sm:mb-36 p-8 sm:p-12 md:p-16 bg-black text-white relative overflow-hidden">
+          <div className="absolute inset-0 bg-grainy opacity-[0.05] pointer-events-none mix-blend-overlay" />
+
+          <div className="relative z-10">
+            <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8">
+              <div>
+                <span className="text-[10px] font-mono font-black uppercase tracking-[0.4em] text-[#E17055] block mb-4">Production Timeline</span>
+                <h3 className="text-3xl sm:text-4xl font-display font-black tracking-tight uppercase">Operational Workflow</h3>
+              </div>
+              <div className="flex items-center gap-3 text-[10px] font-mono text-white/40 tracking-wider">
+                <ShieldCheck className="w-4 h-4" />
+                QUOTE REVIEW BEFORE PRODUCTION
+              </div>
             </div>
-            <div className="divide-y divide-white/12">
-              {page.faq.map((item) => (
-                <div key={item.question} className="py-7 first:pt-0 last:pb-0">
-                  <h3 className="font-display font-black uppercase tracking-tight text-2xl leading-none mb-4">{item.question}</h3>
-                  <p className="text-base leading-8 font-medium text-white/62">{item.answer}</p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 relative">
+              <div className="hidden lg:block absolute top-[28px] left-[40px] right-[40px] h-[1px] bg-white/10" />
+
+              {specs.workflow.map((step, index) => (
+                <div key={step} className="relative space-y-4 group">
+                  <div className="flex items-center gap-4 lg:flex-col lg:items-start lg:gap-6">
+                    <div className="w-14 h-14 bg-[#1C1C1C] border border-white/15 flex items-center justify-center font-display font-black text-lg text-white group-hover:border-[#E17055] group-hover:text-[#E17055] transition-all z-10 shrink-0">
+                      0{index + 1}
+                    </div>
+                    <div className="h-[1px] bg-white/15 flex-1 lg:hidden" />
+                  </div>
+                  <div className="pt-2">
+                    <h5 className="text-[11px] uppercase tracking-[0.2em] font-black text-white mb-2">{step}</h5>
+                    <p className="text-[10px] font-medium leading-relaxed text-white/40">Reviewed by the Print Plaza production desk before moving to the next stage.</p>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+
+        <section id="service-products" className="mb-24 sm:mb-32">
+          <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 sm:mb-20 gap-8">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.4em] text-[#2D545E] mb-6 flex items-center gap-4">
+                <div className="w-8 h-px bg-[#2D545E]/30" /> Ready Specs
+              </div>
+              <h2 className="text-3xl sm:text-5xl font-display font-black tracking-tight uppercase">
+                Product Lineup
+              </h2>
+            </div>
+            <p className="text-xs sm:text-sm font-medium leading-relaxed text-black/50 max-w-sm font-sans">
+              Choose from common production outputs, then request a custom quote with quantity, material, and finishing details.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-black/10 border border-black/10">
+            {[...page.highlights, ...page.uses].slice(0, 6).map((item, index) => (
+              <div key={item} className="bg-[#FDFCFB] min-h-[260px] p-8 flex flex-col justify-between group hover:bg-[#F6F5F2] transition-colors">
+                <div className="flex justify-between items-start gap-6">
+                  <span className="text-[10px] font-mono font-black text-black/25">ITEM_{String(index + 1).padStart(2, '0')}</span>
+                  <Clock className="w-4 h-4 text-[#E17055]" />
+                </div>
+                <div>
+                  <h3 className="text-3xl font-display font-black uppercase tracking-tight leading-[0.9] mb-5">{item}</h3>
+                  <p className="text-sm leading-7 font-medium text-black/52">Available as a custom quote with production details reviewed before final approval.</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="grid lg:grid-cols-[0.72fr_1.28fr] gap-px bg-black/10 border border-black/10">
+          <div className="bg-black text-white p-8 sm:p-12">
+            <div className="text-[10px] font-black uppercase tracking-[0.34em] text-[#E17055] mb-7">Questions</div>
+            <h2 className="font-display font-black uppercase tracking-tight text-4xl sm:text-6xl leading-[0.86]">Before you print.</h2>
+            <a href="/#products" className="mt-10 inline-flex bg-white text-black px-8 py-5 text-[10px] font-black uppercase tracking-[0.28em] hover:bg-[#E17055] hover:text-white transition-colors">
+              Request Quote
+            </a>
+          </div>
+          <div className="bg-[#FDFCFB] divide-y divide-black/10">
+            {page.faq.map((item) => (
+              <div key={item.question} className="p-8 sm:p-10">
+                <h3 className="font-display font-black uppercase tracking-tight text-2xl leading-none mb-4">{item.question}</h3>
+                <p className="text-base leading-8 font-medium text-black/62">{item.answer}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
