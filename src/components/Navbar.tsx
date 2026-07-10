@@ -97,25 +97,28 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
             {navItems.map(item => {
               if (isServicesItem(item)) {
                 return (
-                  <a
+                  <div
                     key={item.id}
-                    href={item.url || '#services'}
-                    target={item.openInNewTab ? '_blank' : undefined}
-                    rel={item.openInNewTab ? 'noreferrer' : undefined}
                     onMouseEnter={() => setIsMegaOpen(true)}
-                    onFocus={() => setIsMegaOpen(true)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Escape') setIsMegaOpen(false);
-                    }}
-                    className={`flex items-center gap-2 font-bold uppercase tracking-[0.2em] transition-colors ${
-                      headerIsTransparent ? 'text-white/72 hover:text-white' : 'text-black/60 hover:text-[#2D545E]'
-                    }`}
-                    style={{ fontSize: `${navFontSize}px` }}
-                    aria-expanded={isMegaOpen}
                   >
-                    {item.label || 'Services'}
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isMegaOpen ? 'rotate-180' : ''}`} />
-                  </a>
+                    <a
+                      href={item.url || '#services'}
+                      target={item.openInNewTab ? '_blank' : undefined}
+                      rel={item.openInNewTab ? 'noreferrer' : undefined}
+                      onFocus={() => setIsMegaOpen(true)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Escape') setIsMegaOpen(false);
+                      }}
+                      className={`flex items-center gap-2 font-bold uppercase tracking-[0.2em] transition-colors ${
+                        headerIsTransparent ? 'text-white/72 hover:text-white' : 'text-black/60 hover:text-[#2D545E]'
+                      }`}
+                      style={{ fontSize: `${navFontSize}px` }}
+                      aria-expanded={isMegaOpen}
+                    >
+                      {item.label || 'Services'}
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isMegaOpen ? 'rotate-180' : ''}`} />
+                    </a>
+                  </div>
                 );
               }
 
@@ -125,6 +128,7 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
                   href={item.url || '#'}
                   target={item.openInNewTab ? '_blank' : undefined}
                   rel={item.openInNewTab ? 'noreferrer' : undefined}
+                  onMouseEnter={() => setIsMegaOpen(false)}
                   className={`font-bold uppercase tracking-[0.2em] transition-colors ${
                     headerIsTransparent ? 'text-white/72 hover:text-white' : 'text-black/60 hover:text-[#2D545E]'
                   }`}
@@ -141,6 +145,7 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
               <div className="flex items-center gap-6">
                 <button 
                   onClick={onViewDashboard}
+                  onMouseEnter={() => setIsMegaOpen(false)}
                   className={`flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${
                     headerIsTransparent ? 'text-white/78 hover:text-white' : 'text-[#2D545E] hover:text-black'
                   }`}
@@ -159,6 +164,7 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
             ) : (
               <button 
                 onClick={onLogin}
+                onMouseEnter={() => setIsMegaOpen(false)}
                 className={`flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] transition-colors ${
                   headerIsTransparent ? 'text-white/62 hover:text-white' : 'text-black/40 hover:text-black'
                 }`}
@@ -168,7 +174,7 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
               </button>
             )}
 
-            <a href={actionUrl} className={`btn-studio px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all ${
+            <a href={actionUrl} onMouseEnter={() => setIsMegaOpen(false)} className={`btn-studio px-8 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all ${
               headerIsTransparent
                 ? 'bg-white text-black hover:bg-[#E17055] hover:text-white'
                 : 'bg-black text-white hover:bg-[#2D545E] hover:shadow-[0_10px_20px_-5px_rgba(45,84,94,0.4)]'
@@ -197,33 +203,34 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.18 }}
             onMouseEnter={() => setIsMegaOpen(true)}
+            onMouseLeave={() => setIsMegaOpen(false)}
             className="hidden md:block border-t border-black/10 bg-[#FDFCFB]/98 backdrop-blur-xl shadow-[0_30px_70px_-40px_rgba(0,0,0,0.75)]"
           >
-            <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 py-7">
-              <div className="grid grid-cols-[0.75fr_1.25fr] gap-8">
+            <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16 py-5">
+              <div className="grid grid-cols-[0.56fr_1.44fr] gap-6">
                 <a
                   href="/custom-packaging-printing"
                   onClick={() => setIsMegaOpen(false)}
-                  className="group relative min-h-[360px] overflow-hidden bg-black text-white p-8 flex flex-col justify-between"
+                  className="group relative min-h-[260px] overflow-hidden bg-black text-white p-7 flex flex-col justify-between"
                 >
                   <div className="absolute inset-0 opacity-45 bg-[radial-gradient(circle_at_20%_20%,#2D545E_0,transparent_34%),radial-gradient(circle_at_82%_80%,#E17055_0,transparent_28%)]" />
                   <div className="absolute inset-0 opacity-20 bg-[linear-gradient(90deg,transparent_0,transparent_31%,#fff_32%,transparent_33%,transparent_64%,#fff_65%,transparent_66%)]" />
                   <div className="relative">
-                    <div className="flex gap-2 mb-8">
+                    <div className="flex gap-2 mb-7">
                       <span className="h-2 w-9 bg-[#2D545E]" />
                       <span className="h-2 w-9 bg-[#E17055]" />
                       <span className="h-2 w-9 bg-white" />
                     </div>
-                    <div className="text-[10px] font-black uppercase tracking-[0.36em] text-white/50 mb-5">Production Desk</div>
-                    <h3 className="font-display font-black uppercase tracking-tight text-5xl leading-[0.86]">
+                    <div className="text-[9px] font-black uppercase tracking-[0.34em] text-white/50 mb-4">Production Desk</div>
+                    <h3 className="font-display font-black uppercase tracking-tight text-4xl leading-[0.86]">
                       Print Services.
                     </h3>
                   </div>
                   <div className="relative flex items-center justify-between gap-6">
-                    <p className="text-sm leading-7 font-semibold text-white/62 max-w-xs">
+                    <p className="text-xs leading-6 font-semibold text-white/62 max-w-xs">
                       Packaging, labels, cards, brochures, flyers, posters, banners, and sticker production pages.
                     </p>
-                    <ArrowUpRight className="w-8 h-8 text-[#E17055] group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                    <ArrowUpRight className="w-7 h-7 text-[#E17055] group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                   </div>
                 </a>
 
@@ -233,33 +240,19 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
                       key={service.path}
                       href={service.path}
                       onClick={() => setIsMegaOpen(false)}
-                      className="group bg-[#FDFCFB] p-5 grid grid-cols-[92px_1fr] gap-5 min-h-[136px] hover:bg-[#F6F5F2] transition-colors"
+                      className="group bg-[#FDFCFB] p-5 min-h-[98px] flex items-start justify-between gap-5 hover:bg-[#F6F5F2] transition-colors"
                     >
-                      <div className="relative overflow-hidden bg-black min-h-[92px]">
-                        <div className="absolute inset-0 opacity-65 bg-[linear-gradient(135deg,#111_0%,#2D545E_52%,#E17055_100%)]" />
-                        <div className="absolute inset-3 border border-white/18" />
-                        <div className="absolute left-4 top-4 flex gap-1">
-                          <span className="h-1.5 w-5 bg-[#2D545E]" />
-                          <span className="h-1.5 w-5 bg-[#E17055]" />
-                          <span className="h-1.5 w-5 bg-white" />
-                        </div>
-                        <div className="absolute bottom-3 left-4 text-[10px] font-mono font-black text-white/55">
-                          0{index + 1}
-                        </div>
-                      </div>
-                      <div className="flex flex-col justify-between min-w-0">
+                      <div className="min-w-0">
                         <div>
                           <div className="text-[8px] font-black uppercase tracking-[0.28em] text-[#E17055] mb-3 truncate">
-                            {service.eyebrow}
+                            0{index + 1} / {service.eyebrow}
                           </div>
                           <h4 className="font-display font-black uppercase tracking-tight text-2xl leading-[0.94] group-hover:text-[#2D545E] transition-colors">
                             {service.title}
                           </h4>
                         </div>
-                        <span className="mt-4 inline-flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.24em] text-black/30 group-hover:text-black">
-                          Open page <ArrowUpRight className="w-3 h-3" />
-                        </span>
                       </div>
+                      <ArrowUpRight className="w-4 h-4 mt-1 shrink-0 text-black/20 group-hover:text-[#E17055] group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
                     </a>
                   ))}
                 </div>
