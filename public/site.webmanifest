@@ -1,0 +1,17 @@
+{
+  "name": "Print Plaza",
+  "short_name": "Print Plaza",
+  "description": "High quality printing, packaging, labels, signage, and business print production.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FDFCFB",
+  "theme_color": "#2D545E",
+  "icons": [
+    {
+      "src": "/brand/print-plaza-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

@@ -27,7 +27,7 @@ export default function ServiceGrid({ categories, onSelect }: ServiceGridProps) 
               <span className="text-[#2D545E]">PRODUCTION.</span>
             </h2>
             <p className="text-[15px] sm:text-base leading-[1.8] text-black/62 font-medium font-sans">
-              Specialized manufacturing across diverse substrates. <br/>
+              Specialized printing services across packaging, labels, cards, brochures, posters, banners, and signage. <br/>
               <span className="font-serif italic text-[#E17055]">High-fidelity output engineered for scale.</span>
             </p>
           </div>

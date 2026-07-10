@@ -183,7 +183,7 @@ function AppContent() {
                   <span className="text-black/10 italic font-serif lowercase">Unit.</span>
                 </h2>
                 <p className="text-[15px] sm:text-base font-medium leading-[1.8] text-black/62 max-w-lg font-sans">
-                  Browse our high-fidelity production lineup. Technical excellence across <span className="text-black/80 font-bold">bespoke formats.</span>
+                  Browse high quality printing services for packaging, labels, brochures, flyers, business cards, posters, banners, and signage. Technical excellence across <span className="text-black/80 font-bold">bespoke print formats.</span>
                 </p>
               </div>
               <div className="flex flex-col items-start md:items-end gap-4 overflow-hidden">
@@ -283,7 +283,7 @@ function AppContent() {
                 <div className="text-[10px] uppercase tracking-[0.32em] font-black text-[#66A0AA]">{siteSettings.footer?.tagline || 'Creative Production Studio'}</div>
               </div>
               <p className="text-sm leading-loose opacity-70 max-w-sm font-medium tracking-wide">
-                {siteSettings.footer?.description || 'Refined creative production with a focus on tactile excellence and tonal precision.'}
+                {siteSettings.footer?.description || 'High quality printing, packaging, labels, signage, and business print production with a focus on tactile excellence and tonal precision.'}
               </p>
             </div>
             
