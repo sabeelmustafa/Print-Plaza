@@ -216,52 +216,87 @@ export function ServicePage({ page }: { page: ServiceSeoPage }) {
   });
 
   return (
-    <main className="bg-[#FDFCFB] text-black">
-      <section className="pt-36 sm:pt-44 pb-20 sm:pb-28 border-b border-black/10">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 grid lg:grid-cols-[1.08fr_0.92fr] gap-12 lg:gap-20 items-end">
-          <div>
-            <div className="flex items-center gap-5 text-[10px] font-black uppercase tracking-[0.34em] text-[#2D545E] mb-7">
-              <span className="h-1 w-12 bg-[#E17055]" />
-              {page.eyebrow}
+    <main className="bg-[#FDFCFB] text-black overflow-hidden">
+      <section className="relative pt-32 sm:pt-40 pb-16 sm:pb-24 bg-black text-white">
+        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_18%_20%,#2D545E_0,transparent_32%),radial-gradient(circle_at_82%_10%,#E17055_0,transparent_24%)]" />
+        <div className="absolute inset-x-0 bottom-0 h-px bg-white/15" />
+        <div className="relative max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-16 items-end">
+            <div>
+              <div className="flex items-center gap-5 text-[10px] font-black uppercase tracking-[0.34em] text-white/70 mb-8">
+                <span className="h-1 w-14 bg-[#E17055]" />
+                {page.eyebrow}
+              </div>
+              <h1 className="font-display font-black uppercase tracking-tight text-[3.4rem] sm:text-[6.2rem] lg:text-[7.7rem] leading-[0.78] max-w-5xl">
+                {page.title}.
+              </h1>
             </div>
-            <h1 className="font-display font-black uppercase tracking-tight text-[3.3rem] sm:text-[5.8rem] lg:text-[7rem] leading-[0.82] max-w-5xl">
-              {page.title}.
-            </h1>
-          </div>
-          <div className="lg:pb-3">
-            <p className="text-lg sm:text-xl leading-[1.75] font-semibold text-black/68 max-w-xl">{page.intro}</p>
-            <div className="mt-10 flex flex-col sm:flex-row gap-4">
-              <a href="/#products" className="bg-black text-white px-8 py-5 text-[10px] font-black uppercase tracking-[0.28em] text-center hover:bg-[#2D545E] transition-colors">Request Quote</a>
-              <a href="/" className="border border-black/20 px-8 py-5 text-[10px] font-black uppercase tracking-[0.28em] text-center hover:border-black transition-colors">Back Home</a>
-            </div>
+
+            <aside className="border border-white/15 bg-white/[0.04] p-6 sm:p-8 backdrop-blur-sm">
+              <div className="flex gap-2 mb-8">
+                <span className="h-2 w-8 bg-[#2D545E]" />
+                <span className="h-2 w-8 bg-[#E17055]" />
+                <span className="h-2 w-8 bg-white" />
+              </div>
+              <p className="text-lg sm:text-xl leading-[1.65] font-semibold text-white/76">{page.intro}</p>
+              <div className="mt-9 grid grid-cols-3 gap-px bg-white/15 text-center">
+                {['Quote', 'Proof', 'Print'].map((step, index) => (
+                  <div key={step} className="bg-black/70 py-5">
+                    <div className="text-[10px] font-mono text-white/35 mb-2">0{index + 1}</div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.24em]">{step}</div>
+                  </div>
+                ))}
+              </div>
+            </aside>
           </div>
         </div>
       </section>
 
-      <section className="py-20 sm:py-28">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 grid lg:grid-cols-3 gap-px bg-black/10 border border-black/10">
-          <div className="bg-[#F6F5F2] p-8 sm:p-10">
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-[#E17055] mb-6">Production</div>
-            <h2 className="font-display font-black uppercase tracking-tight text-4xl leading-none">What we make</h2>
-          </div>
-          {page.highlights.map((item) => (
-            <div key={item} className="bg-white p-8 sm:p-10 min-h-[170px] flex items-end">
-              <p className="font-black uppercase tracking-tight text-2xl leading-[1.02]">{item}</p>
+      <section className="bg-[#F6F5F2] border-b border-black/10">
+        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 grid lg:grid-cols-3 gap-px bg-black/10">
+          {page.highlights.slice(0, 3).map((item, index) => (
+            <div key={item} className="bg-[#F6F5F2] min-h-[150px] p-7 sm:p-9 flex items-end">
+              <div>
+                <div className="text-[10px] font-mono font-black text-[#E17055] mb-4">SPEC_0{index + 1}</div>
+                <p className="font-display font-black uppercase tracking-tight text-2xl sm:text-3xl leading-[0.96]">{item}</p>
+              </div>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="pb-20 sm:pb-28">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 grid lg:grid-cols-[0.8fr_1.2fr] gap-14 lg:gap-20">
-          <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.34em] text-[#2D545E] mb-6">Use Cases</div>
-            <h2 className="font-display font-black uppercase tracking-tight text-4xl sm:text-5xl leading-none">Built for brand output.</h2>
+      <section className="py-20 sm:py-28">
+        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 grid lg:grid-cols-[0.9fr_1.1fr] gap-12 lg:gap-20 items-start">
+          <div className="lg:sticky lg:top-28">
+            <div className="text-[10px] font-black uppercase tracking-[0.34em] text-[#2D545E] mb-6">Production Scope</div>
+            <h2 className="font-display font-black uppercase tracking-tight text-5xl sm:text-7xl leading-[0.84]">
+              Built for brand output.
+            </h2>
+            <p className="mt-8 text-base sm:text-lg leading-8 font-semibold text-black/58 max-w-md">
+              These pages help customers understand what Print Plaza can produce before they request a quote. Every project still gets reviewed before production begins.
+            </p>
+            <div className="mt-10 flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-4">
+              <a href="/#products" className="bg-black text-white px-8 py-5 text-[10px] font-black uppercase tracking-[0.28em] text-center hover:bg-[#2D545E] transition-colors">Request Quote</a>
+              <a href="/" className="border border-black/20 px-8 py-5 text-[10px] font-black uppercase tracking-[0.28em] text-center hover:border-black transition-colors">Back Home</a>
+            </div>
           </div>
-          <div className="grid sm:grid-cols-2 gap-4">
-            {page.uses.map((item) => (
-              <div key={item} className="border border-black/10 bg-[#F6F5F2] p-6 text-sm font-black uppercase tracking-[0.16em]">
-                {item}
+
+          <div className="grid sm:grid-cols-2 gap-px bg-black/10 border border-black/10">
+            <div className="sm:col-span-2 bg-white p-8 sm:p-10">
+              <div className="text-[10px] font-black uppercase tracking-[0.32em] text-[#E17055] mb-5">What we make</div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {page.highlights.map((item) => (
+                  <div key={item} className="bg-[#F6F5F2] border border-black/5 p-6 min-h-[120px] flex items-end">
+                    <p className="font-black uppercase tracking-tight text-xl leading-[1.02]">{item}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {page.uses.map((item, index) => (
+              <div key={item} className="bg-[#FDFCFB] p-7 sm:p-8 min-h-[135px] flex flex-col justify-between">
+                <span className="text-[10px] font-mono font-black text-black/28">USE_{String(index + 1).padStart(2, '0')}</span>
+                <p className="font-display font-black uppercase tracking-tight text-2xl leading-none">{item}</p>
               </div>
             ))}
           </div>
@@ -270,13 +305,19 @@ export function ServicePage({ page }: { page: ServiceSeoPage }) {
 
       <section className="pb-24 sm:pb-32">
         <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
-          <div className="border-t border-black/10">
-            {page.faq.map((item) => (
-              <div key={item.question} className="grid md:grid-cols-[0.85fr_1.15fr] gap-6 border-b border-black/10 py-8">
-                <h3 className="font-display font-black uppercase tracking-tight text-2xl leading-none">{item.question}</h3>
-                <p className="text-base leading-8 font-medium text-black/62">{item.answer}</p>
-              </div>
-            ))}
+          <div className="bg-black text-white p-8 sm:p-12 lg:p-14 grid lg:grid-cols-[0.8fr_1.2fr] gap-10 lg:gap-16">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.34em] text-[#E17055] mb-6">Questions</div>
+              <h2 className="font-display font-black uppercase tracking-tight text-4xl sm:text-6xl leading-[0.86]">Before you print.</h2>
+            </div>
+            <div className="divide-y divide-white/12">
+              {page.faq.map((item) => (
+                <div key={item.question} className="py-7 first:pt-0 last:pb-0">
+                  <h3 className="font-display font-black uppercase tracking-tight text-2xl leading-none mb-4">{item.question}</h3>
+                  <p className="text-base leading-8 font-medium text-white/62">{item.answer}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -338,20 +379,37 @@ export function PrivacyPolicyPage() {
   ];
 
   return (
-    <main className="bg-[#FDFCFB] text-black">
-      <section className="pt-36 sm:pt-44 pb-16 sm:pb-24 border-b border-black/10">
-        <div className="max-w-5xl mx-auto px-6 sm:px-8 lg:px-12">
-          <div className="text-[10px] font-black uppercase tracking-[0.34em] text-[#2D545E] mb-7">Client Access / Google Login / Orders</div>
-          <h1 className="font-display font-black uppercase tracking-tight text-[3.6rem] sm:text-[6.2rem] leading-[0.84] mb-10">Privacy Policy.</h1>
-          <p className="text-lg sm:text-xl leading-[1.75] font-semibold text-black/65 max-w-3xl">
-            This policy explains how Print Plaza handles information when visitors use the website, request quotations, sign in with Google, view client orders, and download invoices.
-          </p>
-          <p className="mt-8 text-[10px] font-black uppercase tracking-[0.28em] text-black/35">Effective date: July 10, 2026</p>
+    <main className="bg-[#FDFCFB] text-black overflow-hidden">
+      <section className="relative pt-36 sm:pt-44 pb-16 sm:pb-24 border-b border-black/10">
+        <div className="absolute top-0 right-0 w-1/3 h-full bg-[#F6F5F2] hidden lg:block" />
+        <div className="relative max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 grid lg:grid-cols-[0.95fr_0.65fr] gap-12 lg:gap-20 items-end">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-[0.34em] text-[#2D545E] mb-7">Client Access / Google Login / Orders</div>
+            <h1 className="font-display font-black uppercase tracking-tight text-[3.6rem] sm:text-[6.5rem] lg:text-[7.6rem] leading-[0.78] mb-10">Privacy Policy.</h1>
+            <p className="text-lg sm:text-xl leading-[1.75] font-semibold text-black/65 max-w-3xl">
+              This policy explains how Print Plaza handles information when visitors use the website, request quotations, sign in with Google, view client orders, and download invoices.
+            </p>
+          </div>
+          <aside className="bg-black text-white p-8 sm:p-10 relative">
+            <div className="absolute top-0 right-0 h-3 w-32 bg-[#E17055]" />
+            <div className="flex gap-2 mb-10">
+              <span className="h-3 w-8 bg-[#2D545E]" />
+              <span className="h-3 w-8 bg-[#E17055]" />
+              <span className="h-3 w-8 bg-white" />
+            </div>
+            <div className="text-[10px] font-black uppercase tracking-[0.34em] text-white/42 mb-4">Effective date</div>
+            <p className="font-display font-black uppercase tracking-tight text-4xl leading-none">July 10, 2026</p>
+            <p className="mt-8 text-sm leading-7 font-semibold text-white/58">Written for Google sign-in, quote requests, client records, invoices, and website analytics.</p>
+          </aside>
         </div>
       </section>
 
       <section className="py-16 sm:py-24">
-        <div className="max-w-5xl mx-auto px-6 sm:px-8 lg:px-12">
+        <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 grid lg:grid-cols-[0.35fr_1fr] gap-12 lg:gap-16">
+          <div className="lg:sticky lg:top-28 h-fit">
+            <div className="text-[10px] font-black uppercase tracking-[0.34em] text-[#E17055] mb-6">Data Handling</div>
+            <h2 className="font-display font-black uppercase tracking-tight text-4xl sm:text-5xl leading-none">Plain language, business first.</h2>
+          </div>
           <div className="border-t border-black/10">
             {sections.map((section) => (
               <div key={section.title} className="grid md:grid-cols-[0.7fr_1.3fr] gap-8 border-b border-black/10 py-9">
@@ -359,12 +417,12 @@ export function PrivacyPolicyPage() {
                 <p className="text-base leading-8 font-medium text-black/64">{section.body}</p>
               </div>
             ))}
-          </div>
-          <div className="mt-14 bg-black text-white p-8 sm:p-10">
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-[#E17055] mb-5">Contact</div>
-            <p className="text-base leading-8 font-semibold text-white/75">
-              For privacy questions, order data questions, or client account help, contact Print Plaza using the email, phone, or address shown on this website.
-            </p>
+            <div className="mt-14 bg-[#F6F5F2] border border-black/10 p-8 sm:p-10">
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-[#E17055] mb-5">Contact</div>
+              <p className="text-base leading-8 font-semibold text-black/65">
+                For privacy questions, order data questions, or client account help, contact Print Plaza using the email, phone, or address shown on this website.
+              </p>
+            </div>
           </div>
         </div>
       </section>

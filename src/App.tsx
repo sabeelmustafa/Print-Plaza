@@ -158,6 +158,7 @@ function SiteFooter({ siteSettings }: { siteSettings: SiteSettings }) {
 
 function AppContent() {
   const { user, isAdmin, loading: authLoading } = useAuth();
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname.replace(/\/$/, '') || '/');
   const [services, setServices] = useState<ServiceCategory[]>(CONSTANT_SERVICES);
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({});
   const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | null>(null);
@@ -169,6 +170,16 @@ function AppContent() {
   useEffect(() => {
     fetchCmsData();
   }, [view]); // Refresh when coming back from dashboard
+
+  useEffect(() => {
+    const syncRoute = () => setCurrentPath(window.location.pathname.replace(/\/$/, '') || '/');
+    window.addEventListener('popstate', syncRoute);
+    window.addEventListener('plaza:navigate', syncRoute);
+    return () => {
+      window.removeEventListener('popstate', syncRoute);
+      window.removeEventListener('plaza:navigate', syncRoute);
+    };
+  }, []);
 
   const fetchCmsData = async () => {
     try {
@@ -214,7 +225,6 @@ function AppContent() {
     setTimeout(() => setShowSuccess(false), 5000);
   };
 
-  const currentPath = window.location.pathname.replace(/\/$/, '') || '/';
   const servicePage = SERVICE_PAGES.find(page => page.path === currentPath);
   const isPrivacyPolicy = currentPath === '/privacy-policy';
 

@@ -8,6 +8,7 @@ import { User as UserIcon, LogOut, Terminal, Lock, Menu, X } from 'lucide-react'
 import { useAuth } from '../lib/AuthContext';
 import { logOut } from '../lib/firebase';
 import { useEffect, useState } from 'react';
+import type React from 'react';
 import { NavMenuItem, SiteSettings } from '../types';
 
 interface NavbarProps {
@@ -37,6 +38,13 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const closeMenu = () => setIsMenuOpen(false);
   const headerIsTransparent = useTransparentHeader && !isScrolled && !isMenuOpen;
+  const navigateHome = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    history.pushState(null, '', '/');
+    window.dispatchEvent(new Event('plaza:navigate'));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setIsMenuOpen(false);
+  };
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 24);
@@ -55,12 +63,7 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
     >
       <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16">
         <div className={`flex justify-between items-center transition-all duration-300 ${isScrolled ? 'h-16' : 'h-20'}`}>
-          <a href="/" className="flex items-center gap-4 group cursor-pointer" onClick={(event) => {
-            event.preventDefault();
-            history.pushState(null, '', '/');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            setIsMenuOpen(false);
-          }}>
+          <a href="/" className="flex items-center gap-4 group cursor-pointer" onClick={navigateHome}>
             {logoImage ? (
               <img
                 src={logoImage}
