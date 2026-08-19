@@ -225,7 +225,7 @@ export default function AdminPanel() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex font-sans antialiased">
-      {/* PlazaOS Sidebar Navigation */}
+      {/* PlazaHQ Sidebar Navigation */}
       <aside className="w-64 bg-[#0F172A] text-slate-300 flex flex-col border-r border-slate-800 shrink-0">
         {/* Brand Header */}
         <div className="h-16 px-6 flex items-center gap-3 border-b border-slate-800">
@@ -233,7 +233,7 @@ export default function AdminPanel() {
             P
           </div>
           <div>
-            <span className="font-bold text-white tracking-tight text-base leading-none block">PlazaOS ERP</span>
+            <span className="font-bold text-white tracking-tight text-base leading-none block">PlazaHQ ERP</span>
             <span className="text-[10px] text-slate-400 font-medium tracking-wide uppercase mt-0.5 block">Print Press Management</span>
           </div>
         </div>
@@ -352,7 +352,7 @@ export default function AdminPanel() {
           {loading ? (
             <div className="h-96 flex flex-col items-center justify-center gap-3 text-slate-400">
               <div className="w-8 h-8 border-2 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
-              <span className="text-xs font-medium">Loading PlazaOS Data...</span>
+              <span className="text-xs font-medium">Loading PlazaHQ Data...</span>
             </div>
           ) : (
             <>
@@ -2038,9 +2038,9 @@ function LiveWebsiteEditor({
     <div className="h-screen grid grid-cols-[260px_minmax(480px,1fr)_340px] grid-rows-[60px_minmax(0,1fr)]">
       <header className="col-span-3 bg-slate-900 text-white px-5 flex items-center justify-between z-30">
         <div className="flex items-center gap-3">
-          <button onClick={() => { window.close(); window.location.href = '/admin'; }} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center" title="Back to PlazaOS ERP"><ArrowLeft className="w-4 h-4" /></button>
+          <button onClick={() => { window.close(); window.location.href = '/admin'; }} className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center" title="Back to PlazaHQ ERP"><ArrowLeft className="w-4 h-4" /></button>
           <div>
-            <div className="font-bold text-sm">PlazaOS Live Editor</div>
+            <div className="font-bold text-sm">PlazaHQ Live Editor</div>
             <div className="text-[10px] text-slate-400 font-mono">Storefront Page Customizer</div>
           </div>
         </div>

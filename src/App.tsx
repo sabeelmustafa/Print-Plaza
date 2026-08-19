@@ -58,7 +58,7 @@ function AdminLoginPage() {
     return (
       <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center text-slate-400 gap-3">
         <div className="w-8 h-8 border-2 border-slate-700 border-t-emerald-500 rounded-full animate-spin" />
-        <span className="text-xs font-mono tracking-wider uppercase">Loading PlazaOS...</span>
+        <span className="text-xs font-mono tracking-wider uppercase">Loading PlazaHQ...</span>
       </div>
     );
   }
@@ -79,7 +79,7 @@ function AdminLoginPage() {
             P
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">PlazaOS ERP</h1>
+            <h1 className="text-xl font-bold text-white tracking-tight">PlazaHQ ERP</h1>
             <p className="text-xs text-slate-400 font-medium">Print Press Production System</p>
           </div>
         </div>
