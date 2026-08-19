@@ -47,7 +47,7 @@ function AdminLoginPage() {
     });
 
     if (!response.ok) {
-      setError('Invalid admin password.');
+      setError('Invalid system security credentials.');
       return;
     }
 
@@ -56,8 +56,9 @@ function AdminLoginPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FDFCFB] flex items-center justify-center">
-        <div className="w-16 h-px bg-black animate-pulse" />
+      <div className="min-h-screen bg-[#0F172A] flex flex-col items-center justify-center text-slate-400 gap-3">
+        <div className="w-8 h-8 border-2 border-slate-700 border-t-emerald-500 rounded-full animate-spin" />
+        <span className="text-xs font-mono tracking-wider uppercase">Loading PlazaOS...</span>
       </div>
     );
   }
@@ -67,35 +68,56 @@ function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FDFCFB] flex items-center justify-center px-6">
-      <form onSubmit={handleLogin} className="w-full max-w-md bg-white border border-black/10 p-10 shadow-2xl">
-        <div className="mb-10">
-          <div className="text-[10px] font-black uppercase tracking-[0.4em] text-[#2D545E] mb-4">Print Plaza CMS</div>
-          <h1 className="text-4xl font-display font-black uppercase tracking-tight leading-none">Admin Login</h1>
+    <div className="min-h-screen bg-[#0F172A] flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Background ambient lighting */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-cyan-500/10 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-emerald-500/10 blur-[100px] rounded-full pointer-events-none" />
+
+      <div className="w-full max-w-md bg-slate-900/90 border border-slate-800 rounded-2xl p-8 shadow-2xl backdrop-blur-xl relative z-10">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-slate-950 font-bold font-mono text-lg shadow-lg shadow-emerald-500/20">
+            P
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-white tracking-tight">PlazaOS ERP</h1>
+            <p className="text-xs text-slate-400 font-medium">Print Press Production System</p>
+          </div>
         </div>
 
-        <label className="block text-[9px] font-black uppercase tracking-[0.3em] text-black/30 mb-4">
-          Password
-        </label>
-        <input
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          className="w-full border-2 border-black/10 px-5 py-4 outline-none focus:border-[#2D545E] font-bold"
-          autoFocus
-        />
+        <form onSubmit={handleLogin} className="space-y-5">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+              Administrator Access Key
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Enter password..."
+              className="w-full bg-slate-950/80 border border-slate-800 focus:border-emerald-500 text-white text-sm rounded-xl px-4 py-3 outline-none transition-all placeholder:text-slate-600 font-mono"
+              autoFocus
+            />
+          </div>
 
-        {error && (
-          <p className="mt-4 text-[11px] font-bold uppercase tracking-widest text-red-600">{error}</p>
-        )}
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-red-400 text-xs font-medium">
+              {error}
+            </div>
+          )}
 
-        <button
-          type="submit"
-          className="mt-8 w-full bg-black text-white py-5 text-[10px] font-black uppercase tracking-[0.4em] hover:bg-[#2D545E] transition-colors"
-        >
-          Open Control Panel
-        </button>
-      </form>
+          <button
+            type="submit"
+            className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-sm py-3 px-4 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
+          >
+            Launch Command Center &rarr;
+          </button>
+        </form>
+
+        <div className="mt-8 pt-6 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
+          <span>Print Plaza Enterprise</span>
+          <span className="font-mono text-[10px] bg-slate-800/60 text-slate-400 px-2 py-0.5 rounded">v2.4.0</span>
+        </div>
+      </div>
     </div>
   );
 }

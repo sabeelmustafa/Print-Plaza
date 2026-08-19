@@ -87,3 +87,39 @@ body {
   color: white;
 }
 
+/* Custom Scrollbar for PlazaOS ERP */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Print Styles for Job Sheets and Invoices */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-job-sheet, #printable-job-sheet * {
+    visibility: visible;
+  }
+  #printable-job-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}
+
+
