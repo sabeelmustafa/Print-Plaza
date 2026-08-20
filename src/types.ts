@@ -126,7 +126,7 @@ export interface Order {
   invoiceNotes?: string;
   paymentDueDate?: string;
   payments?: PaymentRecord[];
-  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  status: 'pending' | 'processing' | 'completed' | 'delivered' | 'cancelled';
   isQuotation?: boolean;
   pjoNumber?: string;
   quoteStatus?: 'new' | 'negotiating' | 'approved' | 'converted' | 'declined';

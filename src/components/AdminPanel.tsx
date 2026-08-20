@@ -38,7 +38,9 @@ import {
   RefreshCw,
   Sparkles,
   MessageSquare,
-  ArrowUpRight
+  ArrowUpRight,
+  Phone,
+  Mail
 } from 'lucide-react';
 import { DataService } from '../lib/dataService';
 import { MediaAsset, NavMenuItem, Order, OrderItem, Product, ProductOption, ServiceCategory, SiteSettings } from '../types';
@@ -836,6 +838,7 @@ function QuotationsEditor({
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {filteredQuotations.map((quote) => {
                 const opts = quote.options || {};
+                const phoneNum = String(opts.phone || opts.Phone || opts.phoneNumber || '');
                 return (
                   <tr key={quote.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3.5 px-4">
@@ -845,7 +848,16 @@ function QuotationsEditor({
                     <td className="py-3.5 px-4">
                       <span className="font-bold text-slate-900 block">{quote.userName || 'Customer'}</span>
                       <span className="text-slate-500 text-[11px] font-mono block">{quote.userEmail}</span>
-                      {opts.phone && <span className="text-slate-400 text-[10px] block">Tel: {String(opts.phone)}</span>}
+                      {phoneNum ? (
+                        <a
+                          href={`tel:${phoneNum}`}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 hover:underline mt-0.5"
+                        >
+                          <Phone className="w-3 h-3 text-emerald-600" /> {phoneNum}
+                        </a>
+                      ) : (
+                        <span className="text-amber-600 text-[10px] block italic mt-0.5">No phone provided</span>
+                      )}
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="font-semibold text-slate-900 block">{quote.productName}</span>
@@ -985,39 +997,58 @@ function QuotationDrawer({
         {/* Body */}
         <div className="flex-1 p-6 overflow-y-auto space-y-6">
           {/* Customer Contact Details */}
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Customer Contact Info</h3>
-            <div className="grid grid-cols-2 gap-3 text-xs text-slate-800">
-              <div>
-                <span className="text-slate-400 block text-[10px]">FULL NAME</span>
-                <span className="font-bold text-slate-900">{quotation.userName || 'Customer'}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block text-[10px]">EMAIL ADDRESS</span>
-                <span className="font-mono font-semibold text-slate-800">{quotation.userEmail}</span>
-              </div>
-              {opts.phone && (
-                <div>
-                  <span className="text-slate-400 block text-[10px]">PHONE NUMBER</span>
-                  <span className="font-semibold text-slate-800">{String(opts.phone)}</span>
+          {(() => {
+            const phoneNum = String(opts.phone || opts.Phone || opts.phoneNumber || '');
+            return (
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Customer Contact Info</h3>
+                  {phoneNum && (
+                    <a
+                      href={`tel:${phoneNum}`}
+                      className="px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                    >
+                      <Phone className="w-3.5 h-3.5" /> Call Customer ({phoneNum})
+                    </a>
+                  )}
                 </div>
-              )}
-              {opts.companyName && (
-                <div>
-                  <span className="text-slate-400 block text-[10px]">COMPANY / BRAND</span>
-                  <span className="font-semibold text-slate-800">{String(opts.companyName)}</span>
+                <div className="grid grid-cols-2 gap-3 text-xs text-slate-800">
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">FULL NAME</span>
+                    <span className="font-bold text-slate-900">{quotation.userName || 'Customer'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">EMAIL ADDRESS</span>
+                    <span className="font-mono font-semibold text-slate-800">{quotation.userEmail}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">PHONE NUMBER</span>
+                    {phoneNum ? (
+                      <a href={`tel:${phoneNum}`} className="font-bold text-emerald-600 hover:underline flex items-center gap-1">
+                        <Phone className="w-3.5 h-3.5" /> {phoneNum}
+                      </a>
+                    ) : (
+                      <span className="text-amber-600 font-semibold italic">Not provided</span>
+                    )}
+                  </div>
+                  {opts.companyName && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">COMPANY / BRAND</span>
+                      <span className="font-semibold text-slate-800">{String(opts.companyName)}</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            {opts.artworkFile && (
-              <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-xs">
-                <span className="text-slate-500">Submitted Artwork:</span>
-                <a href={String(opts.artworkFile)} target="_blank" rel="noreferrer" className="text-cyan-600 font-bold underline hover:text-cyan-700 flex items-center gap-1">
-                  View File <ArrowUpRight className="w-3.5 h-3.5" />
-                </a>
+                {opts.artworkFile && (
+                  <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Submitted Artwork File:</span>
+                    <a href={String(opts.artworkFile)} target="_blank" rel="noreferrer" className="text-cyan-600 font-bold underline hover:text-cyan-700 flex items-center gap-1">
+                      View Artwork <ArrowUpRight className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            );
+          })()}
 
           {/* Submitted Customer Requirements */}
           {opts.specifications && (
@@ -1194,7 +1225,7 @@ function OrdersEditor({
   onStatus: (id: string, status: string) => Promise<void>;
 }) {
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('active_pipeline');
 
   const filteredOrders = orders.filter((o) => {
     const pjo = o.pjoNumber || o.id;
@@ -1204,9 +1235,15 @@ function OrdersEditor({
       (o.userName && o.userName.toLowerCase().includes(searchQuery.toLowerCase())) ||
       o.productName.toLowerCase().includes(searchQuery.toLowerCase());
 
+    if (statusFilter === 'active_pipeline') {
+      return matchesSearch && o.status !== 'delivered';
+    }
     const matchesStatus = statusFilter === 'all' || o.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const activePipelineCount = orders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled').length;
+  const deliveredCount = orders.filter(o => o.status === 'delivered').length;
 
   return (
     <div className="space-y-4">
@@ -1219,10 +1256,12 @@ function OrdersEditor({
             onChange={(e) => setStatusFilter(e.target.value)}
             className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-slate-400"
           >
-            <option value="all">All Pipeline Stages ({orders.length})</option>
+            <option value="active_pipeline">Active Production Pipeline ({activePipelineCount})</option>
+            <option value="delivered">📦 Delivered & Job History ({deliveredCount})</option>
+            <option value="all">All Stages & History ({orders.length})</option>
             <option value="pending">Proofing / Pre-Press ({orders.filter(o => o.status === 'pending').length})</option>
             <option value="processing">In Production ({orders.filter(o => o.status === 'processing').length})</option>
-            <option value="completed">Completed ({orders.filter(o => o.status === 'completed').length})</option>
+            <option value="completed">Ready / Completed ({orders.filter(o => o.status === 'completed').length})</option>
             <option value="cancelled">Cancelled ({orders.filter(o => o.status === 'cancelled').length})</option>
           </select>
 
@@ -1294,7 +1333,8 @@ function OrdersEditor({
                       >
                         <option value="pending">Proofing / Pre-Press</option>
                         <option value="processing">In Production</option>
-                        <option value="completed">Completed</option>
+                        <option value="completed">Ready / Completed</option>
+                        <option value="delivered">Delivered (Move to History)</option>
                         <option value="cancelled">Cancelled</option>
                       </select>
                     </td>
@@ -1318,7 +1358,7 @@ function OrdersEditor({
                 {filteredOrders.length === 0 && (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-slate-400">
-                      No print job orders in pipeline.
+                      No print job orders in this view.
                     </td>
                   </tr>
                 )}
@@ -1346,7 +1386,7 @@ function KanbanPipelineBoard({
     { id: 'pending', title: 'Proofing / Pre-Press', color: 'border-amber-400' },
     { id: 'processing', title: 'In Production', color: 'border-blue-400' },
     { id: 'completed', title: 'Ready / Completed', color: 'border-emerald-400' },
-    { id: 'cancelled', title: 'Cancelled', color: 'border-slate-300' },
+    { id: 'delivered', title: 'Delivered (Job History)', color: 'border-teal-500' },
   ];
 
   return (
@@ -1394,6 +1434,7 @@ function KanbanPipelineBoard({
                       <option value="pending">Proofing</option>
                       <option value="processing">In Production</option>
                       <option value="completed">Completed</option>
+                      <option value="delivered">Delivered & Archived</option>
                       <option value="cancelled">Cancelled</option>
                     </select>
 
@@ -1423,8 +1464,10 @@ function KanbanPipelineBoard({
 
 function StatusBadge({ status }: { status: string }) {
   switch (status) {
+    case 'delivered':
+      return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">Delivered & Archived</span>;
     case 'completed':
-      return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Completed</span>;
+      return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Ready / Completed</span>;
     case 'processing':
       return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">In Production</span>;
     case 'cancelled':
@@ -2120,14 +2163,35 @@ function BusinessOrderModal({
         {/* Scrollable Body */}
         <div id="printable-job-sheet" className="flex-1 p-6 overflow-y-auto space-y-6">
           {/* Customer Card */}
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Customer Contact Information</h3>
-            <div className="text-xs text-slate-800 space-y-1">
-              <p className="font-bold text-slate-900 text-sm">{order.userName || 'Guest Customer'}</p>
-              <p className="font-mono text-slate-600">{order.userEmail}</p>
-              <p className="text-slate-400 text-[10px]">PJO Created: {new Date(order.createdAt).toLocaleString()}</p>
-            </div>
-          </div>
+          {(() => {
+            const opts = order.options || {};
+            const phoneNum = String(opts.phone || opts.Phone || opts.phoneNumber || '');
+            return (
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Customer Contact Information</h3>
+                  {phoneNum && (
+                    <a
+                      href={`tel:${phoneNum}`}
+                      className="px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                    >
+                      <Phone className="w-3.5 h-3.5" /> Call {phoneNum}
+                    </a>
+                  )}
+                </div>
+                <div className="text-xs text-slate-800 space-y-1">
+                  <p className="font-bold text-slate-900 text-sm">{order.userName || 'Guest Customer'}</p>
+                  <p className="font-mono text-slate-600">{order.userEmail}</p>
+                  {phoneNum && (
+                    <p className="font-bold text-emerald-600 flex items-center gap-1 text-xs">
+                      <Phone className="w-3.5 h-3.5" /> {phoneNum}
+                    </p>
+                  )}
+                  <p className="text-slate-400 text-[10px]">PJO Created: {new Date(order.createdAt).toLocaleString()}</p>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Specifications & Finishing Options */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
@@ -2173,12 +2237,14 @@ function BusinessOrderModal({
                 </div>
               )}
 
-              {Object.entries(order.options || {}).map(([key, val]) => (
-                <div key={key} className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500 capitalize">{key}:</span>
-                  <span className="font-semibold text-slate-900">{String(val)}</span>
-                </div>
-              ))}
+              {Object.entries(order.options || {})
+                .filter(([key]) => !['phone', 'Phone', 'phoneNumber', 'companyName', 'specifications', 'artworkFile'].includes(key))
+                .map(([key, val]) => (
+                  <div key={key} className="flex justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-500 capitalize">{key}:</span>
+                    <span className="font-semibold text-slate-900">{String(val)}</span>
+                  </div>
+                ))}
             </div>
           </div>
 
