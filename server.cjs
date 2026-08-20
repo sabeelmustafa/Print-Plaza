@@ -37,23 +37,26 @@ const pool = hasDbConfig ? mysql.createPool(dbConfig) : null;
 async function ensureBusinessSchema() {
   if (!pool) return;
 
-  // ── orders table column additions ────────────────────────────────────────
-  await pool.query(`
-    ALTER TABLE orders
-      ADD COLUMN IF NOT EXISTS cost_price DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER total_price,
-      ADD COLUMN IF NOT EXISTS sell_price DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER cost_price,
-      ADD COLUMN IF NOT EXISTS currency_code VARCHAR(8) NOT NULL DEFAULT 'PKR' AFTER sell_price,
-      ADD COLUMN IF NOT EXISTS items_json JSON NULL AFTER currency_code,
-      ADD COLUMN IF NOT EXISTS invoice_notes TEXT NULL AFTER items_json,
-      ADD COLUMN IF NOT EXISTS payment_due_date DATE NULL AFTER invoice_notes
-  `);
-  await pool.query(`
-    ALTER TABLE orders
-      MODIFY currency_code VARCHAR(8) NOT NULL DEFAULT 'PKR'
-  `);
+  // Helper: silently ignore errors on individual migration steps
+  const safe = async (label, sql) => {
+    try {
+      await pool.query(sql);
+    } catch (e) {
+      console.warn(`[SCHEMA] Skipped "${label}":`, e.message);
+    }
+  };
+
+  // ── orders: add columns one-by-one (safe on all MySQL versions) ──────────
+  await safe('orders.cost_price',       "ALTER TABLE orders ADD COLUMN cost_price DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER total_price");
+  await safe('orders.sell_price',       "ALTER TABLE orders ADD COLUMN sell_price DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER cost_price");
+  await safe('orders.currency_code',    "ALTER TABLE orders ADD COLUMN currency_code VARCHAR(8) NOT NULL DEFAULT 'PKR' AFTER sell_price");
+  await safe('orders.items_json',       "ALTER TABLE orders ADD COLUMN items_json JSON NULL AFTER currency_code");
+  await safe('orders.invoice_notes',    "ALTER TABLE orders ADD COLUMN invoice_notes TEXT NULL AFTER items_json");
+  await safe('orders.payment_due_date', "ALTER TABLE orders ADD COLUMN payment_due_date DATE NULL AFTER invoice_notes");
+  await safe('orders.currency_modify',  "ALTER TABLE orders MODIFY currency_code VARCHAR(8) NOT NULL DEFAULT 'PKR'");
 
   // ── payment_records table ─────────────────────────────────────────────────
-  await pool.query(`
+  await safe('create payment_records', `
     CREATE TABLE IF NOT EXISTS payment_records (
       id VARCHAR(128) PRIMARY KEY,
       order_id VARCHAR(128) NOT NULL,
@@ -71,7 +74,7 @@ async function ensureBusinessSchema() {
   `);
 
   // ── quotations table ──────────────────────────────────────────────────────
-  await pool.query(`
+  await safe('create quotations', `
     CREATE TABLE IF NOT EXISTS quotations (
       id VARCHAR(128) PRIMARY KEY,
       quote_number VARCHAR(64) UNIQUE NULL,
@@ -100,7 +103,7 @@ async function ensureBusinessSchema() {
   `);
 
   // ── customers table ───────────────────────────────────────────────────────
-  await pool.query(`
+  await safe('create customers', `
     CREATE TABLE IF NOT EXISTS customers (
       id VARCHAR(128) PRIMARY KEY,
       user_email VARCHAR(191) UNIQUE NOT NULL,
@@ -118,13 +121,12 @@ async function ensureBusinessSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 
-  // Ensure newer columns exist on older installs
-  const safeAlter = async (sql) => { try { await pool.query(sql); } catch (_) {} };
-  await safeAlter('ALTER TABLE customers ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255) NULL');
-  await safeAlter('ALTER TABLE customers ADD COLUMN IF NOT EXISTS password_plain VARCHAR(64) NULL');
-  await safeAlter('ALTER TABLE customers ADD COLUMN IF NOT EXISTS welcome_sent_at TIMESTAMP NULL');
-  await safeAlter('ALTER TABLE customers ADD COLUMN IF NOT EXISTS notes TEXT NULL');
-  await safeAlter('ALTER TABLE customers ADD COLUMN IF NOT EXISTS company_name VARCHAR(191) NULL');
+  // Ensure individual customer columns exist on older installs
+  await safe('customers.password_hash',    "ALTER TABLE customers ADD COLUMN password_hash VARCHAR(255) NULL");
+  await safe('customers.password_plain',   "ALTER TABLE customers ADD COLUMN password_plain VARCHAR(64) NULL");
+  await safe('customers.welcome_sent_at',  "ALTER TABLE customers ADD COLUMN welcome_sent_at TIMESTAMP NULL");
+  await safe('customers.notes',            "ALTER TABLE customers ADD COLUMN notes TEXT NULL");
+  await safe('customers.company_name',     "ALTER TABLE customers ADD COLUMN company_name VARCHAR(191) NULL");
 
   // Back-fill customers from existing orders / quotations
   try {
@@ -145,7 +147,10 @@ async function ensureBusinessSchema() {
     console.warn('[SCHEMA] Customer back-fill skipped:', _e.message);
   }
 
-  await safeAlter('UPDATE orders SET sell_price = total_price WHERE sell_price = 0 AND total_price > 0');
+  // Sync sell_price from total_price for legacy rows
+  await safe('orders.sell_price backfill',
+    'UPDATE orders SET sell_price = total_price WHERE sell_price = 0 AND total_price > 0'
+  );
 }
 
 /* -------------------------------------------------------------------------- */
