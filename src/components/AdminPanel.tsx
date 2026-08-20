@@ -242,48 +242,51 @@ export default function AdminPanel() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex font-sans antialiased">
       {/* PlazaHQ Sidebar Navigation */}
-      <aside className="w-64 bg-[#0F172A] text-slate-300 flex flex-col border-r border-slate-800 shrink-0">
-        {/* Brand Header */}
-        <div className="h-16 px-6 flex items-center gap-3 border-b border-slate-800">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-emerald-500 to-cyan-500 flex items-center justify-center text-slate-950 font-black font-mono shadow-md shadow-emerald-500/20">
-            P
+      <aside className="w-64 bg-[#14262C] text-slate-300 flex flex-col border-r border-[#223E47] shrink-0">
+        {/* Brand Header with Dual Diagonal Slash Accents matching logo */}
+        <div className="h-16 px-5 flex items-center gap-3 border-b border-[#223E47]">
+          <div className="w-9 h-9 rounded-xl bg-[#1E373F] border border-[#2D545E] flex items-center justify-center p-1.5 shadow-md">
+            <div className="flex items-center gap-1.5 h-full">
+              <div className="w-2 h-full bg-[#2D545E] -skew-x-12 rounded-xs" />
+              <div className="w-2 h-full bg-[#E17055] -skew-x-12 rounded-xs" />
+            </div>
           </div>
           <div>
-            <span className="font-bold text-white tracking-tight text-base leading-none block">PlazaHQ ERP</span>
-            <span className="text-[10px] text-slate-400 font-medium tracking-wide uppercase mt-0.5 block">Print Press Management</span>
+            <span className="font-extrabold text-white tracking-tight text-base leading-none block">PlazaHQ <span className="text-[#E17055]">ERP</span></span>
+            <span className="text-[10px] text-slate-400 font-medium tracking-wider uppercase mt-0.5 block">Print Press Management</span>
           </div>
         </div>
 
         {/* Navigation Items */}
         <div className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-          <div className="px-3 py-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Operations</div>
+          <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Operations</div>
           <SidebarNav tab="dashboard" activeTab={activeTab} onClick={setActiveTab} icon={<LayoutDashboard />} label="Dashboard" />
-          <SidebarNav tab="quotations" activeTab={activeTab} onClick={setActiveTab} icon={<FileText />} label="Quotations Desk" badge={pendingQuotations.length ? String(pendingQuotations.length) : undefined} badgeColor="bg-cyan-500/20 text-cyan-400" />
-          <SidebarNav tab="orders" activeTab={activeTab} onClick={setActiveTab} icon={<ShoppingBag />} label="Print Job Pipeline" badge={activeJobs ? String(activeJobs) : undefined} badgeColor="bg-amber-500/20 text-amber-400" />
+          <SidebarNav tab="quotations" activeTab={activeTab} onClick={setActiveTab} icon={<FileText />} label="Quotations Desk" badge={pendingQuotations.length ? String(pendingQuotations.length) : undefined} badgeColor="bg-[#E17055] text-white" />
+          <SidebarNav tab="orders" activeTab={activeTab} onClick={setActiveTab} icon={<ShoppingBag />} label="Print Job Pipeline" badge={activeJobs ? String(activeJobs) : undefined} badgeColor="bg-[#2D545E] text-white" />
           <SidebarNav tab="customers" activeTab={activeTab} onClick={setActiveTab} icon={<Users />} label="Customer Directory" badge={String(new Set(orders.map(o => o.userEmail)).size)} />
-          <SidebarNav tab="business" activeTab={activeTab} onClick={setActiveTab} icon={<ReceiptText />} label="Invoices & Finance" badge={pendingPayments > 0 ? `$${Math.round(pendingPayments)} due` : undefined} badgeColor="bg-emerald-500/20 text-emerald-400" />
+          <SidebarNav tab="business" activeTab={activeTab} onClick={setActiveTab} icon={<ReceiptText />} label="Invoices & Finance" badge={pendingPayments > 0 ? `$${Math.round(pendingPayments)} due` : undefined} badgeColor="bg-[#E17055]/20 text-[#E17055]" />
 
-          <div className="pt-4 px-3 py-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Catalog & Content</div>
+          <div className="pt-4 px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Catalog & Content</div>
           <SidebarNav tab="products" activeTab={activeTab} onClick={setActiveTab} icon={<Boxes />} label="Products & Stocks" badge={String(products.length)} />
           <SidebarNav tab="categories" activeTab={activeTab} onClick={setActiveTab} icon={<ListTree />} label="Service Categories" />
           <SidebarNav tab="media" activeTab={activeTab} onClick={setActiveTab} icon={<ImageIcon />} label="Media Library" />
           <SidebarNav tab="site" activeTab={activeTab} onClick={setActiveTab} icon={<Monitor />} label="Storefront Editor" />
         </div>
 
-        {/* Quick Action Button */}
-        <div className="p-3 border-t border-slate-800/80">
+        {/* Quick Action Button in Brand Coral Accent */}
+        <div className="p-3 border-t border-[#223E47]">
           <button
             onClick={() => setCreatingOrder(true)}
-            className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs py-2.5 px-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-500/15 cursor-pointer"
+            className="w-full bg-[#E17055] hover:bg-[#D45F44] text-white font-bold text-xs py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-[#E17055]/25 cursor-pointer"
           >
-            <Plus className="w-4 h-4" /> New Print Job
+            <Plus className="w-4 h-4" /> New Print Job Order
           </button>
         </div>
 
         {/* User Footer */}
-        <div className="p-4 border-t border-slate-800 flex items-center justify-between">
+        <div className="p-4 border-t border-[#223E47] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full bg-slate-700 text-white flex items-center justify-center text-xs font-semibold">
+            <div className="w-7 h-7 rounded-full bg-[#2D545E] text-white flex items-center justify-center text-xs font-bold shadow-xs">
               AD
             </div>
             <div className="truncate max-w-[110px]">
@@ -291,7 +294,7 @@ export default function AdminPanel() {
               <span className="text-[10px] text-slate-400 block truncate">Press Manager</span>
             </div>
           </div>
-          <button onClick={logout} className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors" title="Log Out">
+          <button onClick={logout} className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-[#223E47] transition-colors" title="Log Out">
             <LogOut className="w-4 h-4" />
           </button>
         </div>
@@ -588,18 +591,18 @@ function SidebarNav({ tab, activeTab, onClick, icon, label, badge, badgeColor }:
   return (
     <button
       onClick={() => onClick(tab)}
-      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
         isActive
-          ? 'bg-slate-800 text-white font-semibold shadow-xs'
-          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+          ? 'bg-[#2D545E] text-white font-bold shadow-md shadow-[#2D545E]/20'
+          : 'text-slate-300 hover:text-white hover:bg-[#1E373F]/70'
       }`}
     >
       <div className="flex items-center gap-2.5">
-        {React.cloneElement(icon, { className: `w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-slate-400'}` })}
+        {React.cloneElement(icon, { className: `w-4 h-4 ${isActive ? 'text-[#E17055]' : 'text-slate-400'}` })}
         <span>{label}</span>
       </div>
       {badge && (
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badgeColor || (isActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-400')}`}>
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badgeColor || (isActive ? 'bg-[#E17055] text-white' : 'bg-[#1E373F] text-slate-300')}`}>
           {badge}
         </span>
       )}
@@ -643,21 +646,21 @@ function DashboardOverview({
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
             <span>Total Revenue</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"><DollarSign className="w-4 h-4" /></div>
+            <div className="w-8 h-8 rounded-lg bg-[#2D545E]/10 text-[#2D545E] flex items-center justify-center font-bold"><DollarSign className="w-4 h-4" /></div>
           </div>
           <div className="text-2xl font-bold text-slate-900 mt-2">${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
-          <div className="text-[11px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" /> Cumulative earnings
+          <div className="text-[11px] text-[#2D545E] font-semibold mt-1 flex items-center gap-1">
+            <TrendingUp className="w-3 h-3 text-[#2D545E]" /> Cumulative earnings
           </div>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
             <span>Pending Quotations</span>
-            <div className="w-8 h-8 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center"><FileText className="w-4 h-4" /></div>
+            <div className="w-8 h-8 rounded-lg bg-[#E17055]/10 text-[#E17055] flex items-center justify-center font-bold"><FileText className="w-4 h-4" /></div>
           </div>
           <div className="text-2xl font-bold text-slate-900 mt-2">{quotations.length}</div>
-          <div className="text-[11px] text-cyan-600 font-medium mt-1 cursor-pointer" onClick={onViewQuotations}>
+          <div className="text-[11px] text-[#E17055] font-semibold mt-1 cursor-pointer hover:underline" onClick={onViewQuotations}>
             Incoming customer requests &rarr;
           </div>
         </div>
@@ -665,10 +668,10 @@ function DashboardOverview({
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
             <span>Active Press PJOs</span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center"><Printer className="w-4 h-4" /></div>
+            <div className="w-8 h-8 rounded-lg bg-[#2D545E]/10 text-[#2D545E] flex items-center justify-center font-bold"><Printer className="w-4 h-4" /></div>
           </div>
           <div className="text-2xl font-bold text-slate-900 mt-2">{activeJobs}</div>
-          <div className="text-[11px] text-amber-600 font-medium mt-1 flex items-center gap-1">
+          <div className="text-[11px] text-[#2D545E] font-semibold mt-1 flex items-center gap-1">
             <Clock className="w-3 h-3" /> Confirmed job orders
           </div>
         </div>
@@ -676,7 +679,7 @@ function DashboardOverview({
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
             <span>Balance Due</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center"><CreditCard className="w-4 h-4" /></div>
+            <div className="w-8 h-8 rounded-lg bg-[#E17055]/10 text-[#E17055] flex items-center justify-center font-bold"><CreditCard className="w-4 h-4" /></div>
           </div>
           <div className="text-2xl font-bold text-slate-900 mt-2">${pendingPayments.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
           <div className="text-[11px] text-slate-500 font-medium mt-1">Outstanding payments</div>
@@ -685,9 +688,9 @@ function DashboardOverview({
 
       {/* Pending Storefront Quotes Alert Box */}
       {quotations.length > 0 && (
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-2xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="bg-gradient-to-r from-[#14262C] to-[#1E373F] text-white p-5 rounded-2xl shadow-md border border-[#223E47] flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
+            <div className="w-10 h-10 rounded-xl bg-[#E17055]/20 text-[#E17055] flex items-center justify-center font-bold shrink-0">
               <FileText className="w-5 h-5" />
             </div>
             <div>
@@ -697,7 +700,7 @@ function DashboardOverview({
           </div>
           <button
             onClick={onViewQuotations}
-            className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-xl transition-colors cursor-pointer shrink-0"
+            className="px-4 py-2 bg-[#E17055] hover:bg-[#D45F44] text-white font-bold text-xs rounded-xl transition-all cursor-pointer shrink-0 shadow-sm"
           >
             Open Quotations Desk &rarr;
           </button>
@@ -712,7 +715,7 @@ function DashboardOverview({
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Clock className="w-4 h-4 text-slate-500" /> Active Print Job Orders (PJOs)
             </h2>
-            <button onClick={onViewOrders} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1 cursor-pointer">
+            <button onClick={onViewOrders} className="text-xs text-[#2D545E] hover:text-[#1E373F] font-bold flex items-center gap-1 cursor-pointer">
               View all PJOs <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -776,7 +779,7 @@ function QuickQuoteEstimator({ products, onNewJob }: { products: Product[]; onNe
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 flex flex-col justify-between">
       <div>
         <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-4">
-          <Sliders className="w-4 h-4 text-emerald-600" /> Quick Press Estimator
+          <Sliders className="w-4 h-4 text-[#2D545E]" /> Quick Press Estimator
         </h2>
 
         <div className="space-y-4">
@@ -810,11 +813,11 @@ function QuickQuoteEstimator({ products, onNewJob }: { products: Product[]; onNe
             </div>
             <div className="flex justify-between text-xs text-slate-500">
               <span>Est. Gross Profit (45%):</span>
-              <span className="font-semibold text-emerald-600">+${estimatedMargin.toFixed(2)}</span>
+              <span className="font-semibold text-[#2D545E]">+${estimatedMargin.toFixed(2)}</span>
             </div>
             <div className="pt-2 border-t border-slate-200 flex justify-between text-sm font-bold text-slate-900">
               <span>Est. Customer Quote:</span>
-              <span className="text-emerald-600">${estimatedTotal.toFixed(2)}</span>
+              <span className="text-[#E17055] font-extrabold">${estimatedTotal.toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -822,9 +825,9 @@ function QuickQuoteEstimator({ products, onNewJob }: { products: Product[]; onNe
 
       <button
         onClick={onNewJob}
-        className="mt-6 w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+        className="mt-6 w-full bg-[#14262C] hover:bg-[#1E373F] text-white font-bold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
       >
-        <Plus className="w-4 h-4" /> Create Work Order
+        <Plus className="w-4 h-4 text-[#E17055]" /> Create Work Order
       </button>
     </div>
   );
@@ -1053,7 +1056,7 @@ function QuotationDrawer({
                   {phoneNum && (
                     <a
                       href={`tel:${phoneNum}`}
-                      className="px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                      className="px-3 py-1 bg-[#E17055] hover:bg-[#D45F44] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
                     >
                       <Phone className="w-3.5 h-3.5" /> Call Customer ({phoneNum})
                     </a>
@@ -1071,7 +1074,7 @@ function QuotationDrawer({
                   <div>
                     <span className="text-slate-400 block text-[10px]">PHONE NUMBER</span>
                     {phoneNum ? (
-                      <a href={`tel:${phoneNum}`} className="font-bold text-emerald-600 hover:underline flex items-center gap-1">
+                      <a href={`tel:${phoneNum}`} className="font-bold text-[#E17055] hover:underline flex items-center gap-1">
                         <Phone className="w-3.5 h-3.5" /> {phoneNum}
                       </a>
                     ) : (
@@ -1088,7 +1091,7 @@ function QuotationDrawer({
                 {opts.artworkFile && (
                   <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-xs">
                     <span className="text-slate-500 font-medium">Submitted Artwork File:</span>
-                    <a href={String(opts.artworkFile)} target="_blank" rel="noreferrer" className="text-cyan-600 font-bold underline hover:text-cyan-700 flex items-center gap-1">
+                    <a href={String(opts.artworkFile)} target="_blank" rel="noreferrer" className="text-[#2D545E] font-bold underline hover:text-[#1E373F] flex items-center gap-1">
                       View Artwork <ArrowUpRight className="w-3.5 h-3.5" />
                     </a>
                   </div>
@@ -1108,7 +1111,7 @@ function QuotationDrawer({
           {/* Interactive Finishing & Press Specs Form */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-500" /> Press Finishing & Production Options
+              <Sparkles className="w-4 h-4 text-[#E17055]" /> Press Finishing & Production Options
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1219,24 +1222,24 @@ function QuotationDrawer({
                   step="0.01"
                   value={sellPrice}
                   onChange={(e) => setSellPrice(Number(e.target.value))}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-emerald-600 outline-none"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-[#2D545E] outline-none"
                 />
               </div>
             </div>
 
             <div className="bg-slate-50 p-3 rounded-xl flex items-center justify-between text-xs">
               <span className="text-slate-500 font-medium">Calculated Profit Margin:</span>
-              <span className="font-bold text-emerald-600 text-sm">${(sellPrice - costPrice).toFixed(2)}</span>
+              <span className="font-bold text-[#2D545E] text-sm">${(sellPrice - costPrice).toFixed(2)}</span>
             </div>
           </div>
         </div>
 
         {/* Drawer Action Bar */}
-        <div className="p-4 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-3 shrink-0">
+        <div className="p-4 bg-[#14262C] border-t border-[#223E47] flex items-center justify-between gap-3 shrink-0">
           <button
             onClick={handleSaveDraft}
             disabled={submitting}
-            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold cursor-pointer"
+            className="px-4 py-2.5 bg-[#1E373F] hover:bg-[#284852] text-slate-200 rounded-xl text-xs font-semibold cursor-pointer"
           >
             Save Quote Draft
           </button>
@@ -1244,7 +1247,7 @@ function QuotationDrawer({
           <button
             onClick={handleConvertToPjo}
             disabled={submitting}
-            className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-md transition-all"
+            className="px-5 py-2.5 bg-[#E17055] hover:bg-[#D45F44] text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-md transition-all"
           >
             <Sparkles className="w-4 h-4" /> Create Print Job Order (PJO) &rarr;
           </button>
@@ -1335,7 +1338,7 @@ function OrdersEditor({
 
         <button
           onClick={onCreate}
-          className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer"
+          className="w-full sm:w-auto bg-[#E17055] hover:bg-[#D45F44] text-white font-bold text-xs py-2 px-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-[#E17055]/20 cursor-pointer"
         >
           <Plus className="w-4 h-4" /> New Print Order
         </button>
@@ -1565,7 +1568,7 @@ function ProductsEditor({
         <span className="text-xs font-semibold text-slate-500">Showing {filteredProducts.length} print products</span>
         <button
           onClick={onCreate}
-          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs py-2 px-4 rounded-xl flex items-center gap-2 transition-all cursor-pointer shadow-xs"
+          className="bg-[#E17055] hover:bg-[#D45F44] text-white font-bold text-xs py-2 px-4 rounded-xl flex items-center gap-2 transition-all shadow-md shadow-[#E17055]/20 cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Add Product
         </button>
@@ -1596,7 +1599,7 @@ function ProductsEditor({
               </div>
 
               <div className="bg-slate-50 px-5 py-3 border-t border-slate-100 flex items-center justify-between">
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${product.active !== false ? 'text-emerald-600' : 'text-slate-400'}`}>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${product.active !== false ? 'text-[#2D545E]' : 'text-slate-400'}`}>
                   {product.active !== false ? '● Active' : '○ Inactive'}
                 </span>
                 <div className="flex items-center gap-2">
@@ -1635,7 +1638,7 @@ function CategoriesEditor({
         <span className="text-xs font-semibold text-slate-500">Managing {categories.length} service categories</span>
         <button
           onClick={onCreate}
-          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs py-2 px-4 rounded-xl flex items-center gap-2 transition-all cursor-pointer shadow-xs"
+          className="bg-[#2D545E] hover:bg-[#1E373F] text-white font-bold text-xs py-2 px-4 rounded-xl flex items-center gap-2 transition-all shadow-md shadow-[#2D545E]/20 cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Add Category
         </button>
@@ -1715,7 +1718,7 @@ function CustomersEditor({
         <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Customer Directory Ledger ({customers.length} Accounts)</h2>
         <button
           onClick={onCreateCustomer}
-          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs py-2 px-4 rounded-xl flex items-center gap-2 transition-all shadow-xs cursor-pointer"
+          className="bg-[#E17055] hover:bg-[#D45F44] text-white font-bold text-xs py-2 px-4 rounded-xl flex items-center gap-2 transition-all shadow-md shadow-[#E17055]/20 cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Add New Customer
         </button>
@@ -1739,7 +1742,7 @@ function CustomersEditor({
                 <td className="py-3.5 px-4 text-slate-600 font-mono text-[11px]">{cust.email}</td>
                 <td className="py-3.5 px-4"><span className="px-2.5 py-0.5 rounded-full bg-slate-100 font-bold text-slate-800">{cust.totalOrders}</span></td>
                 <td className="py-3.5 px-4 text-slate-500">{new Date(cust.lastOrder).toLocaleDateString()}</td>
-                <td className="py-3.5 px-4 text-right font-bold text-emerald-600">${cust.totalSpent.toFixed(2)}</td>
+                <td className="py-3.5 px-4 text-right font-bold text-[#2D545E]">${cust.totalSpent.toFixed(2)}</td>
               </tr>
             ))}
 
@@ -2344,8 +2347,8 @@ function BusinessOrderModal({
               </div>
 
               <div className="col-span-2 flex items-center justify-between pt-2">
-                <span className="text-xs text-slate-500 font-medium">Estimated Profit Margin: <strong className="text-emerald-600">${(sellPrice - costPrice).toFixed(2)}</strong></span>
-                <button type="submit" disabled={loading} className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold cursor-pointer">
+                <span className="text-xs text-slate-500 font-medium">Estimated Profit Margin: <strong className="text-[#2D545E]">${(sellPrice - costPrice).toFixed(2)}</strong></span>
+                <button type="submit" disabled={loading} className="px-3 py-1.5 bg-[#2D545E] text-white rounded-lg text-xs font-semibold cursor-pointer">
                   Update Margin
                 </button>
               </div>
@@ -2378,7 +2381,7 @@ function BusinessOrderModal({
                 <option value="Credit Card">Credit Card</option>
                 <option value="Cheque">Cheque</option>
               </select>
-              <button type="submit" disabled={loading} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs cursor-pointer">
+              <button type="submit" disabled={loading} className="px-4 py-2 bg-[#2D545E] hover:bg-[#1E373F] text-white font-bold rounded-xl text-xs cursor-pointer">
                 Record
               </button>
             </form>
@@ -2514,7 +2517,7 @@ function CreateOrderModal({
             <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold">
               Cancel
             </button>
-            <button type="submit" disabled={loading} className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold shadow-xs">
+            <button type="submit" disabled={loading} className="px-5 py-2 bg-[#E17055] hover:bg-[#D45F44] text-white rounded-xl text-xs font-bold shadow-md shadow-[#E17055]/20">
               Create PJO Ticket
             </button>
           </div>
@@ -2817,7 +2820,7 @@ function CreateCustomerModal({
             <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold">
               Cancel
             </button>
-            <button type="submit" disabled={loading} className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold shadow-xs">
+            <button type="submit" disabled={loading} className="px-5 py-2 bg-[#2D545E] hover:bg-[#1E373F] text-white rounded-xl text-xs font-bold shadow-md shadow-[#2D545E]/20">
               Save Customer Profile
             </button>
           </div>
@@ -2981,7 +2984,7 @@ function LiveWebsiteEditor({
         </div>
         <div className="flex items-center gap-3">
           <a href="/" target="_blank" rel="noreferrer" className="h-9 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg flex items-center gap-2 text-xs font-semibold"><ExternalLink className="w-3.5 h-3.5" /> View site</a>
-          <button onClick={onSave} className="h-9 bg-emerald-500 hover:bg-emerald-400 text-slate-950 px-4 rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-xs cursor-pointer"><Save className="w-3.5 h-3.5" /> {notice || 'Publish Changes'}</button>
+          <button onClick={onSave} className="h-9 bg-[#E17055] hover:bg-[#D45F44] text-white px-4 rounded-lg text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-[#E17055]/20 cursor-pointer"><Save className="w-3.5 h-3.5" /> {notice || 'Publish Changes'}</button>
         </div>
       </header>
 
