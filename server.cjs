@@ -198,6 +198,44 @@ async function sendWelcomeEmail(customerEmail, customerName, plainPassword) {
   return { success: true, mode: 'simulated' };
 }
 
+async function upsertCustomer(email, name, phone, company, notes) {
+  const targetEmail = String(email || '').trim().toLowerCase();
+  if (!targetEmail) return null;
+
+  const targetName = String(name || targetEmail).trim();
+  const targetPhone = phone ? String(phone).trim() : null;
+  const targetCompany = company ? String(company).trim() : null;
+  const targetNotes = notes ? String(notes).trim() : null;
+
+  const [existing] = await pool.query('SELECT * FROM customers WHERE LOWER(user_email) = ?', [targetEmail]);
+  if (existing.length) {
+    const cust = existing[0];
+    await pool.query(
+      `UPDATE customers
+       SET user_name = COALESCE(?, user_name),
+           phone = COALESCE(?, phone),
+           company_name = COALESCE(?, company_name),
+           notes = COALESCE(?, notes),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [targetName, targetPhone, targetCompany, targetNotes, cust.id]
+    );
+    return { ...cust, user_name: targetName || cust.user_name };
+  }
+
+  const id = createId('cust');
+  const plainPass = generatePassword();
+  const passHash = bcrypt.hashSync(plainPass, 10);
+
+  await pool.query(
+    `INSERT INTO customers (id, user_email, user_name, phone, company_name, notes, password_plain, password_hash)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, targetEmail, targetName, targetPhone, targetCompany, targetNotes, plainPass, passHash]
+  );
+
+  return { id, user_email: targetEmail, user_name: targetName, password_plain: plainPass };
+}
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS customers (
       id VARCHAR(128) PRIMARY KEY,
