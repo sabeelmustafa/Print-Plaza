@@ -384,5 +384,32 @@ export const DataService = {
       method: 'POST',
       body: JSON.stringify(customerData),
     });
+  },
+
+  sendWelcomeEmail: async (customerId: string) => {
+    return await request<any>(`/api/admin/customers/${encodeURIComponent(customerId)}/send-welcome-email`, {
+      method: 'POST',
+    });
+  },
+
+  customerLogin: async (credentials: { email: string; password: string }) => {
+    return await request<any>('/api/customer/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+  },
+
+  customerLogout: async () => {
+    return await request<any>('/api/customer/logout', {
+      method: 'POST',
+    });
+  },
+
+  getCustomerSession: async () => {
+    try {
+      return await request<any>('/api/customer/session');
+    } catch (_err) {
+      return { authenticated: false };
+    }
   }
 };

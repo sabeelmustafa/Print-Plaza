@@ -92,6 +92,101 @@ async function ensureBusinessSchema() {
       INDEX idx_quotations_created (created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+const nodemailer = require('nodemailer');
+
+function createSmtpTransporter() {
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (host && user && pass) {
+    return nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+    });
+  }
+  return null;
+}
+
+async function sendWelcomeEmail(customerEmail, customerName, plainPassword) {
+  const email = String(customerEmail).trim().toLowerCase();
+  const name = String(customerName || 'Valued Customer').trim();
+  const transporter = createSmtpTransporter();
+  const fromAddress = process.env.SMTP_FROM || '"Print Plaza HQ" <noreply@printplaza.com>';
+  const portalUrl = process.env.APP_URL || 'http://localhost:3000';
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 30px;">
+      <table max-width="600" align="center" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; width: 100%;">
+        <tr style="background-color: #2D545E; color: #ffffff;">
+          <td style="padding: 30px; text-align: center;">
+            <h1 style="margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 1px;">PRINT PLAZA</h1>
+            <p style="margin: 5px 0 0; font-size: 13px; opacity: 0.8;">Press & Packaging Production Portal</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 35px; color: #1e293b;">
+            <h2 style="margin-top: 0; color: #2D545E; font-size: 20px;">Welcome to Print Plaza, ${name}!</h2>
+            <p style="font-size: 14px; line-height: 1.6; color: #475569;">
+              Your customer account has been set up successfully. You can now log in to your personal Client Portal to view quotation requests, track Print Job Orders (PJOs), and download official invoices.
+            </p>
+            
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #E17055; padding: 20px; border-radius: 8px; margin: 25px 0;">
+              <h3 style="margin-top: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #E17055;">Your Login Credentials</h3>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Portal URL:</strong> <a href="${portalUrl}" style="color: #2D545E;">${portalUrl}</a></p>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Username (Email):</strong> <span style="font-family: monospace; color: #0f172a;">${email}</span></p>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Password:</strong> <span style="font-family: monospace; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; color: #0f172a;">${plainPassword}</span></p>
+            </div>
+
+            <div style="text-align: center; margin-top: 30px;">
+              <a href="${portalUrl}" style="background-color: #2D545E; color: #ffffff; text-decoration: none; padding: 14px 30px; font-weight: bold; border-radius: 8px; display: inline-block; font-size: 14px;">Log In to Client Portal</a>
+            </div>
+
+            <p style="font-size: 12px; color: #94a3b8; margin-top: 35px; line-height: 1.5;">
+              If you have any questions or require custom print specifications, simply reply to this email or contact our support team.
+            </p>
+          </td>
+        </tr>
+        <tr style="background-color: #f1f5f9; color: #64748b; font-size: 11px; text-align: center;">
+          <td style="padding: 15px;">
+            &copy; ${new Date().getFullYear()} Print Plaza Press. All rights reserved.
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  if (transporter) {
+    try {
+      await transporter.sendMail({
+        from: fromAddress,
+        to: email,
+        subject: 'Welcome to Print Plaza - Your Account Credentials',
+        html: htmlContent,
+      });
+      console.log(`[EMAIL] Live Welcome email sent to ${email}`);
+      return { success: true, mode: 'live' };
+    } catch (err) {
+      console.error(`[EMAIL ERROR] Failed to send email to ${email}:`, err.message);
+    }
+  }
+
+  console.log(`\n======================================================`);
+  console.log(`[WELCOME EMAIL SIMULATION] To: ${email}`);
+  console.log(`Name: ${name} | Username: ${email} | Password: ${plainPassword}`);
+  console.log(`Portal Link: ${portalUrl}`);
+  console.log(`======================================================\n`);
+
+  return { success: true, mode: 'simulated' };
+}
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS customers (
       id VARCHAR(128) PRIMARY KEY,
@@ -99,6 +194,9 @@ async function ensureBusinessSchema() {
       user_name VARCHAR(191) NOT NULL,
       phone VARCHAR(64) NULL,
       company_name VARCHAR(191) NULL,
+      password_hash VARCHAR(255) NULL,
+      password_plain VARCHAR(64) NULL,
+      welcome_sent_at TIMESTAMP NULL,
       notes TEXT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -106,58 +204,84 @@ async function ensureBusinessSchema() {
       INDEX idx_customers_phone (phone)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+
   try {
-    await pool.query(`
-      INSERT IGNORE INTO customers (id, user_email, user_name, phone, company_name, created_at)
-      SELECT 
-        CONCAT('cust-', UUID_SHORT()),
-        LOWER(TRIM(user_email)),
-        COALESCE(NULLIF(TRIM(user_name), ''), LOWER(TRIM(user_email))),
-        NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(options_json, '$.phone'))), 'null'),
-        NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(options_json, '$.companyName'))), 'null'),
-        created_at
-      FROM orders
-      WHERE user_email IS NOT NULL AND TRIM(user_email) != ''
-    `);
-    await pool.query(`
-      INSERT IGNORE INTO customers (id, user_email, user_name, phone, company_name, created_at)
-      SELECT 
-        CONCAT('cust-', UUID_SHORT()),
-        LOWER(TRIM(user_email)),
-        COALESCE(NULLIF(TRIM(user_name), ''), LOWER(TRIM(user_email))),
-        NULLIF(TRIM(phone), 'null'),
-        NULLIF(TRIM(company_name), 'null'),
-        created_at
-      FROM quotations
-      WHERE user_email IS NOT NULL AND TRIM(user_email) != ''
-    `);
-  } catch (_migrationErr) {
-    // Migration ignore duplicates
+    await pool.query('ALTER TABLE customers ADD COLUMN password_hash VARCHAR(255) NULL');
+  } catch (_e) {}
+  try {
+    await pool.query('ALTER TABLE customers ADD COLUMN password_plain VARCHAR(64) NULL');
+  } catch (_e) {}
+  try {
+    await pool.query('ALTER TABLE customers ADD COLUMN welcome_sent_at TIMESTAMP NULL');
+  } catch (_e) {}
+
+  try {
+    const [existingOrders] = await pool.query('SELECT DISTINCT user_email, user_name, options_json FROM orders WHERE user_email IS NOT NULL AND TRIM(user_email) != ""');
+    for (const o of existingOrders) {
+      const opts = parseJson(o.options_json, {});
+      await upsertCustomer(o.user_email, o.user_name, opts.phone || opts.Phone, opts.companyName);
+    }
+    const [existingQuotes] = await pool.query('SELECT DISTINCT user_email, user_name, phone, company_name, notes FROM quotations WHERE user_email IS NOT NULL AND TRIM(user_email) != ""');
+    for (const q of existingQuotes) {
+      await upsertCustomer(q.user_email, q.user_name, q.phone, q.company_name, q.notes);
+    }
+  } catch (_e) {
+    // Ignore migration error
   }
   await pool.query('UPDATE orders SET sell_price = total_price WHERE sell_price = 0 AND total_price > 0');
 }
 
+function generatePassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let pass = 'PP-';
+  for (let i = 0; i < 5; i++) {
+    pass += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return pass;
+}
+
 async function upsertCustomer(email, name, phone, companyName, notes) {
-  if (!pool || !email) return;
+  if (!pool || !email) return null;
   const userEmail = String(email).trim().toLowerCase();
-  if (!userEmail) return;
+  if (!userEmail) return null;
   const userName = String(name || userEmail).trim();
   const phoneVal = phone ? String(phone).trim() : null;
   const companyVal = companyName ? String(companyName).trim() : null;
   const notesVal = notes ? String(notes).trim() : null;
   const id = createId('cust');
 
-  await pool.query(
-    `INSERT INTO customers (id, user_email, user_name, phone, company_name, notes)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE
-       user_name = COALESCE(NULLIF(?, ''), user_name),
-       phone = COALESCE(?, phone),
-       company_name = COALESCE(?, company_name),
-       notes = COALESCE(?, notes),
-       updated_at = CURRENT_TIMESTAMP`,
-    [id, userEmail, userName, phoneVal, companyVal, notesVal, userName, phoneVal, companyVal, notesVal]
-  );
+  const [existing] = await pool.query('SELECT * FROM customers WHERE LOWER(user_email) = ?', [userEmail]);
+
+  if (!existing.length) {
+    const plainPass = generatePassword();
+    await pool.query(
+      `INSERT INTO customers (id, user_email, user_name, phone, company_name, password_plain, notes, welcome_sent_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      [id, userEmail, userName, phoneVal, companyVal, plainPass, notesVal]
+    );
+
+    // Auto send Welcome Email
+    await sendWelcomeEmail(userEmail, userName, plainPass);
+    return { id, isNew: true, plainPass };
+  } else {
+    const customer = existing[0];
+    let plainPass = customer.password_plain;
+    if (!plainPass) {
+      plainPass = generatePassword();
+      await pool.query('UPDATE customers SET password_plain = ? WHERE id = ?', [plainPass, customer.id]);
+    }
+    await pool.query(
+      `UPDATE customers
+       SET user_name = COALESCE(NULLIF(?, ''), user_name),
+           phone = COALESCE(?, phone),
+           company_name = COALESCE(?, company_name),
+           notes = COALESCE(?, notes),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [userName, phoneVal, companyVal, notesVal, customer.id]
+    );
+    return { id: customer.id, isNew: false, plainPass };
+  }
 }
 
 function requireDb(_req, res, next) {
@@ -1040,6 +1164,92 @@ app.patch('/api/admin/customers/:id', requireDb, async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+app.post('/api/admin/customers/:id/send-welcome-email', requireDb, async (req, res, next) => {
+  try {
+    const customerId = req.params.id;
+    const [rows] = await pool.query('SELECT * FROM customers WHERE id = ?', [customerId]);
+
+    if (!rows.length) {
+      res.status(404).json({ error: 'Customer not found.' });
+      return;
+    }
+
+    const customer = rows[0];
+    let plainPass = customer.password_plain;
+    if (!plainPass) {
+      plainPass = generatePassword();
+      await pool.query('UPDATE customers SET password_plain = ? WHERE id = ?', [plainPass, customerId]);
+    }
+
+    const emailResult = await sendWelcomeEmail(customer.user_email, customer.user_name, plainPass);
+    await pool.query('UPDATE customers SET welcome_sent_at = CURRENT_TIMESTAMP WHERE id = ?', [customerId]);
+
+    res.json({
+      ok: true,
+      email: customer.user_email,
+      name: customer.user_name,
+      mode: emailResult.mode,
+      message: `Welcome credentials email sent to ${customer.user_email}`,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/*                        CUSTOMER AUTHENTICATION & PORTAL                     */
+/* -------------------------------------------------------------------------- */
+
+app.post('/api/customer/login', requireDb, async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+    const targetEmail = String(email || '').trim().toLowerCase();
+    const targetPass = String(password || '').trim();
+
+    if (!targetEmail || !targetPass) {
+      res.status(400).json({ error: 'Email and password are required.' });
+      return;
+    }
+
+    const [rows] = await pool.query('SELECT * FROM customers WHERE LOWER(user_email) = ?', [targetEmail]);
+
+    if (!rows.length) {
+      res.status(401).json({ error: 'Invalid email or password.' });
+      return;
+    }
+
+    const customer = rows[0];
+    const match = (customer.password_plain && customer.password_plain === targetPass) ||
+                  (customer.password_hash && customer.password_hash === targetPass);
+
+    if (!match) {
+      res.status(401).json({ error: 'Invalid password. Please check your credentials or welcome email.' });
+      return;
+    }
+
+    res.json({
+      authenticated: true,
+      user: {
+        uid: customer.id,
+        email: customer.user_email,
+        name: customer.user_name,
+        phone: customer.phone || '',
+        company: customer.company_name || '',
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/customer/session', requireDb, async (_req, res) => {
+  res.json({ authenticated: false });
+});
+
+app.post('/api/customer/logout', (_req, res) => {
+  res.json({ ok: true });
 });
 
 app.get('/api/site-settings', requireDb, async (_req, res, next) => {

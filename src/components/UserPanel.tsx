@@ -80,17 +80,26 @@ function printClientInvoice(order: Order, settings: SiteSettings) {
     <div class="rule"></div>
     <div class="panels"><div class="panel"><div class="panel-title">Bill to</div><h3>${escapeInvoice(order.userName || 'Customer')}</h3><div class="muted">${escapeInvoice(order.userEmail)}</div></div><div class="panel"><div class="panel-title">Order status</div><h3>${escapeInvoice(order.status)}</h3><div class="muted">${items.length} item${items.length === 1 ? '' : 's'} / ${escapeInvoice(order.paymentStatus || 'unpaid')}</div></div></div>
     <table><thead><tr><th>Description</th><th>Quantity</th><th class="right">Unit price</th><th class="right">Amount</th></tr></thead><tbody>${rows}</tbody></table>
-    <div class="summary"><div class="notes"><strong>Notes</strong>${escapeInvoice(order.invoiceNotes || 'Thank you for choosing Print Plaza. Payment is due according to the terms above.')}</div><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(sell, currency)}</strong></div><div class="total-row"><span>Paid</span><strong>${money(paid, currency)}</strong></div><div class="total-row"><span>Balance due</span><strong class="balance">${money(balance, currency)}</strong></div><div class="total-row grand"><span>Total</span><span>${money(sell, currency)}</span></div></div></div>
+    <div class="summary"><div class="notes"><strong>Notes</strong>${escapeInvoice(order.invoiceNotes || 'Thank you for choosing Print Plaza. Payment is due according to the terms above.')}</div><div class="totals"><div class="total-row"><span>Subtotal</span><strong>${money(sell, currency)}</strong></div><div class="total-row"><span>Paid</span><strong>${money(paid, currency)}</strong></div><div class="total-row balance"><span>Balance due</span><strong>${money(balance, currency)}</strong></div><div class="total-row grand"><span>Total</span><span>${money(sell, currency)}</span></div></div></div>
     <div class="footer"><div><strong>${escapeInvoice(companyName)}</strong><br>${escapeInvoice(settings.footer?.email || '')}<br>${escapeInvoice(settings.footer?.phone || '')}</div><div>PLAZAHQ DOCUMENT<br>${new Date().toLocaleString()}</div></div>
   </div></div><script>window.onload=function(){window.print()}</script></body></html>`);
   popup.document.close();
 }
 
 export default function UserPanel({ onBack }: { onBack: () => void }) {
-  const { user } = useAuth();
+  const { user, logoutCustomer } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [quotations, setQuotations] = useState<any[]>([]);
   const [settings, setSettings] = useState<SiteSettings>({});
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'quotations' | 'orders' | 'invoices' | 'new_quote'>('quotations');
+
+  // New quote form state
+  const [productName, setProductName] = useState('Custom Packaging Box');
+  const [quantity, setQuantity] = useState('500');
+  const [notes, setNotes] = useState('');
+  const [submittingQuote, setSubmittingQuote] = useState(false);
+  const [quoteSuccess, setQuoteSuccess] = useState('');
 
   useEffect(() => {
     if (user) fetchClientArea();
@@ -99,14 +108,46 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
   const fetchClientArea = async () => {
     setLoading(true);
     try {
-      const [orderData, siteSettings] = await Promise.all([
+      const [orderData, quoteData, siteSettings] = await Promise.all([
         DataService.getOrders(user?.uid, user?.email),
+        DataService.getQuotations(),
         DataService.getSiteSettings(),
       ]);
-      setOrders(orderData);
+
+      const userEmail = String(user?.email || '').toLowerCase().trim();
+      const myQuotes = quoteData.filter((q: any) => String(q.userEmail || '').toLowerCase().trim() === userEmail);
+      const myOrders = orderData.filter((o: any) => String(o.userEmail || '').toLowerCase().trim() === userEmail || !o.userEmail);
+
+      setOrders(myOrders);
+      setQuotations(myQuotes);
       setSettings(siteSettings);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRequestQuote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittingQuote(true);
+    setQuoteSuccess('');
+    try {
+      await DataService.saveQuotation({
+        userName: user?.name || user?.email,
+        userEmail: user?.email,
+        productName,
+        productId: 'custom-quote',
+        quantity: Math.max(1, Number(quantity || 1)),
+        notes,
+        quoteStatus: 'new',
+      });
+      setQuoteSuccess('Your quotation request has been submitted to PlazaHQ Press!');
+      setNotes('');
+      await fetchClientArea();
+      setActiveTab('quotations');
+    } catch (_err) {
+      alert('Could not submit quotation request.');
+    } finally {
+      setSubmittingQuote(false);
     }
   };
 
@@ -126,109 +167,289 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#FDFCFB] p-6 sm:p-8 md:p-16 relative">
-      <div className="absolute inset-0 bg-grainy opacity-[0.03] pointer-events-none" />
-
+    <div className="min-h-screen bg-[#FDFCFB] p-6 sm:p-8 md:p-12 relative">
       <div className="max-w-7xl mx-auto relative z-10">
-        <header className="mb-12 md:mb-16 flex flex-col lg:flex-row lg:items-end justify-between gap-10">
+        <header className="mb-10 flex flex-col lg:flex-row lg:items-end justify-between gap-8 border-b border-black/10 pb-8">
           <div>
-            <button
-              onClick={onBack}
-              className="text-[9px] font-black uppercase tracking-[0.4em] text-black/30 hover:text-black mb-8 flex items-center gap-3 transition-colors group"
-            >
-              <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1" /> Back to website
-            </button>
-            <h2 className="text-4xl sm:text-6xl md:text-7xl font-display font-black tracking-tighter uppercase leading-[0.85] mb-6">
-              Client <br />
-              <span className="text-black/10 italic font-serif lowercase">Area.</span>
+            <div className="flex items-center gap-4 mb-6">
+              <button
+                onClick={onBack}
+                className="text-[9px] font-black uppercase tracking-[0.3em] text-black/40 hover:text-black flex items-center gap-2 transition-colors group cursor-pointer"
+              >
+                <ArrowLeft className="w-3 h-3 group-hover:-translate-x-1" /> Storefront
+              </button>
+              <span className="text-black/20">|</span>
+              <button
+                onClick={logoutCustomer}
+                className="text-[9px] font-black uppercase tracking-[0.3em] text-red-500 hover:text-red-700 transition-colors cursor-pointer"
+              >
+                Sign Out
+              </button>
+            </div>
+            <h2 className="text-4xl sm:text-5xl font-display font-black tracking-tighter uppercase leading-none mb-3">
+              Client Portal
             </h2>
-            <p className="text-[10px] sm:text-[11px] font-mono uppercase tracking-[0.3em] font-bold text-[#2D545E] break-all">
+            <p className="text-[11px] font-mono uppercase tracking-[0.25em] font-bold text-[#2D545E] break-all">
               Signed in as {user?.email}
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:min-w-[620px]">
-            <SummaryCard label="Orders" value={String(orders.length)} icon={<ShoppingBag className="w-4 h-4" />} />
-            <SummaryCard label="Invoiced" value={summarize(totals.invoiced)} icon={<ReceiptText className="w-4 h-4" />} />
-            <SummaryCard label="Balance" value={summarize(totals.balance)} icon={<FileText className="w-4 h-4" />} />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:min-w-[580px]">
+            <SummaryCard label="Quotes" value={String(quotations.length)} icon={<FileText className="w-4 h-4 text-[#2D545E]" />} />
+            <SummaryCard label="Print Orders" value={String(orders.length)} icon={<ShoppingBag className="w-4 h-4 text-[#2D545E]" />} />
+            <SummaryCard label="Balance Due" value={summarize(totals.balance)} icon={<ReceiptText className="w-4 h-4 text-[#E17055]" />} />
           </div>
         </header>
 
+        {/* Tab Navigation */}
+        <div className="flex flex-wrap items-center gap-2 mb-8 border-b border-black/10 pb-4">
+          <button
+            onClick={() => setActiveTab('quotations')}
+            className={`px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === 'quotations' ? 'bg-[#2D545E] text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            My Quotations ({quotations.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === 'orders' ? 'bg-[#2D545E] text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            My Print Orders ({orders.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('invoices')}
+            className={`px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === 'invoices' ? 'bg-[#2D545E] text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+            }`}
+          >
+            Invoices & Receipts
+          </button>
+          <button
+            onClick={() => setActiveTab('new_quote')}
+            className={`px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === 'new_quote' ? 'bg-[#E17055] text-white shadow-md' : 'bg-white text-[#E17055] hover:bg-orange-50 border border-orange-200'
+            }`}
+          >
+            + Request New Quote
+          </button>
+        </div>
+
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <div className="w-10 h-10 border-2 border-black/10 border-t-black animate-spin rounded-full" />
-          </div>
-        ) : orders.length === 0 ? (
-          <div className="bg-white border border-black/10 p-12 sm:p-20 text-center">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-black/5 mb-10">
-              <ShoppingBag className="w-8 h-8 text-black/20" />
-            </div>
-            <h3 className="text-2xl font-display font-black uppercase">No orders found</h3>
-            <p className="mt-4 text-sm font-bold text-black/45 max-w-md mx-auto leading-relaxed">
-              When we create an order or quotation for this email address, it will appear here automatically.
-            </p>
+            <div className="w-10 h-10 border-2 border-black/10 border-t-[#2D545E] animate-spin rounded-full" />
           </div>
         ) : (
-          <div className="space-y-5">
-            {orders.map(order => {
-              const currency = normalizeCurrencyCode(order.currency);
-              const sell = Number(order.sellPrice ?? order.totalPrice ?? 0);
-              const paid = Number(order.paidAmount || 0);
-              const balance = Math.max(0, sell - paid);
-              const items = order.items?.length ? order.items : [{ productName: order.productName, quantity: order.quantity, totalPrice: sell }];
-              return (
-                <article key={order.id} className="bg-white border border-black/10 overflow-hidden">
-                  <div className="p-6 sm:p-8 flex flex-col xl:flex-row gap-8 xl:items-start xl:justify-between">
-                    <div className="flex-1">
-                      <div className="flex flex-wrap items-center gap-3 mb-5">
-                        <span className="text-[10px] font-mono font-bold text-black/30 uppercase tracking-[0.3em]">#{order.id}</span>
-                        <span className={`text-[9px] font-black uppercase px-3 py-1 tracking-widest ${statusClass(order.status)}`}>{order.status}</span>
-                        <span className={`text-[9px] font-black uppercase px-3 py-1 tracking-widest ${paymentClass(order.paymentStatus)}`}>{order.paymentStatus || 'unpaid'}</span>
-                      </div>
-                      <h4 className="text-2xl sm:text-3xl font-display font-black uppercase tracking-tight mb-5 leading-none">{order.productName}</h4>
-                      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <InfoBlock icon={<CalendarDays className="w-4 h-4" />} label="Created" value={formatDate(order.createdAt)} />
-                        <InfoBlock icon={<Clock className="w-4 h-4" />} label="Due" value={order.paymentDueDate ? formatDate(order.paymentDueDate) : 'On receipt'} />
-                        <InfoBlock icon={<ReceiptText className="w-4 h-4" />} label="Invoice total" value={money(sell, currency)} />
-                        <InfoBlock icon={<CheckCircle className="w-4 h-4" />} label="Paid / Balance" value={`${money(paid, currency)} / ${money(balance, currency)}`} />
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => printClientInvoice(order, settings)}
-                      className="bg-black text-white px-5 py-4 text-[9px] font-black uppercase tracking-[0.25em] flex items-center justify-center gap-3 hover:bg-[#2D545E]"
-                    >
-                      <Download className="w-4 h-4" /> Download invoice
+          <>
+            {/* Tab 1: My Quotations */}
+            {activeTab === 'quotations' && (
+              <div className="space-y-4">
+                {quotations.length === 0 ? (
+                  <div className="bg-white border border-black/10 p-12 text-center rounded-2xl">
+                    <FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold uppercase text-slate-800">No quotation requests found</h3>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto mt-2 mb-6">You haven't requested any custom print quotations yet.</p>
+                    <button onClick={() => setActiveTab('new_quote')} className="px-6 py-3 bg-[#E17055] text-white rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer">
+                      Request Your First Quote
                     </button>
                   </div>
-
-                  <div className="border-t border-black/10 bg-[#F6F5F2] p-6 sm:p-8">
-                    <div className="text-[9px] font-black uppercase tracking-[0.3em] text-black/35 mb-4">Work history / items</div>
-                    <div className="grid gap-2">
-                      {items.map((item, index) => (
-                        <div key={`${order.id}-${index}`} className="bg-white border border-black/10 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                ) : (
+                  quotations.map(q => (
+                    <div key={q.id} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs hover:shadow-md transition-all">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-4">
+                        <div>
                           <div className="flex items-center gap-3">
-                            <Package className="w-4 h-4 text-[#2D545E]" />
-                            <div>
-                              <div className="font-black uppercase tracking-tight">{item.productName}</div>
-                              <div className="text-xs font-bold text-black/40 mt-1">Quantity: {item.quantity}</div>
-                            </div>
+                            <span className="text-xs font-mono font-bold text-[#2D545E] bg-cyan-50 px-2.5 py-1 rounded-md border border-cyan-100">
+                              {q.quoteNumber || q.id}
+                            </span>
+                            <span className="text-xs text-slate-400 font-medium">{formatDate(q.createdAt)}</span>
                           </div>
-                          <div className="font-black">{money(Number(item.totalPrice || 0), currency)}</div>
+                          <h4 className="text-xl font-bold text-slate-900 mt-2">{q.productName}</h4>
                         </div>
-                      ))}
-                    </div>
-                    {order.invoiceNotes && (
-                      <div className="mt-4 bg-white border-l-4 border-[#2D545E] p-4 text-sm font-medium leading-relaxed text-black/60">
-                        {order.invoiceNotes}
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-semibold text-slate-500">Qty: <strong>{q.quantity}</strong></span>
+                          <span className={`text-xs font-bold uppercase px-3 py-1.5 rounded-lg ${
+                            q.quoteStatus === 'converted' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
+                            q.quoteStatus === 'approved' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            {q.quoteStatus === 'converted' ? `Converted (${q.convertedPjoNumber || 'PJO'})` : (q.quoteStatus || 'Pending Review')}
+                          </span>
+                        </div>
                       </div>
-                    )}
+
+                      {/* Finishing Specs */}
+                      {q.finishingSpecs && Object.keys(q.finishingSpecs).length > 0 && (
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+                          <h5 className="text-[10px] font-mono font-bold uppercase text-slate-500 mb-2">Press & Finishing Specifications</h5>
+                          <div className="flex flex-wrap gap-2">
+                            {Object.entries(q.finishingSpecs).map(([key, val]) => (
+                              <span key={key} className="text-xs bg-white px-2.5 py-1 rounded-md border border-slate-200 text-slate-700 font-medium">
+                                <strong className="text-slate-900 capitalize">{key}:</strong> {String(val)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-2">
+                        <span className="text-xs text-slate-500 font-medium">{q.notes || 'Custom print quote inquiry'}</span>
+                        <div className="text-right">
+                          <span className="text-[10px] font-mono text-slate-400 uppercase block">Quoted Price</span>
+                          <span className="text-lg font-black text-[#2D545E]">
+                            {q.quotedPrice ? money(q.quotedPrice, q.currency) : 'Under Review'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Tab 2: My Print Orders */}
+            {activeTab === 'orders' && (
+              <div className="space-y-4">
+                {orders.length === 0 ? (
+                  <div className="bg-white border border-black/10 p-12 text-center rounded-2xl">
+                    <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-bold uppercase text-slate-800">No active print orders</h3>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto mt-2">Approved quotations will automatically appear here as Print Job Orders.</p>
                   </div>
-                </article>
-              );
-            })}
-          </div>
+                ) : (
+                  orders.map(order => {
+                    const currency = normalizeCurrencyCode(order.currency);
+                    const sell = Number(order.sellPrice ?? order.totalPrice ?? 0);
+                    const paid = Number(order.paidAmount || 0);
+                    const balance = Math.max(0, sell - paid);
+                    return (
+                      <article key={order.id} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
+                        <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-mono font-bold text-slate-500">#{order.id}</span>
+                              <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded ${statusClass(order.status)}`}>{order.status}</span>
+                              <span className={`text-[10px] font-bold uppercase px-2.5 py-0.5 rounded ${paymentClass(order.paymentStatus)}`}>{order.paymentStatus || 'unpaid'}</span>
+                            </div>
+                            <h4 className="text-xl font-bold text-slate-900">{order.productName}</h4>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => printClientInvoice(order, settings)}
+                            className="bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-[#2D545E] cursor-pointer self-start"
+                          >
+                            <Download className="w-4 h-4" /> Print Invoice
+                          </button>
+                        </div>
+
+                        <div className="grid sm:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl text-xs">
+                          <div><span className="text-slate-400 block text-[10px]">Created</span><strong>{formatDate(order.createdAt)}</strong></div>
+                          <div><span className="text-slate-400 block text-[10px]">Due Date</span><strong>{order.paymentDueDate ? formatDate(order.paymentDueDate) : 'On receipt'}</strong></div>
+                          <div><span className="text-slate-400 block text-[10px]">Total</span><strong>{money(sell, currency)}</strong></div>
+                          <div><span className="text-slate-400 block text-[10px]">Paid / Balance</span><strong className="text-[#E17055]">{money(paid, currency)} / {money(balance, currency)}</strong></div>
+                        </div>
+                      </article>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {/* Tab 3: Invoices & Receipts */}
+            {activeTab === 'invoices' && (
+              <div className="grid sm:grid-cols-2 gap-4">
+                {orders.map(order => (
+                  <div key={order.id} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <span className="text-xs font-mono text-slate-400">INVOICE #{order.id}</span>
+                          <h4 className="text-lg font-bold text-slate-900">{order.productName}</h4>
+                        </div>
+                        <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded ${paymentClass(order.paymentStatus)}`}>
+                          {order.paymentStatus || 'unpaid'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 mb-4">{formatDate(order.createdAt)}</p>
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-4 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] font-mono text-slate-400 uppercase block">Total Amount</span>
+                        <span className="text-base font-bold text-slate-900">{money(order.sellPrice || order.totalPrice || 0, order.currency)}</span>
+                      </div>
+                      <button
+                        onClick={() => printClientInvoice(order, settings)}
+                        className="px-4 py-2 bg-slate-900 hover:bg-[#2D545E] text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" /> Invoice PDF
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Tab 4: Request New Quote */}
+            {activeTab === 'new_quote' && (
+              <div className="bg-white border border-slate-200 rounded-2xl p-8 max-w-2xl shadow-md">
+                <h3 className="text-2xl font-bold text-slate-900 mb-2">Request Custom Print Quotation</h3>
+                <p className="text-xs text-slate-500 mb-6">Submit your packaging and printing requirements directly to PlazaHQ press estimators.</p>
+
+                {quoteSuccess && (
+                  <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl text-xs font-semibold">
+                    {quoteSuccess}
+                  </div>
+                )}
+
+                <form onSubmit={handleRequestQuote} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Product / Packaging Type *</label>
+                    <input
+                      type="text"
+                      required
+                      value={productName}
+                      onChange={e => setProductName(e.target.value)}
+                      placeholder="e.g. Rigid Magnetic Gift Box, Kraft Shopping Bag"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-[#2D545E]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Quantity *</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      value={quantity}
+                      onChange={e => setQuantity(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-[#2D545E]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Specifications & Finishing Notes</label>
+                    <textarea
+                      rows={4}
+                      value={notes}
+                      onChange={e => setNotes(e.target.value)}
+                      placeholder="Specify dimensions (L x W x H), lamination (Matte/Gloss), Gold Foiling, Spot UV, embossing, stock GSM, etc."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-[#2D545E]"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={submittingQuote}
+                    className="w-full py-3.5 bg-[#E17055] hover:bg-orange-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer shadow-md disabled:opacity-50"
+                  >
+                    {submittingQuote ? 'Submitting Request...' : 'Submit Quotation Request'}
+                  </button>
+                </form>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -237,24 +458,12 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
 
 function SummaryCard({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
-    <div className="bg-white border border-black/10 p-5">
-      <div className="flex items-center justify-between text-black/30 mb-5">
-        <span className="text-[9px] font-black uppercase tracking-[0.3em]">{label}</span>
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+      <div className="flex items-center justify-between text-slate-400 mb-3">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</span>
         {icon}
       </div>
-      <div className="text-xl font-display font-black uppercase leading-tight">{value}</div>
-    </div>
-  );
-}
-
-function InfoBlock({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
-  return (
-    <div className="border border-black/10 bg-[#FDFCFB] p-4">
-      <div className="flex items-center gap-2 text-black/30 mb-3">
-        {icon}
-        <span className="text-[8px] font-black uppercase tracking-widest">{label}</span>
-      </div>
-      <div className="text-sm font-black uppercase leading-snug">{value}</div>
+      <div className="text-xl font-black text-slate-900">{value}</div>
     </div>
   );
 }
