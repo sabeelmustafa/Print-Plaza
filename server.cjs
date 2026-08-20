@@ -92,7 +92,72 @@ async function ensureBusinessSchema() {
       INDEX idx_quotations_created (created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS customers (
+      id VARCHAR(128) PRIMARY KEY,
+      user_email VARCHAR(191) UNIQUE NOT NULL,
+      user_name VARCHAR(191) NOT NULL,
+      phone VARCHAR(64) NULL,
+      company_name VARCHAR(191) NULL,
+      notes TEXT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_customers_email (user_email),
+      INDEX idx_customers_phone (phone)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+  try {
+    await pool.query(`
+      INSERT IGNORE INTO customers (id, user_email, user_name, phone, company_name, created_at)
+      SELECT 
+        CONCAT('cust-', UUID_SHORT()),
+        LOWER(TRIM(user_email)),
+        COALESCE(NULLIF(TRIM(user_name), ''), LOWER(TRIM(user_email))),
+        NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(options_json, '$.phone'))), 'null'),
+        NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(options_json, '$.companyName'))), 'null'),
+        created_at
+      FROM orders
+      WHERE user_email IS NOT NULL AND TRIM(user_email) != ''
+    `);
+    await pool.query(`
+      INSERT IGNORE INTO customers (id, user_email, user_name, phone, company_name, created_at)
+      SELECT 
+        CONCAT('cust-', UUID_SHORT()),
+        LOWER(TRIM(user_email)),
+        COALESCE(NULLIF(TRIM(user_name), ''), LOWER(TRIM(user_email))),
+        NULLIF(TRIM(phone), 'null'),
+        NULLIF(TRIM(company_name), 'null'),
+        created_at
+      FROM quotations
+      WHERE user_email IS NOT NULL AND TRIM(user_email) != ''
+    `);
+  } catch (_migrationErr) {
+    // Migration ignore duplicates
+  }
   await pool.query('UPDATE orders SET sell_price = total_price WHERE sell_price = 0 AND total_price > 0');
+}
+
+async function upsertCustomer(email, name, phone, companyName, notes) {
+  if (!pool || !email) return;
+  const userEmail = String(email).trim().toLowerCase();
+  if (!userEmail) return;
+  const userName = String(name || userEmail).trim();
+  const phoneVal = phone ? String(phone).trim() : null;
+  const companyVal = companyName ? String(companyName).trim() : null;
+  const notesVal = notes ? String(notes).trim() : null;
+  const id = createId('cust');
+
+  await pool.query(
+    `INSERT INTO customers (id, user_email, user_name, phone, company_name, notes)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       user_name = COALESCE(NULLIF(?, ''), user_name),
+       phone = COALESCE(?, phone),
+       company_name = COALESCE(?, company_name),
+       notes = COALESCE(?, notes),
+       updated_at = CURRENT_TIMESTAMP`,
+    [id, userEmail, userName, phoneVal, companyVal, notesVal, userName, phoneVal, companyVal, notesVal]
+  );
 }
 
 function requireDb(_req, res, next) {
@@ -668,6 +733,309 @@ app.patch('/api/admin/orders/:id/status', requireDb, requireAdmin, async (req, r
       'UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [req.body.status, req.params.id]
     );
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/*                            QUOTATIONS MANAGEMENT                           */
+/* -------------------------------------------------------------------------- */
+
+app.get('/api/quotations', requireDb, async (_req, res, next) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM quotations ORDER BY created_at DESC');
+    res.json(rows.map((row) => ({
+      id: row.id,
+      quoteNumber: row.quote_number,
+      userId: row.user_id,
+      userName: row.user_name,
+      userEmail: row.user_email,
+      phone: row.phone || '',
+      companyName: row.company_name || '',
+      productId: row.product_id,
+      productName: row.product_name,
+      quantity: Number(row.quantity),
+      quotedPrice: Number(row.quoted_price),
+      currency: normalizeCurrency(row.currency_code),
+      quoteStatus: row.status,
+      convertedPjoNumber: row.converted_pjo_number || null,
+      convertedOrderId: row.converted_order_id || null,
+      finishingSpecs: parseJson(row.finishing_specs, {}),
+      options: parseJson(row.options_json, {}),
+      notes: row.notes || '',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      isQuotation: true,
+      totalPrice: Number(row.quoted_price),
+      sellPrice: Number(row.quoted_price),
+    })));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/quotations', requireDb, async (req, res, next) => {
+  try {
+    const quote = req.body;
+    const id = quote.id || createId('quote');
+    const quoteNumber = quote.quoteNumber || `QT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const optionsObj = quote.options || {};
+    const finishingSpecs = quote.finishingSpecs || {};
+    const phone = quote.phone || optionsObj.phone || '';
+    const companyName = quote.companyName || optionsObj.companyName || '';
+    const quotedPrice = Math.max(0, Number(quote.quotedPrice || quote.totalPrice || quote.sellPrice || 0));
+
+    await pool.query(
+      `INSERT INTO quotations (
+         id, quote_number, user_id, user_name, user_email, phone, company_name,
+         product_id, product_name, quantity, quoted_price, currency_code, status,
+         finishing_specs, options_json, notes
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        quoteNumber,
+        String(quote.userId || quote.userEmail || 'guest-quote'),
+        String(quote.userName || 'Customer').trim(),
+        String(quote.userEmail || '').trim(),
+        String(phone).trim(),
+        String(companyName).trim(),
+        String(quote.productId || 'custom-packaging'),
+        String(quote.productName || 'Packaging Quotation Request'),
+        Math.max(1, Number(quote.quantity || 1)),
+        quotedPrice,
+        normalizeCurrency(quote.currency),
+        quote.quoteStatus || 'new',
+        JSON.stringify(finishingSpecs),
+        JSON.stringify(optionsObj),
+        String(quote.notes || optionsObj.specifications || '').trim(),
+      ]
+    );
+
+    await upsertCustomer(quote.userEmail, quote.userName, phone, companyName, quote.notes);
+
+    res.status(201).json({ id, quoteNumber, status: 'new' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch('/api/quotations/:id', requireDb, async (req, res, next) => {
+  try {
+    const quoteId = req.params.id;
+    const { quotedPrice, quoteStatus, phone, companyName, finishingSpecs, notes, currency } = req.body;
+
+    const updates = [];
+    const params = [];
+
+    if (quotedPrice !== undefined) {
+      updates.push('quoted_price = ?');
+      params.push(Math.max(0, Number(quotedPrice)));
+    }
+    if (quoteStatus !== undefined) {
+      updates.push('status = ?');
+      params.push(String(quoteStatus));
+    }
+    if (phone !== undefined) {
+      updates.push('phone = ?');
+      params.push(String(phone));
+    }
+    if (companyName !== undefined) {
+      updates.push('company_name = ?');
+      params.push(String(companyName));
+    }
+    if (finishingSpecs !== undefined) {
+      updates.push('finishing_specs = ?');
+      params.push(JSON.stringify(finishingSpecs));
+    }
+    if (notes !== undefined) {
+      updates.push('notes = ?');
+      params.push(String(notes));
+    }
+    if (currency !== undefined) {
+      updates.push('currency_code = ?');
+      params.push(normalizeCurrency(currency));
+    }
+
+    if (!updates.length) {
+      res.json({ ok: true });
+      return;
+    }
+
+    params.push(quoteId);
+    await pool.query(`UPDATE quotations SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, params);
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/quotations/:id/convert', requireDb, async (req, res, next) => {
+  try {
+    const quoteId = req.params.id;
+    const [rows] = await pool.query('SELECT * FROM quotations WHERE id = ?', [quoteId]);
+    if (!rows.length) {
+      res.status(404).json({ error: 'Quotation not found.' });
+      return;
+    }
+
+    const quote = rows[0];
+    const pjoNumber = req.body.pjoNumber || `PJO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const orderId = createId('order');
+    const sellPrice = Math.max(0, Number(req.body.sellPrice || quote.quoted_price || 0));
+    const costPrice = Math.max(0, Number(req.body.costPrice || 0));
+    const finishingSpecs = req.body.finishingSpecs || parseJson(quote.finishing_specs, {});
+    const optionsObj = {
+      ...parseJson(quote.options_json, {}),
+      phone: quote.phone,
+      companyName: quote.company_name,
+      pjoNumber,
+      quoteStatus: 'converted',
+      finishingSpecs,
+    };
+
+    await pool.query(
+      `INSERT INTO orders (
+         id, user_id, user_name, user_email, product_id, product_name,
+         quantity, options_json, items_json, total_price, cost_price, sell_price, currency_code,
+         invoice_notes, status
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        orderId,
+        quote.user_id || quote.user_email,
+        quote.user_name,
+        quote.user_email,
+        quote.product_id,
+        quote.product_name,
+        quote.quantity,
+        JSON.stringify(optionsObj),
+        JSON.stringify([{
+          productId: quote.product_id,
+          productName: quote.product_name,
+          quantity: quote.quantity,
+          options: optionsObj,
+          totalPrice: sellPrice
+        }]),
+        sellPrice,
+        costPrice,
+        sellPrice,
+        quote.currency_code || 'PKR',
+        quote.notes || `Converted from Quote #${quote.quote_number || quoteId}`,
+        'pending',
+      ]
+    );
+
+    await pool.query(
+      `UPDATE quotations SET status = 'converted', converted_pjo_number = ?, converted_order_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [pjoNumber, orderId, quoteId]
+    );
+
+    await upsertCustomer(quote.user_email, quote.user_name, quote.phone, quote.company_name, quote.notes);
+
+    res.json({ ok: true, orderId, pjoNumber });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/*                            CUSTOMERS MANAGEMENT                            */
+/* -------------------------------------------------------------------------- */
+
+app.get('/api/admin/customers', requireDb, async (_req, res, next) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        c.*,
+        COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN COALESCE(o.sell_price, o.total_price, 0) ELSE 0 END), 0) AS total_spent,
+        COUNT(DISTINCT CASE WHEN o.status != 'cancelled' THEN o.id END) AS total_orders,
+        MAX(o.created_at) AS last_order_at
+      FROM customers c
+      LEFT JOIN orders o ON LOWER(o.user_email) = LOWER(c.user_email)
+      GROUP BY c.id
+      ORDER BY c.created_at DESC
+    `);
+
+    res.json(rows.map((row) => ({
+      id: row.id,
+      email: row.user_email,
+      name: row.user_name || 'Customer',
+      phone: row.phone || '',
+      company: row.company_name || '',
+      companyName: row.company_name || '',
+      notes: row.notes || '',
+      totalOrders: Number(row.total_orders || 0),
+      totalSpent: Number(row.total_spent || 0),
+      lastOrder: row.last_order_at || row.created_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    })));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/admin/customers', requireDb, async (req, res, next) => {
+  try {
+    const { userEmail, email, userName, name, phone, companyName, company, notes } = req.body;
+    const targetEmail = String(userEmail || email || '').trim().toLowerCase();
+    const targetName = String(userName || name || targetEmail).trim();
+    const targetPhone = String(phone || '').trim();
+    const targetCompany = String(companyName || company || '').trim();
+    const targetNotes = String(notes || '').trim();
+
+    if (!targetEmail) {
+      res.status(400).json({ error: 'Customer email is required.' });
+      return;
+    }
+
+    // Check if customer email already exists in customers table
+    const [existing] = await pool.query('SELECT id, user_name FROM customers WHERE LOWER(user_email) = ?', [targetEmail]);
+    if (existing.length) {
+      res.status(409).json({
+        error: `Customer email '${targetEmail}' is already registered in the directory.`,
+        alreadyExists: true,
+        customerId: existing[0].id,
+      });
+      return;
+    }
+
+    const id = createId('cust');
+    await pool.query(
+      `INSERT INTO customers (id, user_email, user_name, phone, company_name, notes)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, targetEmail, targetName, targetPhone || null, targetCompany || null, targetNotes || null]
+    );
+
+    res.status(201).json({ id, email: targetEmail, name: targetName });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch('/api/admin/customers/:id', requireDb, async (req, res, next) => {
+  try {
+    const customerId = req.params.id;
+    const { userName, phone, companyName, notes } = req.body;
+
+    await pool.query(
+      `UPDATE customers
+       SET user_name = COALESCE(?, user_name),
+           phone = COALESCE(?, phone),
+           company_name = COALESCE(?, company_name),
+           notes = COALESCE(?, notes),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [
+        userName ? String(userName).trim() : null,
+        phone ? String(phone).trim() : null,
+        companyName ? String(companyName).trim() : null,
+        notes ? String(notes).trim() : null,
+        customerId,
+      ]
+    );
+
     res.json({ ok: true });
   } catch (error) {
     next(error);

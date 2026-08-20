@@ -153,3 +153,37 @@ export interface PaymentRecord {
   paidAt: string;
   createdAt?: string;
 }
+
+export interface Quotation {
+  id: string;
+  quoteNumber?: string;
+  userId?: string;
+  userName: string;
+  userEmail: string;
+  phone?: string;
+  companyName?: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  quotedPrice: number;
+  currency?: string;
+  quoteStatus: 'new' | 'negotiating' | 'approved' | 'converted' | 'declined';
+  convertedPjoNumber?: string | null;
+  convertedOrderId?: string | null;
+  finishingSpecs?: {
+    lamination?: string;
+    foiling?: string;
+    uv?: string;
+    emboss?: string;
+    dieCut?: string;
+    specialStock?: string;
+    customNotes?: string;
+  };
+  options?: Record<string, string | number | boolean>;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  isQuotation?: boolean;
+  totalPrice?: number;
+  sellPrice?: number;
+}

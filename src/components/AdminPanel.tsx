@@ -143,6 +143,8 @@ export default function AdminPanel() {
   const [creatingQuotation, setCreatingQuotation] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   
+  const [quotations, setQuotations] = useState<any[]>([]);
+  const [customerList, setCustomerList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
@@ -155,16 +157,20 @@ export default function AdminPanel() {
     setLoading(true);
     setError('');
     try {
-      const [nextProducts, nextCategories, nextOrders, nextSettings, nextMedia] = await Promise.all([
+      const [nextProducts, nextCategories, nextOrders, nextQuotations, nextCustomers, nextSettings, nextMedia] = await Promise.all([
         DataService.getProducts(),
         DataService.getCategories(),
         DataService.getOrders(),
+        DataService.getQuotations(),
+        DataService.getCustomers(),
         DataService.getSiteSettings(),
         DataService.getMedia(),
       ]);
       setProducts(nextProducts);
       setCategories(nextCategories);
       setOrders(nextOrders);
+      setQuotations(nextQuotations);
+      setCustomerList(nextCustomers);
       setSettings({
         header: { ...defaultSettings.header, ...nextSettings.header },
         theme: { ...defaultSettings.theme, ...nextSettings.theme },
@@ -227,7 +233,10 @@ export default function AdminPanel() {
   };
 
   // Filtered Lists for Workflow Separation (Quotations Desk vs Production Pipeline)
-  const pendingQuotations = orders.filter(o => Boolean(o.isQuotation) && o.quoteStatus !== 'converted');
+  const pendingQuotations = [
+    ...quotations.filter(q => q.quoteStatus !== 'converted'),
+    ...orders.filter(o => Boolean(o.isQuotation) && o.quoteStatus !== 'converted' && !quotations.some(q => q.id === o.id)),
+  ];
   const confirmedPjos = orders.filter(o => !o.isQuotation || o.quoteStatus === 'converted');
 
   // Metrics (Exclude cancelled orders from revenue and balance due)
@@ -443,6 +452,7 @@ export default function AdminPanel() {
               {activeTab === 'customers' && (
                 <CustomersEditor
                   orders={orders}
+                  customerList={customerList}
                   searchQuery={searchQuery}
                   onCreateCustomer={() => setCreatingCustomer(true)}
                   onManageOrder={setBusinessOrder}
@@ -462,15 +472,10 @@ export default function AdminPanel() {
                   <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center mb-6">
                     <Monitor className="w-6 h-6" />
                   </div>
-                  <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Live Storefront Editor</h2>
-                  <p className="mt-3 text-sm text-slate-600 leading-relaxed">
-                    Customize your public storefront branding, live hero copy, menu links, colors, and footer details in a dedicated live preview workspace.
-                  </p>
-                  <button
-                    onClick={() => window.open('/admin/editor', '_blank', 'noopener,noreferrer')}
-                    className="mt-6 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl text-xs font-semibold inline-flex items-center gap-2 shadow-md transition-all cursor-pointer"
-                  >
-                    <ExternalLink className="w-4 h-4" /> Open Full-Screen Live Editor
+                  <h2 className="text-xl font-bold text-slate-900 mb-2">Live Storefront Page Customizer</h2>
+                  <p className="text-xs text-slate-500 mb-6">Customize hero text, product showcase grid, theme accents, and footer contact links in real-time.</p>
+                  <button onClick={() => window.open('/admin/editor', '_blank')} className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-md">
+                    <ExternalLink className="w-4 h-4" /> Open Storefront Customizer Mode
                   </button>
                 </div>
               )}
@@ -553,8 +558,8 @@ export default function AdminPanel() {
         <CreateQuotationModal
           products={products}
           onClose={() => setCreatingQuotation(false)}
-          onSave={async order => {
-            await DataService.createAdminOrder(order);
+          onSave={async quote => {
+            await DataService.saveQuotation(quote);
             setCreatingQuotation(false);
             await loadAll();
             flash('New quotation request created.');
@@ -566,11 +571,16 @@ export default function AdminPanel() {
       {creatingCustomer && (
         <CreateCustomerModal
           onClose={() => setCreatingCustomer(false)}
-          onSave={async order => {
-            await DataService.createAdminOrder(order);
-            setCreatingCustomer(false);
-            await loadAll();
-            flash('New customer profile saved.');
+          onSave={async data => {
+            try {
+              await DataService.createCustomer(data);
+              setCreatingCustomer(false);
+              await loadAll();
+              flash('New customer profile registered.');
+            } catch (err: any) {
+              const msg = typeof err === 'string' ? err : (err?.message || err?.error || 'A customer with this email is already listed.');
+              alert(msg);
+            }
           }}
         />
       )}
@@ -1001,9 +1011,8 @@ function QuotationDrawer({
   const handleSaveDraft = async () => {
     setSubmitting(true);
     try {
-      await DataService.updateOrderFinance(quotation.id, {
-        costPrice,
-        sellPrice,
+      await DataService.updateQuotation(quotation.id, {
+        quotedPrice: sellPrice,
         finishingSpecs,
         quoteStatus: 'negotiating'
       });
@@ -1017,7 +1026,7 @@ function QuotationDrawer({
     if (!confirm(`Finalize quote and create Print Job Order (PJO) for ${quotation.userName || quotation.userEmail}?`)) return;
     setSubmitting(true);
     try {
-      await DataService.convertToPjo(quotation.id, {
+      await DataService.convertQuotationToPjo(quotation.id, {
         sellPrice,
         costPrice,
         finishingSpecs
@@ -1671,11 +1680,13 @@ function CategoriesEditor({
 
 function CustomersEditor({
   orders,
+  customerList = [],
   searchQuery,
   onCreateCustomer,
   onManageOrder
 }: {
   orders: Order[];
+  customerList?: any[];
   searchQuery: string;
   onCreateCustomer: () => void;
   onManageOrder: (o: Order) => void;
@@ -1683,6 +1694,23 @@ function CustomersEditor({
   // Aggregate customer statistics
   const customerMap = new Map<string, { email: string; name: string; phone: string; company: string; totalOrders: number; totalSpent: number; lastOrder: string; orderList: Order[] }>();
 
+  // 1. Seed customerMap from dedicated customers table
+  customerList.forEach((c) => {
+    const key = (c.email || c.userEmail || '').toLowerCase().trim();
+    if (!key) return;
+    customerMap.set(key, {
+      email: c.email || c.userEmail,
+      name: c.name || c.userName || 'Customer',
+      phone: c.phone || '',
+      company: c.company || c.companyName || '',
+      totalOrders: Number(c.totalOrders || 0),
+      totalSpent: Number(c.totalSpent || 0),
+      lastOrder: c.lastOrder || c.createdAt || new Date().toISOString(),
+      orderList: []
+    });
+  });
+
+  // 2. Merge order history and metrics
   orders.forEach((o) => {
     const key = (o.userEmail || o.userName || o.userId || '').toLowerCase().trim();
     if (!key) return;
@@ -1694,14 +1722,16 @@ function CustomersEditor({
     const amount = o.sellPrice || o.totalPrice || 0;
 
     if (existing) {
-      existing.totalOrders += 1;
-      existing.totalSpent += amount;
       existing.orderList.push(o);
+      if (!customerList.length) {
+        existing.totalOrders += 1;
+        existing.totalSpent += amount;
+        if (new Date(o.createdAt) > new Date(existing.lastOrder)) {
+          existing.lastOrder = o.createdAt;
+        }
+      }
       if (phone && !existing.phone) existing.phone = phone;
       if (company && !existing.company) existing.company = company;
-      if (new Date(o.createdAt) > new Date(existing.lastOrder)) {
-        existing.lastOrder = o.createdAt;
-      }
     } else {
       customerMap.set(key, {
         email: o.userEmail || key,
@@ -2559,7 +2589,7 @@ function CreateQuotationModal({
 }: {
   products: Product[];
   onClose: () => void;
-  onSave: (order: Partial<Order>) => Promise<void>;
+  onSave: (quote: any) => Promise<void>;
 }) {
   const [selectedProductId, setSelectedProductId] = useState<string>(products[0]?.id || '');
   const [userEmail, setUserEmail] = useState('');
@@ -2578,7 +2608,7 @@ function CreateQuotationModal({
     if (!product || !userEmail) return;
     setLoading(true);
     try {
-      const totalPrice = customPrice ?? (product.price * quantity);
+      const quotedPrice = customPrice ?? (product.price * quantity);
       await onSave({
         userId: `cust_${Date.now()}`,
         productId: product.id,
@@ -2586,18 +2616,19 @@ function CreateQuotationModal({
         quantity,
         userEmail,
         userName: userName || userEmail,
-        totalPrice,
-        sellPrice: totalPrice,
-        costPrice: totalPrice * 0.5,
+        phone,
+        companyName,
+        quotedPrice,
+        totalPrice: quotedPrice,
+        sellPrice: quotedPrice,
         options: {
           phone,
           companyName,
           specifications,
         },
-        status: 'pending',
-        paymentStatus: 'unpaid',
-        isQuotation: true,
+        notes: specifications,
         quoteStatus: 'new',
+        isQuotation: true,
         createdAt: new Date().toISOString()
       });
     } finally {
@@ -2731,7 +2762,7 @@ function CreateCustomerModal({
   onSave
 }: {
   onClose: () => void;
-  onSave: (order: Partial<Order>) => Promise<void>;
+  onSave: (data: any) => Promise<void>;
 }) {
   const [userEmail, setUserEmail] = useState('');
   const [userName, setUserName] = useState('');
@@ -2746,25 +2777,11 @@ function CreateCustomerModal({
     setLoading(true);
     try {
       await onSave({
-        userId: `cust_${Date.now()}`,
-        productId: 'custom-account',
-        productName: 'Customer Profile',
-        quantity: 1,
         userEmail,
         userName: userName || userEmail,
-        totalPrice: 0,
-        sellPrice: 0,
-        costPrice: 0,
-        options: {
-          phone,
-          companyName,
-          specifications: notes || 'Registered customer profile',
-        },
-        status: 'pending',
-        paymentStatus: 'unpaid',
-        isQuotation: true,
-        quoteStatus: 'new',
-        createdAt: new Date().toISOString()
+        phone,
+        companyName,
+        notes,
       });
     } finally {
       setLoading(false);

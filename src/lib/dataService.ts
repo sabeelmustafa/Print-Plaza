@@ -307,5 +307,82 @@ export const DataService = {
       }),
     });
     return result.url;
+  },
+
+  getQuotations: async (): Promise<any[]> => {
+    try {
+      return await request<any[]>('/api/quotations');
+    } catch (_error) {
+      const stored = localStorage.getItem('plaza_studio_quotations');
+      return stored ? JSON.parse(stored) : [];
+    }
+  },
+
+  saveQuotation: async (quote: any) => {
+    try {
+      await request('/api/quotations', {
+        method: 'POST',
+        body: JSON.stringify(quote),
+      });
+      return DataService.getQuotations();
+    } catch (_error) {
+      const stored = localStorage.getItem('plaza_studio_quotations');
+      const list = stored ? JSON.parse(stored) : [];
+      const newQuote = {
+        ...quote,
+        id: quote.id || `quote-${Math.random().toString(36).slice(2, 7)}`,
+        quoteNumber: quote.quoteNumber || `QT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+        createdAt: new Date().toISOString(),
+        quoteStatus: quote.quoteStatus || 'new',
+        isQuotation: true,
+      };
+      const updated = [newQuote, ...list];
+      localStorage.setItem('plaza_studio_quotations', JSON.stringify(updated));
+      return updated;
+    }
+  },
+
+  updateQuotation: async (quoteId: string, updates: any) => {
+    try {
+      await request(`/api/quotations/${encodeURIComponent(quoteId)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates),
+      });
+      return DataService.getQuotations();
+    } catch (_error) {
+      const stored = localStorage.getItem('plaza_studio_quotations');
+      const list = stored ? JSON.parse(stored) : [];
+      const updated = list.map((q: any) => q.id === quoteId ? { ...q, ...updates, updatedAt: new Date().toISOString() } : q);
+      localStorage.setItem('plaza_studio_quotations', JSON.stringify(updated));
+      return updated;
+    }
+  },
+
+  convertQuotationToPjo: async (quoteId: string, pjoData: any) => {
+    try {
+      await request(`/api/quotations/${encodeURIComponent(quoteId)}/convert`, {
+        method: 'POST',
+        body: JSON.stringify(pjoData),
+      });
+      await Promise.all([DataService.getOrders(), DataService.getQuotations()]);
+      return DataService.getOrders();
+    } catch (_error) {
+      return DataService.convertToPjo(quoteId, pjoData);
+    }
+  },
+
+  getCustomers: async (): Promise<any[]> => {
+    try {
+      return await request<any[]>('/api/admin/customers');
+    } catch (_error) {
+      return [];
+    }
+  },
+
+  createCustomer: async (customerData: any) => {
+    return await request<any>('/api/admin/customers', {
+      method: 'POST',
+      body: JSON.stringify(customerData),
+    });
   }
 };
