@@ -348,7 +348,63 @@ async function sendQuotationUpdateEmail(customerEmail, customerName, quoteObj) {
   return { success: true, mode: 'simulated' };
 }
 
+function generatePassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let pass = 'PP-';
+  for (let i = 0; i < 5; i++) {
+    pass += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return pass;
+}
 
+async function upsertCustomer(email, name, phone, companyName, notes, autoSendWelcome = false) {
+  if (!pool || !email) return null;
+  const userEmail = String(email).trim().toLowerCase();
+  if (!userEmail) return null;
+  const userName = String(name || userEmail).trim();
+  const phoneVal = phone ? String(phone).trim() : null;
+  const companyVal = companyName ? String(companyName).trim() : null;
+  const notesVal = notes ? String(notes).trim() : null;
+  const id = createId('cust');
+
+  const [existing] = await pool.query('SELECT * FROM customers WHERE LOWER(user_email) = ?', [userEmail]);
+
+  if (!existing.length) {
+    const plainPass = generatePassword();
+    await pool.query(
+      `INSERT INTO customers (id, user_email, user_name, phone, company_name, password_plain, notes, welcome_sent_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ${autoSendWelcome ? 'CURRENT_TIMESTAMP' : 'NULL'})`,
+      [id, userEmail, userName, phoneVal, companyVal, plainPass, notesVal]
+    );
+
+    if (autoSendWelcome) {
+      try {
+        await sendWelcomeEmail(userEmail, userName, plainPass);
+      } catch (err) {
+        console.error('[UPSERT CUSTOMER] Welcome email failed:', err.message);
+      }
+    }
+    return { id, isNew: true, plainPass };
+  } else {
+    const customer = existing[0];
+    let plainPass = customer.password_plain;
+    if (!plainPass) {
+      plainPass = generatePassword();
+      await pool.query('UPDATE customers SET password_plain = ? WHERE id = ?', [plainPass, customer.id]);
+    }
+    await pool.query(
+      `UPDATE customers
+       SET user_name = COALESCE(NULLIF(?, ''), user_name),
+           phone = COALESCE(?, phone),
+           company_name = COALESCE(?, company_name),
+           notes = COALESCE(?, notes),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [userName, phoneVal, companyVal, notesVal, customer.id]
+    );
+    return { id: customer.id, isNew: false, plainPass };
+  }
+}
 
 function requireDb(_req, res, next) {
   if (!pool) {
