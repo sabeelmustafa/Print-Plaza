@@ -95,23 +95,26 @@ async function ensureBusinessSchema() {
 const nodemailer = require('nodemailer');
 
 function createSmtpTransporter() {
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const host = (process.env.SMTP_HOST || '').trim().replace(/^["']|["']$/g, '');
+  const port = Number((process.env.SMTP_PORT || '587').trim());
+  const user = (process.env.SMTP_USER || '').trim().replace(/^["']|["']$/g, '');
+  const pass = (process.env.SMTP_PASS || '').trim().replace(/^["']|["']$/g, '');
 
   if (user && pass) {
-    if (!host || host.includes('gmail')) {
+    if (host && host.toLowerCase().includes('gmail')) {
       return nodemailer.createTransport({
         service: 'gmail',
         auth: { user, pass },
       });
     }
     return nodemailer.createTransport({
-      host,
-      port,
+      host: host || 'localhost',
+      port: port || 587,
       secure: port === 465,
       auth: { user, pass },
+      tls: {
+        rejectUnauthorized: false,
+      },
     });
   }
   return null;
@@ -121,10 +124,11 @@ async function sendWelcomeEmail(customerEmail, customerName, plainPassword) {
   const email = String(customerEmail).trim().toLowerCase();
   const name = String(customerName || 'Valued Customer').trim();
   const transporter = createSmtpTransporter();
-  let fromAddress = process.env.SMTP_FROM || '"Print Plaza HQ" <sales@printplaza.net>';
+  let rawFrom = (process.env.SMTP_FROM || '').trim().replace(/^["']|["']$/g, '');
+  let fromAddress = rawFrom || '"Print Plaza HQ" <sales@printplaza.net>';
   if (!fromAddress.includes('<') && (process.env.SMTP_USER || email)) {
     const senderName = fromAddress.replace(/"/g, '').trim() || 'Print Plaza HQ';
-    const senderEmail = process.env.SMTP_USER || 'sales@printplaza.net';
+    const senderEmail = (process.env.SMTP_USER || 'sales@printplaza.net').trim().replace(/^["']|["']$/g, '');
     fromAddress = `"${senderName}" <${senderEmail}>`;
   }
   const portalUrl = (process.env.APP_URL || 'https://printplaza.net').replace(/\/$/, '');
@@ -186,6 +190,7 @@ async function sendWelcomeEmail(customerEmail, customerName, plainPassword) {
       return { success: true, mode: 'live' };
     } catch (err) {
       console.error(`[EMAIL ERROR] Failed to send email to ${email}:`, err.message);
+      return { success: false, error: err.message, mode: 'live' };
     }
   }
 
