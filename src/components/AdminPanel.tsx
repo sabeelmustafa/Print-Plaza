@@ -226,9 +226,9 @@ export default function AdminPanel() {
     window.location.href = '/admin';
   };
 
-  // Filtered Lists for Workflow Separation (Only jobs with PJO numbers are in the Production Pipeline)
-  const pendingQuotations = orders.filter(o => !o.pjoNumber && o.quoteStatus !== 'converted');
-  const confirmedPjos = orders.filter(o => Boolean(o.pjoNumber) || o.quoteStatus === 'converted');
+  // Filtered Lists for Workflow Separation (Quotations Desk vs Production Pipeline)
+  const pendingQuotations = orders.filter(o => Boolean(o.isQuotation) && o.quoteStatus !== 'converted');
+  const confirmedPjos = orders.filter(o => !o.isQuotation || o.quoteStatus === 'converted');
 
   // Metrics (Exclude cancelled orders from revenue and balance due)
   const totalRevenue = orders
@@ -1681,10 +1681,15 @@ function CustomersEditor({
   onManageOrder: (o: Order) => void;
 }) {
   // Aggregate customer statistics
-  const customerMap = new Map<string, { email: string; name: string; totalOrders: number; totalSpent: number; lastOrder: string; orderList: Order[] }>();
+  const customerMap = new Map<string, { email: string; name: string; phone: string; company: string; totalOrders: number; totalSpent: number; lastOrder: string; orderList: Order[] }>();
 
   orders.forEach((o) => {
-    const key = o.userEmail.toLowerCase();
+    const key = (o.userEmail || o.userName || o.userId || '').toLowerCase().trim();
+    if (!key) return;
+
+    const opts = o.options || {};
+    const phone = String(opts.phone || opts.Phone || opts.phoneNumber || '');
+    const company = String(opts.companyName || '');
     const existing = customerMap.get(key);
     const amount = o.sellPrice || o.totalPrice || 0;
 
@@ -1692,16 +1697,20 @@ function CustomersEditor({
       existing.totalOrders += 1;
       existing.totalSpent += amount;
       existing.orderList.push(o);
+      if (phone && !existing.phone) existing.phone = phone;
+      if (company && !existing.company) existing.company = company;
       if (new Date(o.createdAt) > new Date(existing.lastOrder)) {
         existing.lastOrder = o.createdAt;
       }
     } else {
       customerMap.set(key, {
-        email: o.userEmail,
+        email: o.userEmail || key,
         name: o.userName || 'Customer',
+        phone,
+        company,
         totalOrders: 1,
         totalSpent: amount,
-        lastOrder: o.createdAt,
+        lastOrder: o.createdAt || new Date().toISOString(),
         orderList: [o]
       });
     }
@@ -1709,7 +1718,9 @@ function CustomersEditor({
 
   const customers = Array.from(customerMap.values()).filter(c =>
     c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.name.toLowerCase().includes(searchQuery.toLowerCase())
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.phone.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -1728,18 +1739,28 @@ function CustomersEditor({
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
-              <th className="py-3.5 px-4">Customer</th>
-              <th className="py-3.5 px-4">Email</th>
-              <th className="py-3.5 px-4">Total Orders</th>
-              <th className="py-3.5 px-4">Last Order</th>
+              <th className="py-3.5 px-4">Customer Name & Company</th>
+              <th className="py-3.5 px-4">Contact Info</th>
+              <th className="py-3.5 px-4">Orders</th>
+              <th className="py-3.5 px-4">Last Activity</th>
               <th className="py-3.5 px-4 text-right">Lifetime Spend</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
             {customers.map((cust) => (
               <tr key={cust.email} className="hover:bg-slate-50/80 transition-colors">
-                <td className="py-3.5 px-4 font-bold text-slate-900">{cust.name}</td>
-                <td className="py-3.5 px-4 text-slate-600 font-mono text-[11px]">{cust.email}</td>
+                <td className="py-3.5 px-4">
+                  <span className="font-bold text-slate-900 block">{cust.name}</span>
+                  {cust.company && <span className="text-[11px] text-slate-500 block">{cust.company}</span>}
+                </td>
+                <td className="py-3.5 px-4">
+                  <span className="text-slate-600 font-mono text-[11px] block">{cust.email}</span>
+                  {cust.phone && (
+                    <a href={`tel:${cust.phone}`} className="text-[11px] font-bold text-[#E17055] hover:underline flex items-center gap-1 mt-0.5">
+                      <Phone className="w-3 h-3" /> {cust.phone}
+                    </a>
+                  )}
+                </td>
                 <td className="py-3.5 px-4"><span className="px-2.5 py-0.5 rounded-full bg-slate-100 font-bold text-slate-800">{cust.totalOrders}</span></td>
                 <td className="py-3.5 px-4 text-slate-500">{new Date(cust.lastOrder).toLocaleDateString()}</td>
                 <td className="py-3.5 px-4 text-right font-bold text-[#2D545E]">${cust.totalSpent.toFixed(2)}</td>

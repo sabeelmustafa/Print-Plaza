@@ -149,11 +149,25 @@ export const DataService = {
   },
 
   createAdminOrder: async (order: Partial<Order>) => {
-    await request('/api/admin/orders', {
-      method: 'POST',
-      body: JSON.stringify(order),
-    });
-    return DataService.getOrders();
+    try {
+      await request('/api/admin/orders', {
+        method: 'POST',
+        body: JSON.stringify(order),
+      });
+      return DataService.getOrders();
+    } catch (_error) {
+      const orders = getLocalOrders();
+      const newOrder = {
+        ...order,
+        id: order.id || `order-${Math.random().toString(36).slice(2, 7)}`,
+        createdAt: order.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        status: order.status || 'pending'
+      } as Order;
+      const updated = [newOrder, ...orders];
+      localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
+      return updated;
+    }
   },
 
   updateOrderStatus: async (orderId: string, status: string) => {

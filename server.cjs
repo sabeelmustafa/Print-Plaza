@@ -415,8 +415,8 @@ app.get('/api/orders', requireDb, async (req, res, next) => {
     }
     res.json(rows.map((row) => {
       const optionsObj = parseJson(row.options_json, {});
-      const isQuotation = optionsObj.isQuotation !== false && !optionsObj.pjoNumber;
-      const pjoNumber = optionsObj.pjoNumber || null;
+      const isQuotation = Boolean(optionsObj.isQuotation);
+      const pjoNumber = optionsObj.pjoNumber || (isQuotation ? null : (optionsObj.pjoNumber || `#${row.id.slice(0, 8)}`));
       const quoteStatus = optionsObj.quoteStatus || (isQuotation ? 'new' : 'converted');
       const finishingSpecs = optionsObj.finishingSpecs || null;
 
