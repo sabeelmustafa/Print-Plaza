@@ -30,10 +30,14 @@ jobs:
         run: |
           rm -rf .deploy
           mkdir -p .deploy/dist
+          mkdir -p .deploy/tmp
           cp -a dist/. .deploy/
           cp -a dist/. .deploy/dist/
           rm -f .deploy/.htaccess
           cp server.cjs package.json package-lock.json .npmrc .deploy/
+          # Touch restart.txt — cPanel Passenger watches this file and
+          # automatically restarts the Node.js app when it changes
+          date -u > .deploy/tmp/restart.txt
 
       - name: Sync built files to cPanel
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
