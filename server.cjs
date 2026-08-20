@@ -100,7 +100,13 @@ function createSmtpTransporter() {
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
 
-  if (host && user && pass) {
+  if (user && pass) {
+    if (!host || host.includes('gmail')) {
+      return nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user, pass },
+      });
+    }
     return nodemailer.createTransport({
       host,
       port,
