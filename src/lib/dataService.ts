@@ -148,6 +148,42 @@ export const DataService = {
     }
   },
 
+  /**
+   * Submit a quote request from the storefront. Posts to /api/quotations so it
+   * lands in the quotations table (not the orders table) and auto-creates the
+   * customer record.
+   */
+  submitQuoteRequest: async (data: {
+    userId?: string;
+    userName: string;
+    userEmail: string;
+    phone?: string;
+    companyName?: string;
+    productId: string;
+    productName: string;
+    quantity: number;
+    quotedPrice?: number;
+    finishingSpecs?: Record<string, string | number | boolean>;
+    options?: Record<string, string | number | boolean>;
+    notes?: string;
+    artworkUrl?: string;
+  }) => {
+    const payload = {
+      ...data,
+      quoteStatus: 'new',
+      options: {
+        ...(data.options || {}),
+        artworkFile: data.artworkUrl || undefined,
+      },
+      finishingSpecs: data.finishingSpecs || {},
+      notes: [data.notes, data.artworkUrl ? `Artwork: ${data.artworkUrl}` : ''].filter(Boolean).join('\n'),
+    };
+    return request<{ id: string; quoteNumber: string; status: string }>('/api/quotations', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
   createAdminOrder: async (order: Partial<Order>) => {
     try {
       await request('/api/admin/orders', {

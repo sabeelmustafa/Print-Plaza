@@ -36,6 +36,8 @@ const pool = hasDbConfig ? mysql.createPool(dbConfig) : null;
 
 async function ensureBusinessSchema() {
   if (!pool) return;
+
+  // ── orders table column additions ────────────────────────────────────────
   await pool.query(`
     ALTER TABLE orders
       ADD COLUMN IF NOT EXISTS cost_price DECIMAL(12,2) NOT NULL DEFAULT 0 AFTER total_price,
@@ -49,6 +51,8 @@ async function ensureBusinessSchema() {
     ALTER TABLE orders
       MODIFY currency_code VARCHAR(8) NOT NULL DEFAULT 'PKR'
   `);
+
+  // ── payment_records table ─────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS payment_records (
       id VARCHAR(128) PRIMARY KEY,
@@ -65,6 +69,8 @@ async function ensureBusinessSchema() {
         ON UPDATE CASCADE ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+
+  // ── quotations table ──────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS quotations (
       id VARCHAR(128) PRIMARY KEY,
@@ -92,6 +98,54 @@ async function ensureBusinessSchema() {
       INDEX idx_quotations_created (created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+
+  // ── customers table ───────────────────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS customers (
+      id VARCHAR(128) PRIMARY KEY,
+      user_email VARCHAR(191) UNIQUE NOT NULL,
+      user_name VARCHAR(191) NOT NULL DEFAULT '',
+      phone VARCHAR(64) NULL,
+      company_name VARCHAR(191) NULL,
+      password_hash VARCHAR(255) NULL,
+      password_plain VARCHAR(64) NULL,
+      welcome_sent_at TIMESTAMP NULL,
+      notes TEXT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_customers_email (user_email),
+      INDEX idx_customers_phone (phone)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  // Ensure newer columns exist on older installs
+  const safeAlter = async (sql) => { try { await pool.query(sql); } catch (_) {} };
+  await safeAlter('ALTER TABLE customers ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255) NULL');
+  await safeAlter('ALTER TABLE customers ADD COLUMN IF NOT EXISTS password_plain VARCHAR(64) NULL');
+  await safeAlter('ALTER TABLE customers ADD COLUMN IF NOT EXISTS welcome_sent_at TIMESTAMP NULL');
+  await safeAlter('ALTER TABLE customers ADD COLUMN IF NOT EXISTS notes TEXT NULL');
+  await safeAlter('ALTER TABLE customers ADD COLUMN IF NOT EXISTS company_name VARCHAR(191) NULL');
+
+  // Back-fill customers from existing orders / quotations
+  try {
+    const [existingOrders] = await pool.query(
+      'SELECT DISTINCT user_email, user_name, options_json FROM orders WHERE user_email IS NOT NULL AND TRIM(user_email) != ""'
+    );
+    for (const o of existingOrders) {
+      const opts = parseJson(o.options_json, {});
+      await upsertCustomer(o.user_email, o.user_name, opts.phone || opts.Phone, opts.companyName);
+    }
+    const [existingQuotes] = await pool.query(
+      'SELECT DISTINCT user_email, user_name, phone, company_name, notes FROM quotations WHERE user_email IS NOT NULL AND TRIM(user_email) != ""'
+    );
+    for (const q of existingQuotes) {
+      await upsertCustomer(q.user_email, q.user_name, q.phone, q.company_name, q.notes);
+    }
+  } catch (_e) {
+    console.warn('[SCHEMA] Customer back-fill skipped:', _e.message);
+  }
+
+  await safeAlter('UPDATE orders SET sell_price = total_price WHERE sell_price = 0 AND total_price > 0');
 }
 
 /* -------------------------------------------------------------------------- */
@@ -947,8 +1001,14 @@ app.post('/api/quotations', requireDb, async (req, res, next) => {
     await upsertCustomer(quote.userEmail, quote.userName, phone, companyName, quote.notes);
 
     res.status(201).json({ id, quoteNumber, status: 'new' });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    console.error('[DB ERROR] POST /api/quotations:', err);
+    return res.status(500).json({
+      ok: false,
+      error:      err.message   || 'Failed to save quotation',
+      code:       err.code      || 'DB_ERROR',
+      sqlMessage: err.sqlMessage || undefined,
+    });
   }
 });
 
@@ -1082,13 +1142,22 @@ app.post('/api/quotations/:id/convert', requireDb, async (req, res, next) => {
 /*                            CUSTOMERS MANAGEMENT                            */
 /* -------------------------------------------------------------------------- */
 
-app.get('/api/admin/customers', requireDb, async (_req, res, next) => {
+app.get('/api/admin/customers', requireDb, async (_req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT 
+      SELECT
         c.*,
-        COALESCE(SUM(CASE WHEN o.status != 'cancelled' AND (o.options_json IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(o.options_json, '$.isQuotation')) != 'true') THEN COALESCE(o.sell_price, o.total_price, 0) ELSE 0 END), 0) AS total_spent,
-        COUNT(DISTINCT CASE WHEN o.status != 'cancelled' AND (o.options_json IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(o.options_json, '$.isQuotation')) != 'true') THEN o.id END) AS total_orders,
+        COALESCE(SUM(CASE
+          WHEN o.status != 'cancelled'
+           AND (o.options_json IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(o.options_json, '$.isQuotation')) != 'true')
+          THEN COALESCE(o.sell_price, o.total_price, 0)
+          ELSE 0
+        END), 0) AS total_spent,
+        COUNT(DISTINCT CASE
+          WHEN o.status != 'cancelled'
+           AND (o.options_json IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(o.options_json, '$.isQuotation')) != 'true')
+          THEN o.id
+        END) AS total_orders,
         MAX(o.created_at) AS last_order_at
       FROM customers c
       LEFT JOIN orders o ON LOWER(o.user_email) = LOWER(c.user_email)
@@ -1096,22 +1165,28 @@ app.get('/api/admin/customers', requireDb, async (_req, res, next) => {
       ORDER BY c.created_at DESC
     `);
 
-    res.json(rows.map((row) => ({
-      id: row.id,
-      email: row.user_email,
-      name: row.user_name || 'Customer',
-      phone: row.phone || '',
-      company: row.company_name || '',
+    return res.json(rows.map((row) => ({
+      id:          row.id,
+      email:       row.user_email,
+      name:        row.user_name || 'Customer',
+      phone:       row.phone || '',
+      company:     row.company_name || '',
       companyName: row.company_name || '',
-      notes: row.notes || '',
+      notes:       row.notes || '',
       totalOrders: Number(row.total_orders || 0),
-      totalSpent: Number(row.total_spent || 0),
-      lastOrder: row.last_order_at || row.created_at,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      totalSpent:  Number(row.total_spent  || 0),
+      lastOrder:   row.last_order_at || row.created_at,
+      createdAt:   row.created_at,
+      updatedAt:   row.updated_at,
     })));
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    console.error('[DB ERROR] GET /api/admin/customers:', err);
+    return res.status(500).json({
+      ok: false,
+      error:      err.message  || 'Database query failed',
+      code:       err.code     || 'DB_ERROR',
+      sqlMessage: err.sqlMessage || undefined,
+    });
   }
 });
 
@@ -1428,8 +1503,12 @@ app.use((_req, res) => {
 });
 
 app.use((error, _req, res, _next) => {
-  console.error(error);
-  res.status(500).json({ error: 'Server error.' });
+  console.error('[UNHANDLED ERROR]', error);
+  res.status(500).json({
+    error: error.message || 'Server error.',
+    code: error.code || undefined,
+    details: process.env.NODE_ENV !== 'production' ? String(error.stack || error) : undefined,
+  });
 });
 
 ensureBusinessSchema()

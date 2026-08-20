@@ -46,6 +46,11 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
+    if (!email || !fullName) {
+      alert('Please fill in your name and email address.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       let artworkUrl = '';
@@ -57,33 +62,26 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
         }
       }
 
-      const orderData = {
-        userId: user?.uid || `guest_${Date.now()}`,
-        userEmail: email,
-        userName: fullName || email.split('@')[0],
-        productId: product.id,
+      await DataService.submitQuoteRequest({
+        userId:      user?.uid || undefined,
+        userName:    fullName || email.split('@')[0],
+        userEmail:   email,
+        phone:       phone || undefined,
+        companyName: companyName || undefined,
+        productId:   product.id,
         productName: productType || product.name,
-        quantity: Number(quantity) || 1,
-        options: {
-          ...options,
-          phone,
-          companyName,
-          specifications,
-          artworkFile: artworkUrl || undefined,
-        },
-        totalPrice: estimatedTotalPrice,
-        sellPrice: estimatedTotalPrice,
-        costPrice: estimatedTotalPrice * 0.5,
-        status: 'pending' as const,
-        paymentStatus: 'unpaid' as const,
-        isQuotation: true,
-        quoteStatus: 'new' as const,
-      };
+        quantity:    Number(quantity) || 1,
+        quotedPrice: estimatedTotalPrice,
+        options:     { ...options },
+        finishingSpecs: {},
+        notes:       specifications || undefined,
+        artworkUrl:  artworkUrl || undefined,
+      });
 
-      await DataService.saveOrder(orderData);
-      onSubmit(orderData);
+      onSubmit({ userEmail: email, userName: fullName, productName: productType || product.name });
       setIsSuccess(true);
     } catch (_err) {
+      console.error('[OrderModal] submitQuoteRequest failed:', _err);
       alert('Failed to submit quote request. Please try again.');
     } finally {
       setIsSubmitting(false);
