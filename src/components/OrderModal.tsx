@@ -5,7 +5,7 @@
 
 import React, { useState, FormEvent } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Send, ChevronRight, Lock } from 'lucide-react';
+import { X, Send, ChevronRight, Upload, CheckCircle2, FileText, Sparkles, Phone, Mail, User, Building, ArrowRight } from 'lucide-react';
 import { Product } from '../types';
 import { useAuth } from '../lib/AuthContext';
 import { DataService } from '../lib/dataService';
@@ -20,339 +20,368 @@ interface OrderModalProps {
 export default function OrderModal({ product, onClose, onSubmit, onLoginRequest }: OrderModalProps) {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState<any>({
-    quantity: 1,
-    options: {}
-  });
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  // Form State
+  const [fullName, setFullName] = useState(user?.displayName || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [phone, setPhone] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [quantity, setQuantity] = useState<number>(500);
+  const [productType, setProductType] = useState(product?.name || '');
+  const [options, setOptions] = useState<Record<string, string | number | boolean>>({});
+  const [specifications, setSpecifications] = useState('');
+  const [artworkFile, setArtworkFile] = useState<File | null>(null);
 
   if (!product) return null;
 
+  const estimatedTotalPrice = product.price * quantity;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setArtworkFile(e.target.files[0]);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!user) {
-      onLoginRequest();
-      return;
-    }
 
     setIsSubmitting(true);
     try {
+      let artworkUrl = '';
+      if (artworkFile) {
+        try {
+          artworkUrl = await DataService.uploadImage(artworkFile, artworkFile.name);
+        } catch (_fileErr) {
+          artworkUrl = artworkFile.name;
+        }
+      }
+
       const orderData = {
-        userId: user.uid,
-        userEmail: user.email,
-        userName: user.displayName,
+        userId: user?.uid || `guest_${Date.now()}`,
+        userEmail: email,
+        userName: fullName || email.split('@')[0],
         productId: product.id,
-        productName: product.name,
-        quantity: formData.quantity,
-        options: formData.options,
-        totalPrice: product.price * formData.quantity,
+        productName: productType || product.name,
+        quantity: Number(quantity) || 1,
+        options: {
+          ...options,
+          phone,
+          companyName,
+          specifications,
+          artworkFile: artworkUrl || undefined,
+        },
+        totalPrice: estimatedTotalPrice,
+        sellPrice: estimatedTotalPrice,
+        costPrice: estimatedTotalPrice * 0.5,
+        status: 'pending' as const,
+        paymentStatus: 'unpaid' as const,
       };
 
       await DataService.saveOrder(orderData);
-      
-      onSubmit({
-        ...orderData
-      });
+      onSubmit(orderData);
+      setIsSuccess(true);
+    } catch (_err) {
+      alert('Failed to submit quote request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center sm:p-4 md:p-8 lg:p-12 overflow-hidden">
-      <motion.div 
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6 lg:p-8 overflow-y-auto">
+      {/* Dark backdrop */}
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 bg-black/90 backdrop-blur-xl"
+        className="fixed inset-0 bg-slate-950/80 backdrop-blur-md"
       />
-      
-      <motion.div 
-        key="modal"
-        initial={{ opacity: 0, y: 100, scale: 0.95 }}
+
+      <motion.div
+        key="quote-modal"
+        initial={{ opacity: 0, y: 40, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 100, scale: 0.95 }}
-        transition={{ type: "spring", damping: 30, stiffness: 300, mass: 0.8 }}
-        className="relative bg-[#FDFCFB] w-full h-full sm:h-auto sm:max-h-[90vh] max-w-7xl overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.5)] flex flex-col md:flex-row border border-white/10 z-10 sm:rounded-none group"
+        exit={{ opacity: 0, y: 40, scale: 0.96 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 280 }}
+        className="relative w-full max-w-5xl bg-white rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row border border-slate-200/80 z-10 my-auto max-h-[92vh]"
       >
-        {/* Grain overlay */}
-        <div className="absolute inset-0 bg-grainy opacity-[0.05] pointer-events-none z-50 mix-blend-overlay" />
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-30 w-9 h-9 rounded-full bg-slate-900 text-white hover:bg-slate-800 hover:scale-105 flex items-center justify-center transition-all cursor-pointer shadow-md"
+          title="Close Modal"
+        >
+          <X className="w-5 h-5" />
+        </button>
 
-        {/* Left Panel: Visual Summary & Technical Specs */}
-        <div className="md:w-[40%] bg-black flex flex-col relative z-20 border-b md:border-b-0 md:border-r border-white/10 overflow-hidden shrink-0">
-          {/* Mobile Header / Identity Tag */}
-          <div className="p-6 md:p-12 border-b border-white/5 flex justify-between items-center bg-black/50 backdrop-blur-sm md:bg-transparent">
-             <div className="flex gap-2">
-                <div className="w-2 h-2 bg-[#2D545E]" />
-                <div className="w-2 h-2 bg-[#E17055]" />
-                <div className="w-2 h-2 bg-white/20" />
-             </div>
-             <div className="text-[10px] font-mono font-bold text-white/40 tracking-[0.3em] uppercase">Ref_Quote_v02</div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-8 md:p-12 lg:p-16 space-y-10 scrollbar-none">
-            <div className="group/image relative">
-              <div className="aspect-[16/9] md:aspect-square bg-neutral-900 border border-white/10 overflow-hidden shadow-2xl relative">
-                <img 
-                  src={product.image} 
-                  alt={product.name} 
-                  className="w-full h-full object-cover mix-blend-luminosity opacity-50 group-hover/image:opacity-100 group-hover/image:scale-105 transition-all duration-1000 grayscale group-hover/image:grayscale-0" 
-                  referrerPolicy="no-referrer" 
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60" />
-                
-                {/* Visual scanning line decorative */}
-                <div className="absolute inset-x-0 h-[1px] bg-white/20 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <div className="absolute inset-y-0 w-[1px] bg-white/20 left-1/2 -translate-x-1/2 pointer-events-none" />
-              </div>
-              
-              <div className="absolute -bottom-4 -right-4 bg-[#E17055] text-white text-[10px] font-black px-6 py-4 uppercase tracking-[0.2em] shadow-xl rotate-3">
-                Live_Spec
-              </div>
+        {isSuccess ? (
+          /* Success Screen */
+          <div className="w-full p-8 sm:p-14 flex flex-col items-center justify-center text-center space-y-5 bg-white">
+            <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200 shadow-sm animate-bounce">
+              <CheckCircle2 className="w-8 h-8" />
             </div>
 
-            <header>
-              <h3 className="text-3xl lg:text-4xl font-display font-black tracking-tight mb-4 text-white uppercase leading-[0.85]">
-                {product.name}
-              </h3>
-              <div className="inline-flex items-center gap-3 py-1.5 px-3 bg-white/5 border border-white/10">
-                <div className="w-1.5 h-1.5 rounded-full bg-[#E17055] animate-pulse" />
-                <span className="text-[9px] text-white/50 uppercase tracking-[0.4em] font-black font-mono">ID: 0x{product.id}</span>
-              </div>
-            </header>
+            <h3 className="text-2xl sm:text-3xl font-display font-bold text-slate-900 tracking-tight">
+              Quote Request Submitted!
+            </h3>
 
-            <div className="grid grid-cols-2 gap-4 pb-8">
-               <div className="p-4 bg-white/5 border border-white/10 space-y-1">
-                  <div className="text-[7px] font-black text-white/30 uppercase tracking-widest">Base Rate</div>
-                  <div className="text-lg font-display font-bold text-white">${product.price.toFixed(2)}</div>
-               </div>
-               <div className="p-4 bg-white/5 border border-white/10 space-y-1">
-                  <div className="text-[7px] font-black text-white/30 uppercase tracking-widest">Unit Type</div>
-                  <div className="text-lg font-display font-bold text-white uppercase">{product.unit}</div>
-               </div>
+            <p className="text-sm text-slate-600 max-w-md leading-relaxed">
+              Thank you, <strong className="text-slate-900">{fullName || 'Valued Customer'}</strong>! Our print & packaging team has received your custom quote request for{' '}
+              <strong className="text-slate-900">{product.name} ({quantity} {product.unit}s)</strong>.
+            </p>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs text-slate-500 font-mono space-y-1">
+              <p>Confirmation sent to: <strong className="text-slate-800">{email}</strong></p>
+              <p>Estimated Response Time: <strong className="text-emerald-700">1 - 2 Hours</strong></p>
             </div>
-          </div>
 
-          {/* Bottom Total Bar (Sticky-like or anchored) */}
-          <div className="p-8 md:p-10 lg:p-12 bg-white/5 border-t border-white/10 mt-auto">
-            <div className="flex flex-col gap-3">
-              <span className="text-[9px] uppercase tracking-[0.4em] font-black text-white/30">Estimated Quote Range</span>
-              <div className="flex items-baseline justify-between">
-                <div className="flex items-baseline gap-3">
-                  <span className="text-4xl lg:text-6xl font-display font-black text-white tracking-tighter">
-                    ${(product.price * formData.quantity).toFixed(2)}
-                  </span>
-                  <span className="text-[10px] font-mono text-white/30 uppercase tracking-widest font-bold">USD</span>
+            <button
+              onClick={onClose}
+              className="mt-4 px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+            >
+              Back to Products Catalog
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Left Panel: Visual Product Showcase */}
+            <div className="md:w-[38%] bg-[#0F172A] text-white p-6 sm:p-8 md:p-10 flex flex-col justify-between relative overflow-hidden shrink-0 border-b md:border-b-0 md:border-r border-slate-800">
+              {/* Background ambient lighting */}
+              <div className="absolute -top-20 -left-20 w-60 h-60 bg-emerald-500/10 blur-[90px] rounded-full pointer-events-none" />
+              <div className="absolute -bottom-20 -right-20 w-60 h-60 bg-cyan-500/10 blur-[90px] rounded-full pointer-events-none" />
+
+              <div className="relative z-10 space-y-6">
+                <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.25em] text-emerald-400 font-bold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Print Plaza Studio // Quote Desk
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Right Panel: Config Form */}
-        <div className="md:w-[60%] bg-[#FDFCFB] flex flex-col relative z-20 overflow-hidden">
-          <button 
-            onClick={onClose} 
-            className="absolute top-6 right-6 md:top-10 md:right-10 p-3 bg-black text-white hover:bg-[#2D545E] transition-all hover:rotate-90 duration-500 z-50 rounded-none shadow-xl"
-          >
-            <X className="w-5 h-5 md:w-6 md:h-6" />
-          </button>
-          
-          <div className="flex-1 overflow-y-auto px-8 py-12 md:px-16 md:py-20 lg:p-24 scrollbar-thin scrollbar-thumb-black/10">
-            <header className="mb-12 md:mb-16">
-              <div className="inline-flex items-center gap-5 mb-5">
-                <span className="w-12 h-[2px] bg-black" />
-                <span className="text-[10px] font-black uppercase tracking-[0.5em] text-black/40">Request a Quote // Hub.01</span>
-              </div>
-              <h4 className="text-3xl md:text-5xl font-display font-black tracking-tight uppercase leading-[0.85] mb-6">
-                Quote <br/>Configuration.
-              </h4>
-              <p className="text-sm font-medium text-black/50 font-sans max-w-md leading-relaxed border-l-2 border-black/5 pl-6">
-                Share the details we need to prepare a quotation. This does not start production or confirm an order until our team reviews and approves it with you.
-              </p>
-            </header>
-            
-            <form onSubmit={handleSubmit} className="space-y-16 md:space-y-24">
-              <div className="space-y-12 md:space-y-20">
-                {product.options.map((option, idx) => (
-                  <motion.div 
-                    key={option.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 + idx * 0.05 }}
-                    className="group"
-                  >
-                    <div className="flex items-center gap-4 mb-6">
-                       <span className="text-[#2D545E] font-mono text-sm font-black opacity-30 group-hover:opacity-100 transition-opacity">0{idx + 1}</span>
-                       <label className="text-[10px] uppercase tracking-[0.4em] font-black text-black/30 group-hover:text-black transition-colors">
-                         {option.label}
-                       </label>
-                    </div>
 
-                    {option.type === 'select' ? (
-                      <div className="relative group/select">
-                        <select 
-                          required={option.required !== false}
-                          className="w-full bg-white border-2 border-black/5 px-6 py-5 focus:border-[#2D545E] focus:bg-white outline-none text-base font-bold transition-all appearance-none uppercase tracking-widest cursor-pointer group-hover/select:border-black/10 shadow-sm"
-                          onChange={(e) => setFormData({
-                            ...formData,
-                            options: { ...formData.options, [option.id]: e.target.value }
-                          })}
-                        >
-                          <option value="">-- SELECT SPECIFICATION --</option>
-                          {option.values?.map(val => (
-                            <option key={val} value={val}>{val}</option>
-                          ))}
-                        </select>
-                        <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none opacity-40">
-                          <ChevronRight className="w-5 h-5 rotate-90" />
-                        </div>
-                      </div>
-                    ) : option.type === 'textarea' ? (
-                      <textarea
-                        required={option.required !== false}
-                        rows={4}
-                        placeholder={option.placeholder || "Enter requirements..."}
-                        className="w-full bg-white border-2 border-black/5 px-6 py-5 focus:border-[#2D545E] focus:bg-white outline-none text-base font-bold transition-all placeholder:text-black/10 uppercase tracking-widest shadow-sm resize-y"
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          options: { ...formData.options, [option.id]: e.target.value }
-                        })}
-                      />
-                    ) : option.type === 'checkbox' ? (
-                      <label className="flex items-center gap-5 bg-white border-2 border-black/5 px-6 py-5 cursor-pointer hover:border-black/10 transition-all">
-                        <input
-                          type="checkbox"
-                          className="w-5 h-5 accent-[#2D545E]"
-                          onChange={(e) => setFormData({
-                            ...formData,
-                            options: { ...formData.options, [option.id]: e.target.checked }
-                          })}
-                        />
-                        <span className="text-[11px] font-black uppercase tracking-[0.3em] text-black/50">
-                          {option.placeholder || 'Enable option'}
-                        </span>
-                      </label>
-                    ) : option.type === 'file' ? (
-                      <input
-                        type="file"
-                        required={option.required !== false}
-                        className="w-full bg-white border-2 border-black/5 px-6 py-5 focus:border-[#2D545E] focus:bg-white outline-none text-sm font-bold transition-all shadow-sm file:mr-5 file:border-0 file:bg-black file:text-white file:px-5 file:py-3 file:text-[10px] file:font-black file:uppercase file:tracking-widest"
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          options: { ...formData.options, [option.id]: e.target.files?.[0]?.name || '' }
-                        })}
-                      />
-                    ) : (
-                      <input 
-                        type={option.type === 'number' ? 'number' : 'text'}
-                        required={option.required !== false}
-                        placeholder={option.placeholder || "Enter requirements..."}
-                        className="w-full bg-white border-2 border-black/5 px-6 py-5 focus:border-[#2D545E] focus:bg-white outline-none text-lg font-bold transition-all placeholder:text-black/10 uppercase tracking-widest shadow-sm"
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          options: { ...formData.options, [option.id]: e.target.value }
-                        })}
-                      />
-                    )}
-                  </motion.div>
-                ))}
-                
-                {/* Quantity Section */}
-                <motion.div 
-                   initial={{ opacity: 0, x: -20 }}
-                   animate={{ opacity: 1, x: 0 }}
-                   transition={{ delay: 0.3 }}
-                   className="pt-12 border-t border-black/5"
-                >
-                  <div className="flex items-center gap-4 mb-10">
-                     <span className="text-[#E17055] font-mono text-sm font-black opacity-30">0{product.options.length + 1}</span>
-                     <label className="text-[10px] uppercase tracking-[0.4em] font-black text-black/30">
-                       Quote Quantity / Estimated Volume
-                     </label>
+                {/* Product Image Card */}
+                <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-950/80 shadow-xl group aspect-4/3 sm:aspect-square">
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-90"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent" />
+                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs">
+                    <span className="bg-slate-900/90 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-slate-300 border border-slate-700/80 uppercase tracking-wider">
+                      {product.unit} Production
+                    </span>
+                    <span className="bg-emerald-500/20 text-emerald-300 px-2 py-1 rounded-lg text-[10px] font-mono font-bold">
+                      ${product.price.toFixed(2)} / {product.unit}
+                    </span>
                   </div>
-                  
-                  <div className="flex flex-col sm:flex-row sm:items-end gap-8 bg-black/5 p-8 md:p-12 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    
-                    <div className="flex-1 space-y-4">
-                      <div className="flex items-end gap-2">
-                        <input 
-                          type="number"
-                          min="1"
-                          max={product.maxQuantity}
-                          required
-                          value={formData.quantity}
-                          className="bg-transparent border-none p-0 focus:ring-0 outline-none text-5xl md:text-6xl font-display font-black text-black placeholder:text-black/5 w-full max-w-[280px]"
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 1;
-                            setFormData({ ...formData, quantity: product.maxQuantity ? Math.min(val, product.maxQuantity) : val });
-                          }}
-                        />
-                        <span className="text-xl font-black text-black/20 mb-4 uppercase">{product.unit}s</span>
-                      </div>
-                      
-                      {product.maxQuantity && (
-                        <div className="flex items-center gap-3">
-                           <div className="h-[1px] flex-1 bg-black/10" />
-                           <div className="text-[9px] font-mono font-black uppercase tracking-[0.2em] text-[#E17055] bg-white px-3 py-1 shadow-sm">
-                             Safe_Limit: {product.maxQuantity.toLocaleString()}
-                           </div>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="sm:w-40 text-[10px] font-mono font-bold text-black/30 uppercase tracking-[0.15em] leading-relaxed">
-                      Enter the quantity you want us to quote. Final price is confirmed after review.
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-              
-              {/* Submission Area */}
-              <div className="space-y-10">
-                <button 
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="group relative w-full bg-black text-white py-8 md:py-10 text-[12px] font-black uppercase tracking-[0.5em] overflow-hidden transition-all hover:bg-[#2D545E] hover:shadow-[0_40px_80px_-20px_rgba(45,84,94,0.4)] disabled:opacity-50 active:scale-[0.98]"
-                >
-                  <div className="absolute inset-x-0 bottom-0 h-1 bg-[#E17055] transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500" />
-                  
-                  <div className="relative z-10 flex items-center justify-center gap-6">
-                    {!user ? (
-                      <>
-                        <span className="opacity-50">Auth Required //</span> Login to Proceed
-                        <Lock className="w-4 h-4 text-[#E17055]" />
-                      </>
-                    ) : isSubmitting ? (
-                      <>
-                        <span className="animate-pulse">Sending Quote Request...</span>
-                        <div className="w-4 h-4 border-2 border-white/20 border-t-white animate-spin rounded-full" />
-                      </>
-                    ) : (
-                      <>
-                        Request Project Quote
-                        <Send className="w-4 h-4 text-[#E17055] group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                      </>
-                    )}
-                  </div>
-                </button>
-                
-                <div className="flex flex-col sm:flex-row items-center gap-6 p-8 border-2 border-black/5 bg-white/50 backdrop-blur-sm">
-                  <div className="w-12 h-12 flex items-center justify-center bg-black text-white shrink-0 rotate-45 group-hover:rotate-0 transition-transform duration-700">
-                    <div className="w-8 h-8 border border-white/20 flex items-center justify-center -rotate-45 group-hover:rotate-0 transition-transform duration-700">
-                      <span className="text-[10px] font-mono font-black">H6</span>
-                    </div>
-                  </div>
-                  <p className="text-[11px] font-medium leading-relaxed tracking-tight text-black/50 font-sans text-center sm:text-left">
-                    Quote review typically completes within <span className="text-black font-bold">120-240m</span>. 
-                    No production begins until you approve the final quotation.
+                </div>
+
+                <div>
+                  <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white leading-tight font-display">
+                    {product.name}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-2 line-clamp-3 leading-relaxed">
+                    {product.description}
                   </p>
                 </div>
               </div>
-            </form>
-          </div>
-        </div>
+
+              {/* Bottom Quote Range Summary */}
+              <div className="relative z-10 pt-6 mt-6 border-t border-slate-800/80 space-y-2">
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 block">
+                  Estimated Quote Price Range
+                </span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
+                    ${estimatedTotalPrice.toFixed(2)}
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">USD</span>
+                </div>
+                <p className="text-[10px] text-slate-400 leading-normal">
+                  *Final quotation verified by our press team. No payment required until quote approval.
+                </p>
+              </div>
+            </div>
+
+            {/* Right Panel: BoxNovo Style Multi-Column Form */}
+            <div className="md:w-[62%] bg-white p-6 sm:p-8 md:p-10 flex flex-col justify-between overflow-y-auto relative">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Header */}
+                <div className="pr-8">
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight font-display">
+                    Get A Custom Packaging Quote
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-1 font-medium">
+                    Tell us what you need and our packaging team will get back to you with a custom quote.
+                  </p>
+                </div>
+
+                {/* Row 1: Contact Details (3 Columns) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Full Name *</label>
+                    <input
+                      type="text"
+                      placeholder="Your full name"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-slate-400 focus:bg-white rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none transition-all"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Business Email *</label>
+                    <input
+                      type="email"
+                      placeholder="you@company.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-slate-400 focus:bg-white rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none transition-all"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Phone Number *</label>
+                    <input
+                      type="tel"
+                      placeholder="(555) 123-4567"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-slate-400 focus:bg-white rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none transition-all"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Row 2: Quantity, Product Type & Company Name (3 Columns) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Estimated Quantity *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="e.g. 1000"
+                      value={quantity}
+                      onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-slate-400 focus:bg-white rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none transition-all font-mono"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Product Type *</label>
+                    <input
+                      type="text"
+                      value={productType}
+                      onChange={(e) => setProductType(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-slate-400 focus:bg-white rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none transition-all"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Company Name</label>
+                    <input
+                      type="text"
+                      placeholder="Company name"
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 focus:border-slate-400 focus:bg-white rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Row 3: Dynamic Product Specifications (2 Columns Grid) */}
+                {product.options && product.options.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {product.options.map((opt) => (
+                      <div key={opt.id}>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">{opt.label}</label>
+                        {opt.type === 'select' ? (
+                          <select
+                            value={String(options[opt.id] || '')}
+                            onChange={(e) => setOptions({ ...options, [opt.id]: e.target.value })}
+                            className="w-full bg-slate-50 border border-slate-200 focus:border-slate-400 focus:bg-white rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none transition-all"
+                          >
+                            <option value="">—Please choose an option—</option>
+                            {opt.values?.map((v) => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            placeholder={opt.placeholder || `Enter ${opt.label}`}
+                            value={String(options[opt.id] || '')}
+                            onChange={(e) => setOptions({ ...options, [opt.id]: e.target.value })}
+                            className="w-full bg-slate-50 border border-slate-200 focus:border-slate-400 focus:bg-white rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none transition-all"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Row 4: Packaging & Specifications Textarea */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Packaging Specifications</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Tell us about your box style, dimensions, material, printing, finish, or other requirements..."
+                    value={specifications}
+                    onChange={(e) => setSpecifications(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 focus:border-slate-400 focus:bg-white rounded-xl p-3 text-xs font-medium text-slate-800 outline-none transition-all resize-y placeholder:text-slate-400"
+                  />
+                </div>
+
+                {/* Row 5: Upload Artwork or Reference Images */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Upload Artwork or Reference Images</label>
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-2 flex items-center justify-between gap-3">
+                    <label className="bg-white border border-slate-200 hover:bg-slate-100 text-slate-800 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 shrink-0 transition-colors shadow-xs">
+                      <Upload className="w-3.5 h-3.5 text-slate-500" /> Choose File
+                      <input type="file" onChange={handleFileChange} className="hidden" />
+                    </label>
+                    <span className="text-xs text-slate-500 font-mono truncate flex-1">
+                      {artworkFile ? artworkFile.name : 'No file chosen'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Optional &bull; JPG, PNG, PDF, AI, EPS or ZIP &bull; Max 10MB
+                  </span>
+                </div>
+
+                {/* Row 6: Submit CTA */}
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3.5 px-6 rounded-xl text-xs font-bold tracking-wide transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white animate-spin rounded-full" />
+                        <span>Sending Custom Quote Request...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Submit Quote Request</span>
+                        <ArrowRight className="w-4 h-4 text-emerald-400" />
+                      </>
+                    )}
+                  </button>
+
+                  <p className="text-[10px] text-slate-400 text-center mt-2.5 font-medium">
+                    Review completed in 1-2h &bull; Zero obligation until quote confirmation
+                  </p>
+                </div>
+              </form>
+            </div>
+          </>
+        )}
       </motion.div>
     </div>
   );
