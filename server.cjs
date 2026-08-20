@@ -92,347 +92,204 @@ async function ensureBusinessSchema() {
       INDEX idx_quotations_created (created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+}
+
+/* -------------------------------------------------------------------------- */
+/*                           EMAIL / NODEMAILER                               */
+/* -------------------------------------------------------------------------- */
+
 const nodemailer = require('nodemailer');
 
 function createSmtpTransporter() {
   const host = (process.env.SMTP_HOST || '').trim().replace(/^["']|["']$/g, '');
-  const port = Number((process.env.SMTP_PORT || '587').trim());
+  const port = parseInt((process.env.SMTP_PORT || '587').trim(), 10) || 587;
   const user = (process.env.SMTP_USER || '').trim().replace(/^["']|["']$/g, '');
   const pass = (process.env.SMTP_PASS || '').trim().replace(/^["']|["']$/g, '');
 
-  if (user && pass) {
-    if (host && host.toLowerCase().includes('gmail')) {
-      return nodemailer.createTransport({
-        service: 'gmail',
-        auth: { user, pass },
-      });
-    }
+  if (!user || !pass) {
+    console.warn('[SMTP] No credentials configured — running in simulation mode.');
+    return null;
+  }
+
+  if (host && host.toLowerCase().includes('gmail')) {
     return nodemailer.createTransport({
-      host: host || 'localhost',
-      port: port || 587,
-      secure: port === 465,
+      service: 'gmail',
       auth: { user, pass },
-      tls: {
-        rejectUnauthorized: false,
-      },
     });
   }
-  return null;
+
+  return nodemailer.createTransport({
+    host: host || 'localhost',
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+    tls: { rejectUnauthorized: false },
+  });
+}
+
+function buildFromAddress() {
+  const rawFrom = (process.env.SMTP_FROM || '').trim().replace(/^["']|["']$/g, '');
+  const smtpUser = (process.env.SMTP_USER || 'sales@printplaza.net').trim().replace(/^["']|["']$/g, '');
+
+  if (rawFrom && rawFrom.includes('<')) return rawFrom;
+
+  const displayName = rawFrom || 'Print Plaza HQ';
+  return `"${displayName}" <${smtpUser}>`;
 }
 
 async function sendWelcomeEmail(customerEmail, customerName, plainPassword) {
-  const email = String(customerEmail).trim().toLowerCase();
-  const name = String(customerName || 'Valued Customer').trim();
-  const transporter = createSmtpTransporter();
-  let rawFrom = (process.env.SMTP_FROM || '').trim().replace(/^["']|["']$/g, '');
-  let fromAddress = rawFrom || '"Print Plaza HQ" <sales@printplaza.net>';
-  if (!fromAddress.includes('<') && (process.env.SMTP_USER || email)) {
-    const senderName = fromAddress.replace(/"/g, '').trim() || 'Print Plaza HQ';
-    const senderEmail = (process.env.SMTP_USER || 'sales@printplaza.net').trim().replace(/^["']|["']$/g, '');
-    fromAddress = `"${senderName}" <${senderEmail}>`;
+  const toEmail = String(customerEmail || '').trim().toLowerCase();
+  const toName  = String(customerName  || 'Valued Customer').trim();
+
+  if (!toEmail) {
+    console.error('[EMAIL] sendWelcomeEmail called with no recipient email.');
+    return { success: false, error: 'No recipient email address provided.' };
   }
+
   const portalUrl = (process.env.APP_URL || 'https://printplaza.net').replace(/\/$/, '');
+  const fromAddress = buildFromAddress();
+  const transporter  = createSmtpTransporter();
 
   const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="utf-8"></head>
-    <body style="font-family: Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 30px;">
-      <table max-width="600" align="center" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; width: 100%;">
-        <tr style="background-color: #2D545E; color: #ffffff;">
-          <td style="padding: 30px; text-align: center;">
-            <h1 style="margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 1px;">PRINT PLAZA</h1>
-            <p style="margin: 5px 0 0; font-size: 13px; opacity: 0.8;">Press & Packaging Production Portal</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding: 35px; color: #1e293b;">
-            <h2 style="margin-top: 0; color: #2D545E; font-size: 20px;">Welcome to Print Plaza, ${name}!</h2>
-            <p style="font-size: 14px; line-height: 1.6; color: #475569;">
-              Your customer account has been set up successfully. You can now log in to your personal Client Portal to view quotation requests, track Print Job Orders (PJOs), and download official invoices.
-            </p>
-            
-            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #E17055; padding: 20px; border-radius: 8px; margin: 25px 0;">
-              <h3 style="margin-top: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #E17055;">Your Login Credentials</h3>
-              <p style="margin: 8px 0; font-size: 14px;"><strong>Portal URL:</strong> <a href="${portalUrl}" style="color: #2D545E;">${portalUrl}</a></p>
-              <p style="margin: 8px 0; font-size: 14px;"><strong>Username (Email):</strong> <span style="font-family: monospace; color: #0f172a;">${email}</span></p>
-              <p style="margin: 8px 0; font-size: 14px;"><strong>Password:</strong> <span style="font-family: monospace; background: #e2e8f0; padding: 2px 6px; border-radius: 4px; color: #0f172a;">${plainPassword}</span></p>
-            </div>
-
-            <div style="text-align: center; margin-top: 30px;">
-              <a href="${portalUrl}" style="background-color: #2D545E; color: #ffffff; text-decoration: none; padding: 14px 30px; font-weight: bold; border-radius: 8px; display: inline-block; font-size: 14px;">Log In to Client Portal</a>
-            </div>
-
-            <p style="font-size: 12px; color: #94a3b8; margin-top: 35px; line-height: 1.5;">
-              If you have any questions or require custom print specifications, simply reply to this email or contact our support team.
-            </p>
-          </td>
-        </tr>
-        <tr style="background-color: #f1f5f9; color: #64748b; font-size: 11px; text-align: center;">
-          <td style="padding: 15px;">
-            &copy; ${new Date().getFullYear()} Print Plaza Press. All rights reserved.
-          </td>
-        </tr>
-      </table>
-    </body>
-    </html>
-  `;
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:Arial,sans-serif;background:#f4f6f8;margin:0;padding:30px">
+<table align="center" style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;width:100%;max-width:600px">
+  <tr style="background:#2D545E;color:#fff">
+    <td style="padding:30px;text-align:center">
+      <h1 style="margin:0;font-size:24px;letter-spacing:1px">PRINT PLAZA</h1>
+      <p style="margin:5px 0 0;font-size:13px;opacity:.8">Press &amp; Packaging Production Portal</p>
+    </td>
+  </tr>
+  <tr><td style="padding:35px;color:#1e293b">
+    <h2 style="margin-top:0;color:#2D545E;font-size:20px">Welcome, ${toName}!</h2>
+    <p style="font-size:14px;line-height:1.6;color:#475569">
+      Your customer account has been set up. Log in to your Client Portal to track quotation requests, Print Job Orders, and invoices.
+    </p>
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #E17055;padding:20px;border-radius:8px;margin:25px 0">
+      <h3 style="margin-top:0;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:#E17055">Your Login Credentials</h3>
+      <p style="margin:8px 0;font-size:14px"><strong>Portal:</strong> <a href="${portalUrl}" style="color:#2D545E">${portalUrl}</a></p>
+      <p style="margin:8px 0;font-size:14px"><strong>Email:</strong> <span style="font-family:monospace">${toEmail}</span></p>
+      <p style="margin:8px 0;font-size:14px"><strong>Password:</strong> <span style="font-family:monospace;background:#e2e8f0;padding:2px 6px;border-radius:4px">${plainPassword}</span></p>
+    </div>
+    <div style="text-align:center;margin-top:30px">
+      <a href="${portalUrl}" style="background:#2D545E;color:#fff;text-decoration:none;padding:14px 30px;font-weight:bold;border-radius:8px;display:inline-block;font-size:14px">Log In to Client Portal</a>
+    </div>
+    <p style="font-size:12px;color:#94a3b8;margin-top:35px;line-height:1.5">
+      Questions? Reply to this email or contact us at sales@printplaza.net.
+    </p>
+  </td></tr>
+  <tr style="background:#f1f5f9;color:#64748b;font-size:11px;text-align:center">
+    <td style="padding:15px">&copy; ${new Date().getFullYear()} Print Plaza Press. All rights reserved.</td>
+  </tr>
+</table>
+</body></html>`;
 
   if (transporter) {
     try {
       await transporter.sendMail({
-        from: fromAddress,
-        to: email,
-        subject: 'Welcome to Print Plaza - Your Account Credentials',
-        html: htmlContent,
+        from:    fromAddress,
+        to:      toEmail,
+        subject: 'Welcome to Print Plaza — Your Account Credentials',
+        html:    htmlContent,
       });
-      console.log(`[EMAIL] Live Welcome email sent to ${email}`);
+      console.log(`[EMAIL] Welcome email sent to ${toEmail}`);
       return { success: true, mode: 'live' };
     } catch (err) {
-      console.error(`[EMAIL ERROR] Failed to send email to ${email}:`, err.message);
+      console.error('[EMAIL ERROR] sendWelcomeEmail failed:', err.message, err.stack);
       return { success: false, error: err.message, mode: 'live' };
     }
   }
 
-  console.log(`\n======================================================`);
-  console.log(`[WELCOME EMAIL SIMULATION] To: ${email}`);
-  console.log(`Name: ${name} | Username: ${email} | Password: ${plainPassword}`);
-  console.log(`Portal Link: ${portalUrl}`);
-  console.log(`======================================================\n`);
-
+  // Simulation mode
+  console.log(`\n=== [WELCOME EMAIL SIMULATION] ===`);
+  console.log(`To: ${toEmail} | Name: ${toName} | Password: ${plainPassword}`);
+  console.log(`Portal: ${portalUrl}`);
+  console.log(`===================================\n`);
   return { success: true, mode: 'simulated' };
 }
 
 async function sendQuotationUpdateEmail(customerEmail, customerName, quoteObj) {
-  const email = String(customerEmail).trim().toLowerCase();
-  const name = String(customerName || 'Valued Customer').trim();
+  const toEmail = String(customerEmail || '').trim().toLowerCase();
+  const toName  = String(customerName  || 'Valued Customer').trim();
+
+  if (!toEmail) return { success: false, error: 'No recipient email.' };
+
   const transporter = createSmtpTransporter();
-  let fromAddress = process.env.SMTP_FROM || '"Print Plaza HQ" <sales@printplaza.net>';
-  if (!fromAddress.includes('<') && (process.env.SMTP_USER || email)) {
-    const senderName = fromAddress.replace(/"/g, '').trim() || 'Print Plaza HQ';
-    const senderEmail = process.env.SMTP_USER || 'sales@printplaza.net';
-    fromAddress = `"${senderName}" <${senderEmail}>`;
-  }
-  const portalUrl = (process.env.APP_URL || 'https://printplaza.net').replace(/\/$/, '');
+  const fromAddress = buildFromAddress();
+  const portalUrl   = (process.env.APP_URL || 'https://printplaza.net').replace(/\/$/, '');
 
-  const quoteId = String(quoteObj.id || quoteObj.quoteNumber || 'QUOTE').slice(0, 8).toUpperCase();
+  const quoteId     = String(quoteObj.id || quoteObj.quote_number || 'QUOTE').slice(0, 12).toUpperCase();
   const quotedPrice = Number(quoteObj.quoted_price || quoteObj.quotedPrice || 0).toFixed(2);
-  const currency = String(quoteObj.currency_code || quoteObj.currency || 'USD').toUpperCase();
+  const currency    = String(quoteObj.currency_code || quoteObj.currency || 'PKR').toUpperCase();
   const productName = quoteObj.product_name || quoteObj.productName || 'Custom Print Job';
-  const quantity = quoteObj.quantity || 1;
-  const status = String(quoteObj.status || quoteObj.quoteStatus || 'Updated').toUpperCase();
-
-  const specs = typeof quoteObj.finishing_specs === 'string'
-    ? (parseJson(quoteObj.finishing_specs, {}))
-    : (quoteObj.finishing_specs || {});
+  const quantity    = quoteObj.quantity || 1;
+  const status      = String(quoteObj.status || quoteObj.quoteStatus || 'updated').toUpperCase();
+  const specs       = parseJson(quoteObj.finishing_specs, {});
 
   const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="utf-8"></head>
-    <body style="font-family: Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 30px;">
-      <table max-width="600" align="center" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; width: 100%;">
-        <tr style="background-color: #2D545E; color: #ffffff;">
-          <td style="padding: 30px; text-align: center;">
-            <h1 style="margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 1px;">PRINT PLAZA</h1>
-            <p style="margin: 5px 0 0; font-size: 13px; opacity: 0.8;">Quotation Update Notification</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding: 35px; color: #1e293b;">
-            <h2 style="margin-top: 0; color: #2D545E; font-size: 20px;">Your Custom Print Quote Has Been Updated</h2>
-            <p style="font-size: 14px; line-height: 1.6; color: #475569;">
-              Hello <strong>${name}</strong>, our print engineering team has reviewed and updated your quotation request <strong>#${quoteId}</strong>.
-            </p>
-            
-            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #E17055; padding: 20px; border-radius: 8px; margin: 25px 0;">
-              <h3 style="margin-top: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #E17055;">Quotation Summary</h3>
-              <p style="margin: 8px 0; font-size: 14px;"><strong>Product:</strong> ${productName}</p>
-              <p style="margin: 8px 0; font-size: 14px;"><strong>Quantity:</strong> ${quantity} pcs</p>
-              <p style="margin: 8px 0; font-size: 14px;"><strong>Quoted Price:</strong> <span style="font-size: 18px; font-weight: bold; color: #2D545E;">${currency} $${quotedPrice}</span></p>
-              <p style="margin: 8px 0; font-size: 14px;"><strong>Status:</strong> <span style="background: #e2e8f0; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${status}</span></p>
-              ${specs.lamination ? `<p style="margin: 6px 0; font-size: 13px; color: #64748b;">Lamination: ${specs.lamination}</p>` : ''}
-              ${specs.foiling ? `<p style="margin: 6px 0; font-size: 13px; color: #64748b;">Foil Stamping: ${specs.foiling}</p>` : ''}
-              ${specs.uv ? `<p style="margin: 6px 0; font-size: 13px; color: #64748b;">Spot UV: ${specs.uv}</p>` : ''}
-              ${specs.emboss ? `<p style="margin: 6px 0; font-size: 13px; color: #64748b;">Embossing: ${specs.emboss}</p>` : ''}
-            </div>
-
-            <div style="text-align: center; margin-top: 30px;">
-              <a href="${portalUrl}" style="background-color: #E17055; color: #ffffff; text-decoration: none; padding: 14px 30px; font-weight: bold; border-radius: 8px; display: inline-block; font-size: 14px;">View & Approve in Client Portal</a>
-            </div>
-
-            <p style="font-size: 12px; color: #94a3b8; margin-top: 35px; line-height: 1.5;">
-              If you have any questions or require adjustments to this quotation, simply reply to this email or log in to your Client Portal.
-            </p>
-          </td>
-        </tr>
-        <tr style="background-color: #f1f5f9; color: #64748b; font-size: 11px; text-align: center;">
-          <td style="padding: 15px;">
-            &copy; ${new Date().getFullYear()} Print Plaza Press. All rights reserved.
-          </td>
-        </tr>
-      </table>
-    </body>
-    </html>
-  `;
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family:Arial,sans-serif;background:#f4f6f8;margin:0;padding:30px">
+<table align="center" style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;width:100%;max-width:600px">
+  <tr style="background:#2D545E;color:#fff">
+    <td style="padding:30px;text-align:center">
+      <h1 style="margin:0;font-size:24px;letter-spacing:1px">PRINT PLAZA</h1>
+      <p style="margin:5px 0 0;font-size:13px;opacity:.8">Quotation Update Notification</p>
+    </td>
+  </tr>
+  <tr><td style="padding:35px;color:#1e293b">
+    <h2 style="margin-top:0;color:#2D545E;font-size:20px">Your Quote Has Been Updated</h2>
+    <p style="font-size:14px;line-height:1.6;color:#475569">
+      Hello <strong>${toName}</strong>, your quotation <strong>#${quoteId}</strong> has been reviewed and updated.
+    </p>
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #E17055;padding:20px;border-radius:8px;margin:25px 0">
+      <h3 style="margin-top:0;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:#E17055">Quotation Summary</h3>
+      <p style="margin:8px 0;font-size:14px"><strong>Product:</strong> ${productName}</p>
+      <p style="margin:8px 0;font-size:14px"><strong>Quantity:</strong> ${quantity} pcs</p>
+      <p style="margin:8px 0;font-size:14px"><strong>Quoted Price:</strong> <span style="font-size:18px;font-weight:bold;color:#2D545E">${currency} ${quotedPrice}</span></p>
+      <p style="margin:8px 0;font-size:14px"><strong>Status:</strong> <span style="background:#e2e8f0;padding:2px 8px;border-radius:4px;font-weight:bold">${status}</span></p>
+      ${specs.lamination ? `<p style="margin:6px 0;font-size:13px;color:#64748b">Lamination: ${specs.lamination}</p>` : ''}
+      ${specs.foiling    ? `<p style="margin:6px 0;font-size:13px;color:#64748b">Foil Stamping: ${specs.foiling}</p>` : ''}
+      ${specs.uv         ? `<p style="margin:6px 0;font-size:13px;color:#64748b">Spot UV: ${specs.uv}</p>` : ''}
+      ${specs.emboss     ? `<p style="margin:6px 0;font-size:13px;color:#64748b">Embossing: ${specs.emboss}</p>` : ''}
+    </div>
+    <div style="text-align:center;margin-top:30px">
+      <a href="${portalUrl}" style="background:#E17055;color:#fff;text-decoration:none;padding:14px 30px;font-weight:bold;border-radius:8px;display:inline-block;font-size:14px">View &amp; Approve in Client Portal</a>
+    </div>
+    <p style="font-size:12px;color:#94a3b8;margin-top:35px;line-height:1.5">
+      Questions? Reply to this email or log in to your Client Portal.
+    </p>
+  </td></tr>
+  <tr style="background:#f1f5f9;color:#64748b;font-size:11px;text-align:center">
+    <td style="padding:15px">&copy; ${new Date().getFullYear()} Print Plaza Press. All rights reserved.</td>
+  </tr>
+</table>
+</body></html>`;
 
   if (transporter) {
     try {
       await transporter.sendMail({
-        from: fromAddress,
-        to: email,
-        subject: `Quotation Update #${quoteId} - Print Plaza`,
-        html: htmlContent,
+        from:    fromAddress,
+        to:      toEmail,
+        subject: `Your Print Plaza Quote #${quoteId} Has Been Updated`,
+        html:    htmlContent,
       });
-      console.log(`[EMAIL] Quotation update email sent to ${email}`);
+      console.log(`[EMAIL] Quote update email sent to ${toEmail}`);
       return { success: true, mode: 'live' };
     } catch (err) {
-      console.error(`[EMAIL ERROR] Failed to send quote update email to ${email}:`, err.message);
+      console.error('[EMAIL ERROR] sendQuotationUpdateEmail failed:', err.message);
+      return { success: false, error: err.message, mode: 'live' };
     }
   }
 
-  console.log(`\n======================================================`);
-  console.log(`[QUOTE UPDATE EMAIL SIMULATION] To: ${email}`);
-  console.log(`Quote #${quoteId} | Price: ${currency} $${quotedPrice} | Status: ${status}`);
-  console.log(`======================================================\n`);
-
+  console.log(`[QUOTE EMAIL SIMULATION] To:${toEmail} | #${quoteId} | ${currency} ${quotedPrice}`);
   return { success: true, mode: 'simulated' };
 }
 
-async function upsertCustomer(email, name, phone, company, notes) {
-  const targetEmail = String(email || '').trim().toLowerCase();
-  if (!targetEmail) return null;
 
-  const targetName = String(name || targetEmail).trim();
-  const targetPhone = phone ? String(phone).trim() : null;
-  const targetCompany = company ? String(company).trim() : null;
-  const targetNotes = notes ? String(notes).trim() : null;
-
-  const [existing] = await pool.query('SELECT * FROM customers WHERE LOWER(user_email) = ?', [targetEmail]);
-  if (existing.length) {
-    const cust = existing[0];
-    await pool.query(
-      `UPDATE customers
-       SET user_name = COALESCE(?, user_name),
-           phone = COALESCE(?, phone),
-           company_name = COALESCE(?, company_name),
-           notes = COALESCE(?, notes),
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-      [targetName, targetPhone, targetCompany, targetNotes, cust.id]
-    );
-    return { ...cust, user_name: targetName || cust.user_name };
-  }
-
-  const id = createId('cust');
-  const plainPass = generatePassword();
-  const passHash = bcrypt.hashSync(plainPass, 10);
-
-  await pool.query(
-    `INSERT INTO customers (id, user_email, user_name, phone, company_name, notes, password_plain, password_hash)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, targetEmail, targetName, targetPhone, targetCompany, targetNotes, plainPass, passHash]
-  );
-
-  return { id, user_email: targetEmail, user_name: targetName, password_plain: plainPass };
-}
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS customers (
-      id VARCHAR(128) PRIMARY KEY,
-      user_email VARCHAR(191) UNIQUE NOT NULL,
-      user_name VARCHAR(191) NOT NULL,
-      phone VARCHAR(64) NULL,
-      company_name VARCHAR(191) NULL,
-      password_hash VARCHAR(255) NULL,
-      password_plain VARCHAR(64) NULL,
-      welcome_sent_at TIMESTAMP NULL,
-      notes TEXT NULL,
-      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_customers_email (user_email),
-      INDEX idx_customers_phone (phone)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
-
-  try {
-    await pool.query('ALTER TABLE customers ADD COLUMN password_hash VARCHAR(255) NULL');
-  } catch (_e) {}
-  try {
-    await pool.query('ALTER TABLE customers ADD COLUMN password_plain VARCHAR(64) NULL');
-  } catch (_e) {}
-  try {
-    await pool.query('ALTER TABLE customers ADD COLUMN welcome_sent_at TIMESTAMP NULL');
-  } catch (_e) {}
-
-  try {
-    const [existingOrders] = await pool.query('SELECT DISTINCT user_email, user_name, options_json FROM orders WHERE user_email IS NOT NULL AND TRIM(user_email) != ""');
-    for (const o of existingOrders) {
-      const opts = parseJson(o.options_json, {});
-      await upsertCustomer(o.user_email, o.user_name, opts.phone || opts.Phone, opts.companyName);
-    }
-    const [existingQuotes] = await pool.query('SELECT DISTINCT user_email, user_name, phone, company_name, notes FROM quotations WHERE user_email IS NOT NULL AND TRIM(user_email) != ""');
-    for (const q of existingQuotes) {
-      await upsertCustomer(q.user_email, q.user_name, q.phone, q.company_name, q.notes);
-    }
-  } catch (_e) {
-    // Ignore migration error
-  }
-  await pool.query('UPDATE orders SET sell_price = total_price WHERE sell_price = 0 AND total_price > 0');
-}
-
-function generatePassword() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let pass = 'PP-';
-  for (let i = 0; i < 5; i++) {
-    pass += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return pass;
-}
-
-async function upsertCustomer(email, name, phone, companyName, notes) {
-  if (!pool || !email) return null;
-  const userEmail = String(email).trim().toLowerCase();
-  if (!userEmail) return null;
-  const userName = String(name || userEmail).trim();
-  const phoneVal = phone ? String(phone).trim() : null;
-  const companyVal = companyName ? String(companyName).trim() : null;
-  const notesVal = notes ? String(notes).trim() : null;
-  const id = createId('cust');
-
-  const [existing] = await pool.query('SELECT * FROM customers WHERE LOWER(user_email) = ?', [userEmail]);
-
-  if (!existing.length) {
-    const plainPass = generatePassword();
-    await pool.query(
-      `INSERT INTO customers (id, user_email, user_name, phone, company_name, password_plain, notes, welcome_sent_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-      [id, userEmail, userName, phoneVal, companyVal, plainPass, notesVal]
-    );
-
-    // Auto send Welcome Email
-    await sendWelcomeEmail(userEmail, userName, plainPass);
-    return { id, isNew: true, plainPass };
-  } else {
-    const customer = existing[0];
-    let plainPass = customer.password_plain;
-    if (!plainPass) {
-      plainPass = generatePassword();
-      await pool.query('UPDATE customers SET password_plain = ? WHERE id = ?', [plainPass, customer.id]);
-    }
-    await pool.query(
-      `UPDATE customers
-       SET user_name = COALESCE(NULLIF(?, ''), user_name),
-           phone = COALESCE(?, phone),
-           company_name = COALESCE(?, company_name),
-           notes = COALESCE(?, notes),
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-      [userName, phoneVal, companyVal, notesVal, customer.id]
-    );
-    return { id: customer.id, isNew: false, plainPass };
-  }
-}
 
 function requireDb(_req, res, next) {
   if (!pool) {
@@ -1318,7 +1175,7 @@ app.patch('/api/admin/customers/:id', requireDb, async (req, res, next) => {
   }
 });
 
-app.post('/api/admin/customers/:id/send-welcome-email', requireDb, async (req, res, next) => {
+app.post('/api/admin/customers/:id/send-welcome-email', requireDb, async (req, res) => {
   try {
     const rawIdOrEmail = decodeURIComponent(req.params.id || '');
     const { email, name, phone, companyName } = req.body || {};
@@ -1338,16 +1195,25 @@ app.post('/api/admin/customers/:id/send-welcome-email', requireDb, async (req, r
       }
     }
 
-    // 3. If customer is not in DB yet, create profile on the fly!
+    // 3. If customer is not in DB yet, create profile on the fly
     if (!customer) {
       const finalEmail = targetEmail || (rawIdOrEmail.includes('@') ? rawIdOrEmail : '');
       if (!finalEmail) {
-        res.status(400).json({ error: 'Customer profile or email is required.' });
-        return;
+        return res.status(400).json({ ok: false, error: 'Customer profile or email is required.' });
       }
       const upserted = await upsertCustomer(finalEmail, name || finalEmail, phone, companyName);
-      const [newRows] = await pool.query('SELECT * FROM customers WHERE id = ? OR LOWER(user_email) = ?', [upserted.id, finalEmail]);
+      if (!upserted) {
+        return res.status(500).json({ ok: false, error: 'Failed to create or find customer record.' });
+      }
+      const [newRows] = await pool.query(
+        'SELECT * FROM customers WHERE id = ? OR LOWER(user_email) = ?',
+        [upserted.id, finalEmail]
+      );
       customer = newRows[0];
+    }
+
+    if (!customer || !customer.user_email) {
+      return res.status(400).json({ ok: false, error: 'Valid customer email not found.' });
     }
 
     let plainPass = customer.password_plain;
@@ -1357,17 +1223,34 @@ app.post('/api/admin/customers/:id/send-welcome-email', requireDb, async (req, r
     }
 
     const emailResult = await sendWelcomeEmail(customer.user_email, customer.user_name, plainPass);
+
+    // Check if SMTP actually failed
+    if (emailResult && !emailResult.success && emailResult.mode === 'live') {
+      return res.status(500).json({
+        ok: false,
+        error: emailResult.error || 'SMTP send failed',
+        code: 'SMTP_ERROR',
+        hint: 'Check SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS in cPanel environment variables.',
+      });
+    }
+
     await pool.query('UPDATE customers SET welcome_sent_at = CURRENT_TIMESTAMP WHERE id = ?', [customer.id]);
 
-    res.json({
+    return res.json({
       ok: true,
       email: customer.user_email,
       name: customer.user_name,
       mode: emailResult.mode,
       message: `Welcome credentials email sent to ${customer.user_email}!`,
     });
-  } catch (error) {
-    next(error);
+  } catch (err) {
+    console.error('[API ERROR] /send-welcome-email:', err.message, err.stack);
+    return res.status(500).json({
+      ok: false,
+      error: err.message || 'Email sending failed',
+      code: err.code || 'UNKNOWN_ERROR',
+      details: String(err),
+    });
   }
 });
 
