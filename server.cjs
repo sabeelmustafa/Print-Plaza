@@ -121,8 +121,13 @@ async function sendWelcomeEmail(customerEmail, customerName, plainPassword) {
   const email = String(customerEmail).trim().toLowerCase();
   const name = String(customerName || 'Valued Customer').trim();
   const transporter = createSmtpTransporter();
-  const fromAddress = process.env.SMTP_FROM || '"Print Plaza HQ" <noreply@printplaza.com>';
-  const portalUrl = process.env.APP_URL || 'http://localhost:3000';
+  let fromAddress = process.env.SMTP_FROM || '"Print Plaza HQ" <sales@printplaza.net>';
+  if (!fromAddress.includes('<') && (process.env.SMTP_USER || email)) {
+    const senderName = fromAddress.replace(/"/g, '').trim() || 'Print Plaza HQ';
+    const senderEmail = process.env.SMTP_USER || 'sales@printplaza.net';
+    fromAddress = `"${senderName}" <${senderEmail}>`;
+  }
+  const portalUrl = (process.env.APP_URL || 'https://printplaza.net').replace(/\/$/, '');
 
   const htmlContent = `
     <!DOCTYPE html>
