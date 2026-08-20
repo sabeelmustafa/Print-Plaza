@@ -7,7 +7,8 @@ ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS payment_due_date DATE NULL AFTER invoice_notes;
 
 ALTER TABLE orders
-  MODIFY currency_code VARCHAR(8) NOT NULL DEFAULT 'PKR';
+  MODIFY currency_code VARCHAR(8) NOT NULL DEFAULT 'PKR',
+  MODIFY status VARCHAR(64) NOT NULL DEFAULT 'pending';
 
 UPDATE orders
 SET sell_price = total_price

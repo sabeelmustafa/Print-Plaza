@@ -278,6 +278,9 @@ export const DataService = {
 
   addPayment: async (orderId: string, payment: {
     amount: number;
+    currency?: string;
+    pkrAmount?: number;
+    exchangeRate?: number;
     paymentMethod: string;
     reference?: string;
     notes?: string;

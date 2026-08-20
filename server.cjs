@@ -54,6 +54,7 @@ async function ensureBusinessSchema() {
   await safe('orders.invoice_notes',    "ALTER TABLE orders ADD COLUMN invoice_notes TEXT NULL AFTER items_json");
   await safe('orders.payment_due_date', "ALTER TABLE orders ADD COLUMN payment_due_date DATE NULL AFTER invoice_notes");
   await safe('orders.currency_modify',  "ALTER TABLE orders MODIFY currency_code VARCHAR(8) NOT NULL DEFAULT 'PKR'");
+  await safe('orders.status_modify',    "ALTER TABLE orders MODIFY status VARCHAR(64) NOT NULL DEFAULT 'pending'");
 
   // ── payment_records table ─────────────────────────────────────────────────
   await safe('create payment_records', `
@@ -61,6 +62,9 @@ async function ensureBusinessSchema() {
       id VARCHAR(128) PRIMARY KEY,
       order_id VARCHAR(128) NOT NULL,
       amount DECIMAL(12,2) NOT NULL,
+      currency_code VARCHAR(8) NOT NULL DEFAULT 'PKR',
+      pkr_amount DECIMAL(12,2) NULL,
+      exchange_rate DECIMAL(12,4) NULL,
       payment_method VARCHAR(80) NOT NULL DEFAULT 'bank_transfer',
       reference VARCHAR(220) NULL,
       notes TEXT NULL,
@@ -72,6 +76,10 @@ async function ensureBusinessSchema() {
         ON UPDATE CASCADE ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+
+  await safe('payment_records.currency_code', "ALTER TABLE payment_records ADD COLUMN currency_code VARCHAR(8) NOT NULL DEFAULT 'PKR' AFTER amount");
+  await safe('payment_records.pkr_amount',    "ALTER TABLE payment_records ADD COLUMN pkr_amount DECIMAL(12,2) NULL AFTER currency_code");
+  await safe('payment_records.exchange_rate', "ALTER TABLE payment_records ADD COLUMN exchange_rate DECIMAL(12,4) NULL AFTER pkr_amount");
 
   // ── quotations table ──────────────────────────────────────────────────────
   await safe('create quotations', `
@@ -743,6 +751,9 @@ app.get('/api/orders', requireDb, async (req, res, next) => {
           id: payment.id,
           orderId,
           amount: Number(payment.amount),
+          currency: normalizeCurrency(payment.currency_code),
+          pkrAmount: payment.pkr_amount != null ? Number(payment.pkr_amount) : Number(payment.amount),
+          exchangeRate: payment.exchange_rate != null ? Number(payment.exchange_rate) : undefined,
           paymentMethod: payment.payment_method,
           reference: payment.reference || '',
           notes: payment.notes || '',
@@ -938,21 +949,32 @@ app.post('/api/admin/orders/:id/payments', requireDb, requireAdmin, async (req, 
       return;
     }
     const id = createId('payment');
+    const currency = normalizeCurrency(req.body.currency || 'PKR');
+    const pkrAmount = req.body.pkrAmount != null && req.body.pkrAmount !== ''
+      ? Number(req.body.pkrAmount)
+      : (currency === 'PKR' ? amount : Number(req.body.amount || 0));
+    const exchangeRate = req.body.exchangeRate
+      ? Number(req.body.exchangeRate)
+      : (pkrAmount && amount && amount > 0 ? Number((pkrAmount / amount).toFixed(4)) : 1);
+
     await pool.query(
       `INSERT INTO payment_records
-       (id, order_id, amount, payment_method, reference, notes, paid_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (id, order_id, amount, currency_code, pkr_amount, exchange_rate, payment_method, reference, notes, paid_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         req.params.id,
         amount,
+        currency,
+        pkrAmount,
+        exchangeRate,
         String(req.body.paymentMethod || 'bank_transfer'),
         String(req.body.reference || '').trim() || null,
         String(req.body.notes || '').trim() || null,
         req.body.paidAt || new Date(),
       ]
     );
-    res.status(201).json({ id });
+    res.status(201).json({ id, pkrAmount });
   } catch (error) {
     next(error);
   }

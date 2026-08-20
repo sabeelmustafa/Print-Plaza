@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS orders (
   items_json JSON NULL,
   invoice_notes TEXT NULL,
   payment_due_date DATE NULL,
-  status ENUM('pending', 'processing', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
+  status VARCHAR(64) NOT NULL DEFAULT 'pending',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_orders_user (user_id),

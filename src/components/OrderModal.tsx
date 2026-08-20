@@ -35,8 +35,6 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
 
   if (!product) return null;
 
-  const estimatedTotalPrice = product.price * quantity;
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setArtworkFile(e.target.files[0]);
@@ -71,7 +69,7 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
         productId:   product.id,
         productName: productType || product.name,
         quantity:    Number(quantity) || 1,
-        quotedPrice: estimatedTotalPrice,
+        quotedPrice: 0,
         options:     { ...options },
         finishingSpecs: {},
         notes:       specifications || undefined,
@@ -169,10 +167,10 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent" />
                   <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs">
                     <span className="bg-slate-900/90 backdrop-blur-md px-2.5 py-1 rounded-lg text-[10px] font-bold text-slate-300 border border-slate-700/80 uppercase tracking-wider">
-                      {product.unit} Production
+                      Custom Production
                     </span>
                     <span className="bg-emerald-500/20 text-emerald-300 px-2 py-1 rounded-lg text-[10px] font-mono font-bold">
-                      ${product.price.toFixed(2)} / {product.unit}
+                      Direct Press Quote
                     </span>
                   </div>
                 </div>
@@ -187,19 +185,18 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                 </div>
               </div>
 
-              {/* Bottom Quote Range Summary */}
+              {/* Bottom Quote Summary */}
               <div className="relative z-10 pt-6 mt-6 border-t border-slate-800/80 space-y-2">
                 <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 block">
-                  Estimated Quote Price Range
+                  Custom Volume Pricing
                 </span>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
-                    ${estimatedTotalPrice.toFixed(2)}
+                  <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-display tracking-tight uppercase">
+                    Tailored Quote
                   </span>
-                  <span className="text-xs text-slate-400 font-mono">USD</span>
                 </div>
                 <p className="text-[10px] text-slate-400 leading-normal">
-                  *Final quotation verified by our press team. No payment required until quote approval.
+                  *Engineered pricing calculated per sizes, substrates & batch volume. No upfront payment required.
                 </p>
               </div>
             </div>

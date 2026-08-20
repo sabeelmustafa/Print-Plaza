@@ -43,9 +43,6 @@ export default function ProductCard({ product, onOrder }: ProductCardProps) {
           </div>
         )}
         <div className="absolute top-0 left-0 w-full h-1 bg-[#E17055] transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500" />
-        <div className="absolute bottom-5 left-5 bg-black/90 backdrop-blur-md text-white text-[9px] font-bold uppercase tracking-[0.16em] px-3.5 py-2">
-          ${product.price.toFixed(2)} / {product.unit.toUpperCase()}
-        </div>
       </div>
       
       <div className="flex-1 flex flex-col">

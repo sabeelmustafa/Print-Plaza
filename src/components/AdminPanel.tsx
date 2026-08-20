@@ -40,13 +40,31 @@ import {
   MessageSquare,
   ArrowUpRight,
   Phone,
-  Mail
+  Mail,
+  Upload
 } from 'lucide-react';
 import { DataService } from '../lib/dataService';
 import { MediaAsset, NavMenuItem, Order, OrderItem, Product, ProductOption, ServiceCategory, SiteSettings } from '../types';
 import Hero from './Hero';
 import ProductCard from './ProductCard';
 import ServiceGrid from './ServiceGrid';
+import { printClientInvoice } from './UserPanel';
+
+function formatCurrency(value: number, currency = 'PKR') {
+  const code = String(currency || 'PKR').trim().toUpperCase();
+  const validCode = /^[A-Z]{3}$/.test(code) ? code : 'PKR';
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: validCode,
+      currencyDisplay: 'narrowSymbol',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Number(value || 0));
+  } catch (_e) {
+    return `${validCode} ${Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+}
 
 type AdminTab = 'dashboard' | 'quotations' | 'orders' | 'products' | 'categories' | 'customers' | 'business' | 'media' | 'site';
 type WebsiteSection = 'header' | 'hero' | 'products' | 'services' | 'footer' | 'theme';
@@ -783,10 +801,10 @@ function DashboardOverview({
 function QuickQuoteEstimator({ products, onNewJob }: { products: Product[]; onNewJob: () => void }) {
   const [selectedProduct, setSelectedProduct] = useState<string>(products[0]?.id || '');
   const [quantity, setQuantity] = useState<number>(500);
+  const [unitRate, setUnitRate] = useState<number>(1.50);
 
   const prod = products.find(p => p.id === selectedProduct) || products[0];
-  const unitPrice = prod ? prod.price : 0;
-  const estimatedTotal = unitPrice * quantity;
+  const estimatedTotal = unitRate * quantity;
   const estimatedMargin = estimatedTotal * 0.45; // Estimated 45% gross profit margin
 
   return (
@@ -805,25 +823,37 @@ function QuickQuoteEstimator({ products, onNewJob }: { products: Product[]; onNe
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-slate-400"
             >
               {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} (${p.price}/{p.unit})</option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           </div>
 
-          <div>
-            <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Production Quantity</label>
-            <input
-              type="number"
-              value={quantity}
-              onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-slate-400"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Est. Rate / Unit ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={unitRate}
+                onChange={(e) => setUnitRate(Math.max(0, Number(e.target.value)))}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-slate-400"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Quantity</label>
+              <input
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-slate-400"
+              />
+            </div>
           </div>
 
           <div className="bg-slate-50 rounded-xl p-4 border border-slate-200/60 space-y-2">
             <div className="flex justify-between text-xs text-slate-500">
               <span>Unit Rate:</span>
-              <span className="font-semibold text-slate-700">${unitPrice.toFixed(2)}</span>
+              <span className="font-semibold text-slate-700">${unitRate.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-xs text-slate-500">
               <span>Est. Gross Profit (45%):</span>
@@ -934,7 +964,7 @@ function QuotationsEditor({
                       <QuoteStatusBadge status={quote.quoteStatus || 'new'} />
                     </td>
                     <td className="py-3.5 px-4 text-right font-bold text-slate-900">
-                      ${(quote.sellPrice || quote.totalPrice).toFixed(2)}
+                      {formatCurrency(quote.quotedPrice || quote.sellPrice || quote.totalPrice || 0, quote.currency)}
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <button
@@ -991,8 +1021,8 @@ function QuotationDrawer({
 }) {
   const opts = quotation.options || {};
   const [costPrice, setCostPrice] = useState(quotation.costPrice || (quotation.totalPrice * 0.5));
-  const [sellPrice, setSellPrice] = useState(quotation.sellPrice || quotation.totalPrice || 0);
-  const [currency, setCurrency] = useState(quotation.currency || 'USD');
+  const [sellPrice, setSellPrice] = useState(quotation.sellPrice || quotation.quotedPrice || quotation.totalPrice || 0);
+  const [currency, setCurrency] = useState(quotation.currency || 'PKR');
   const [quoteStatus, setQuoteStatus] = useState(quotation.quoteStatus || 'new');
 
   // Finishing Specs State
@@ -1057,6 +1087,7 @@ function QuotationDrawer({
       await DataService.convertQuotationToPjo(quotation.id, {
         sellPrice,
         costPrice,
+        currency,
         finishingSpecs
       });
       await onConverted();
@@ -1305,19 +1336,21 @@ function QuotationDrawer({
                   onChange={(e) => setCurrency(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none"
                 >
-                  <option value="USD">USD ($)</option>
-                  <option value="PKR">PKR (Rs)</option>
-                  <option value="EUR">EUR (€)</option>
-                  <option value="GBP">GBP (£)</option>
-                  <option value="AED">AED (AED)</option>
-                  <option value="CAD">CAD ($)</option>
+                  <option value="PKR">PKR (Rs. Pakistani Rupee)</option>
+                  <option value="USD">USD ($ US Dollar)</option>
+                  <option value="GBP">GBP (£ British Pound)</option>
+                  <option value="EUR">EUR (€ Euro)</option>
+                  <option value="AED">AED (AED UAE Dirham)</option>
+                  <option value="SAR">SAR (SAR Saudi Riyal)</option>
+                  <option value="CAD">CAD ($ Canadian Dollar)</option>
+                  <option value="AUD">AUD ($ Australian Dollar)</option>
                 </select>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Est. Base Cost Price ($)</label>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Est. Base Cost Price ({currency})</label>
                 <input
                   type="number"
                   step="0.01"
@@ -1328,7 +1361,7 @@ function QuotationDrawer({
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Final Quoted Customer Price ($)</label>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Final Quoted Customer Price ({currency})</label>
                 <input
                   type="number"
                   step="0.01"
@@ -1513,7 +1546,7 @@ function OrdersEditor({
                       <PaymentBadge status={order.paymentStatus || 'unpaid'} />
                     </td>
                     <td className="py-3.5 px-4 text-right font-bold text-slate-900">
-                      ${(order.sellPrice || order.totalPrice).toFixed(2)}
+                      {formatCurrency(order.sellPrice || order.totalPrice, order.currency)}
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <button
@@ -1581,7 +1614,7 @@ function KanbanPipelineBoard({
                 >
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-mono font-bold text-slate-900">{order.pjoNumber || `#${order.id.slice(0, 8)}`}</span>
-                    <span className="font-bold text-slate-900">${(order.sellPrice || order.totalPrice).toFixed(2)}</span>
+                    <span className="font-bold text-slate-900">{formatCurrency(order.sellPrice || order.totalPrice, order.currency)}</span>
                   </div>
 
                   <div>
@@ -1714,8 +1747,8 @@ function ProductsEditor({
                 <p className="text-xs text-slate-500 mt-1 line-clamp-2">{product.description}</p>
 
                 <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-slate-500">Base Unit Price:</span>
-                  <span className="font-bold text-slate-900">${product.price} / {product.unit}</span>
+                  <span className="text-slate-500">Custom Options:</span>
+                  <span className="font-semibold text-slate-700">{product.options?.length || 0} configured</span>
                 </div>
               </div>
 
@@ -1971,14 +2004,15 @@ function BusinessEditor({
 }) {
   const filteredOrders = orders.filter((o) =>
     o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    o.userEmail.toLowerCase().includes(searchQuery.toLowerCase())
+    o.userEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (o.pjoNumber && o.pjoNumber.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
     <div className="space-y-4">
       <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
         <h2 className="text-sm font-bold text-slate-900 mb-2">Financial Ledger & Invoicing</h2>
-        <p className="text-xs text-slate-500">Manage client payments, record partial deposits, track due balances, and generate print invoices.</p>
+        <p className="text-xs text-slate-500">Manage client payments, record multi-currency transactions with PKR conversions, track due balances, and generate print invoices.</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
@@ -1992,7 +2026,7 @@ function BusinessEditor({
                 <th className="py-3.5 px-4">Paid</th>
                 <th className="py-3.5 px-4">Balance Due</th>
                 <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4 text-right">Action</th>
+                <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -2008,13 +2042,13 @@ function BusinessEditor({
                       {order.pjoNumber || `INV-#${order.id.slice(0, 8)}`}
                     </td>
                     <td className="py-3.5 px-4 font-semibold text-slate-900">{order.userEmail}</td>
-                    <td className="py-3.5 px-4 font-bold text-slate-900">${total.toFixed(2)}</td>
-                    <td className="py-3.5 px-4 text-emerald-600 font-semibold">${paid.toFixed(2)}</td>
+                    <td className="py-3.5 px-4 font-bold text-slate-900">{formatCurrency(total, order.currency)}</td>
+                    <td className="py-3.5 px-4 text-emerald-600 font-semibold">{formatCurrency(paid, order.currency)}</td>
                     <td className="py-3.5 px-4 font-bold">
                       {isCancelled ? (
                         <span className="text-slate-400 text-xs">$0.00 <span className="text-[10px] italic">(Cancelled)</span></span>
                       ) : (
-                        <span className="text-rose-600">${due.toFixed(2)}</span>
+                        <span className="text-rose-600">{formatCurrency(due, order.currency)}</span>
                       )}
                     </td>
                     <td className="py-3.5 px-4">
@@ -2025,12 +2059,22 @@ function BusinessEditor({
                       )}
                     </td>
                     <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => onManage(order)}
-                        className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                      >
-                        Invoice & Payments
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => printClientInvoice(order, settings)}
+                          title="Print Branded Invoice"
+                          className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => onManage(order)}
+                          className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          Invoice & Payments
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -2158,12 +2202,30 @@ function ProductModal({
   onSave: (e: React.FormEvent) => void;
   updateOption: (idx: number, opt: Partial<ProductOption>) => void;
 }) {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return;
+    const file = e.target.files[0];
+    setUploading(true);
+    setUploadError('');
+    try {
+      const url = await DataService.uploadImage(file, file.name);
+      setProduct((prev) => prev ? { ...prev, image: url } : null);
+    } catch (_err) {
+      setUploadError('Failed to upload image. Please try again or paste an image URL.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-2xl overflow-hidden my-8">
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-base font-bold text-slate-900">{product.id ? 'Edit Product' : 'Add New Print Product'}</h2>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"><X className="w-5 h-5" /></button>
         </div>
 
         <form onSubmit={onSave} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
@@ -2171,6 +2233,7 @@ function ProductModal({
             <label className="block text-xs font-semibold text-slate-600 mb-1">Product Title</label>
             <input
               type="text"
+              placeholder="e.g. Custom Product Boxes"
               value={product.name || ''}
               onChange={(e) => setProduct({ ...product, name: e.target.value })}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
@@ -2178,50 +2241,86 @@ function ProductModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Category</label>
-              <select
-                value={product.categoryId || ''}
-                onChange={(e) => setProduct({ ...product, categoryId: e.target.value })}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.title}</option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Category</label>
+            <select
+              value={product.categoryId || ''}
+              onChange={(e) => setProduct({ ...product, categoryId: e.target.value })}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+            >
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.title}</option>
+              ))}
+            </select>
+          </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Base Price / Unit</label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  step="0.01"
-                  value={product.price || 0}
-                  onChange={(e) => setProduct({ ...product, price: Number(e.target.value) })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
-                  required
-                />
+          {/* Product Image Manager */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Product Image</label>
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 rounded-xl bg-slate-200 border border-slate-300 overflow-hidden shrink-0 relative flex items-center justify-center">
+                  {product.image ? (
+                    <img
+                      src={product.image}
+                      alt={product.name || 'Product'}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1'; }}
+                    />
+                  ) : (
+                    <ImageIcon className="w-8 h-8 text-slate-400" />
+                  )}
+                  {uploading && (
+                    <div className="absolute inset-0 bg-slate-900/60 flex items-center justify-center">
+                      <RefreshCw className="w-5 h-5 text-white animate-spin" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="px-3.5 py-1.5 bg-[#2D545E] hover:bg-[#223E47] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors">
+                      <Upload className="w-3.5 h-3.5" />
+                      {uploading ? 'Uploading...' : (product.image ? 'Change Image' : 'Upload Image')}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={uploading}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {product.image && (
+                      <button
+                        type="button"
+                        onClick={() => setProduct({ ...product, image: '' })}
+                        className="px-3 py-1.5 bg-white border border-slate-200 text-red-600 hover:bg-red-50 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Upload PNG, JPG, or WebP. The file will be saved and linked automatically.
+                  </p>
+                  {uploadError && (
+                    <p className="text-[11px] text-red-600 font-semibold">{uploadError}</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Or Direct Image URL</label>
                 <input
                   type="text"
-                  placeholder="unit (pcs/box)"
-                  value={product.unit || 'pcs'}
-                  onChange={(e) => setProduct({ ...product, unit: e.target.value })}
-                  className="w-24 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+                  placeholder="https://... or /uploads/..."
+                  value={product.image || ''}
+                  onChange={(e) => setProduct({ ...product, image: e.target.value })}
+                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-slate-400"
                 />
               </div>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Image URL</label>
-            <input
-              type="text"
-              value={product.image || ''}
-              onChange={(e) => setProduct({ ...product, image: e.target.value })}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-slate-400"
-            />
           </div>
 
           <div>
@@ -2244,7 +2343,7 @@ function ProductModal({
                   opts.push({ id: `opt_${Date.now()}`, label: 'Option Title', type: 'select', values: ['Choice A', 'Choice B'] });
                   setProduct({ ...product, options: opts });
                 }}
-                className="text-xs text-emerald-600 font-semibold hover:underline"
+                className="text-xs text-emerald-600 font-semibold hover:underline cursor-pointer"
               >
                 + Add Option
               </button>
@@ -2272,7 +2371,7 @@ function ProductModal({
                       const opts = product.options?.filter((_, i) => i !== idx);
                       setProduct({ ...product, options: opts });
                     }}
-                    className="p-1 text-slate-400 hover:text-red-600"
+                    className="p-1 text-slate-400 hover:text-red-600 cursor-pointer"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -2282,10 +2381,10 @@ function ProductModal({
           </div>
 
           <div className="pt-4 border-t border-slate-100 flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold">
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer">
               Cancel
             </button>
-            <button type="submit" className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold shadow-xs">
+            <button type="submit" className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold shadow-xs cursor-pointer">
               Save Product
             </button>
           </div>
@@ -2355,6 +2454,166 @@ function CategoryModal({
 }
 
 /* -------------------------------------------------------------------------- */
+/*                 PRODUCTION PJO JOB TICKET GENERATOR (NO PRICING)           */
+/* -------------------------------------------------------------------------- */
+
+function printPjoJobTicket(order: Order, settings: SiteSettings) {
+  const opts = order.options || {};
+  const phoneNum = String(opts.phone || opts.Phone || opts.phoneNumber || '');
+  const companyName = String(opts.companyName || '');
+  const documentSettings = settings.documents || {};
+  const brandName = documentSettings.companyName || settings.header?.logoText || 'Print Plaza';
+  const logo = documentSettings.invoiceLogo || settings.header?.logoImageDark || settings.header?.logoImage || '/brand/print-plaza-logo.png';
+  const logoUrl = logo && logo.startsWith('/') ? `${window.location.origin}${logo}` : logo;
+
+  const escapeHtml = (val: unknown) => String(val ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[char] || char));
+
+  const popup = window.open('', '_blank', 'width=960,height=720');
+  if (!popup) return;
+
+  const otherSpecs = Object.entries(order.options || {})
+    .filter(([key]) => !['phone', 'Phone', 'phoneNumber', 'companyName', 'specifications', 'artworkFile', 'isQuotation', 'costPrice', 'sellPrice', 'quotedPrice'].includes(key))
+    .map(([key, val]) => `<tr><td class="label">${escapeHtml(key)}:</td><td class="val">${escapeHtml(val)}</td></tr>`)
+    .join('');
+
+  popup.document.write(`<!doctype html><html><head><title>PJO ${escapeHtml(order.pjoNumber || order.id)}</title><style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#f4f3f0;color:#111;font-family:Arial,Helvetica,sans-serif}
+    .sheet{max-width:900px;margin:0 auto;background:#fff;min-height:100vh}
+    .inner{padding:36px 44px}
+    .top-bar{height:6px;background:#14262C}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #14262C;padding-bottom:20px;margin-bottom:24px}
+    .logo{max-height:60px;object-fit:contain}
+    .pjo-title{font-size:24px;font-weight:900;text-transform:uppercase;color:#14262C;margin:0}
+    .pjo-sub{font-size:11px;color:#666;font-weight:700;letter-spacing:1.5px;text-transform:uppercase}
+    .pjo-num{font-size:20px;font-weight:900;font-family:monospace;color:#E17055;margin-top:4px}
+    .banner{background:#14262C;color:#fff;padding:14px 20px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+    .banner-item{font-size:12px}
+    .banner-item strong{font-size:16px;display:block;margin-top:2px}
+    .qty-box{background:#E17055;color:#fff;padding:8px 18px;border-radius:6px;font-size:22px;font-weight:900;text-align:center}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px}
+    .card{border:1px solid #ddd;border-radius:8px;padding:16px;background:#fafafa}
+    .card-title{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#888;margin-bottom:10px;border-bottom:1px solid #eee;padding-bottom:4px}
+    .card-content{font-size:13px;line-height:1.6}
+    table.specs{width:100%;border-collapse:collapse;margin-top:8px}
+    table.specs td{padding:8px 10px;border-bottom:1px solid #e5e5e5;font-size:12px}
+    table.specs td.label{width:35%;color:#666;font-weight:600;text-transform:capitalize}
+    table.specs td.val{font-weight:700;color:#111}
+    .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:800;background:#e2e8f0;color:#334155}
+    .notes-box{background:#f8fafc;border-left:4px solid #14262C;padding:14px;border-radius:0 8px 8px 0;font-size:12px;color:#334155;line-height:1.6;margin-bottom:24px}
+    .checklist{border:1px solid #14262C;border-radius:8px;padding:16px;background:#fff;margin-top:20px}
+    .checklist-title{font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px;color:#14262C;margin-bottom:12px}
+    .checklist-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;text-align:center}
+    .check-step{border:1px dashed #cbd5e1;padding:12px 8px;border-radius:6px;font-size:11px;font-weight:700}
+    .check-box{width:18px;height:18px;border:2px solid #14262C;border-radius:3px;margin:8px auto 4px}
+    .sign-line{border-top:1px solid #94a3b8;margin-top:20px;font-size:9px;color:#64748b}
+    .footer{border-top:1px solid #e2e8f0;margin-top:28px;padding-top:12px;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8}
+    @media print{
+      body{background:#fff}
+      .sheet{max-width:none;box-shadow:none}
+      .inner{padding:20px 24px}
+      @page{size:A4;margin:.4in}
+    }
+  </style></head><body><div class="sheet"><div class="top-bar"></div><div class="inner">
+    <div class="header">
+      <div>
+        ${logoUrl ? `<img class="logo" src="${escapeHtml(logoUrl)}" alt="${escapeHtml(brandName)}">` : `<h1 style="margin:0;font-size:24px;">${escapeHtml(brandName)}</h1>`}
+        <div class="pjo-sub">Factory Production Job Order Ticket</div>
+      </div>
+      <div style="text-align:right;">
+        <div class="pjo-title">JOB TICKET</div>
+        <div class="pjo-num">${escapeHtml(order.pjoNumber || `#${order.id.slice(0, 8)}`)}</div>
+        <div style="font-size:11px;color:#666;margin-top:2px;">Created: ${new Date(order.createdAt).toLocaleDateString()} ${new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+      </div>
+    </div>
+
+    <div class="banner">
+      <div class="banner-item"><span>Product / Substrate</span><strong>${escapeHtml(order.productName)}</strong></div>
+      <div class="banner-item"><span>Production Status</span><strong>${escapeHtml(order.status).toUpperCase()}</strong></div>
+      <div class="qty-box"><div>${Number(order.quantity).toLocaleString()}</div><div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;">TOTAL PIECES</div></div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="card-title">Customer & Contact Information</div>
+        <div class="card-content">
+          <div style="font-size:15px;font-weight:800;color:#111;">${escapeHtml(order.userName || 'Customer')}</div>
+          ${companyName ? `<div style="font-weight:700;color:#2D545E;margin-bottom:4px;">${escapeHtml(companyName)}</div>` : ''}
+          ${phoneNum ? `<div style="font-weight:700;color:#059669;margin-top:4px;">&#9742; ${escapeHtml(phoneNum)}</div>` : ''}
+          <div style="font-family:monospace;color:#64748b;font-size:11px;margin-top:2px;">${escapeHtml(order.userEmail)}</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Job Production Summary</div>
+        <div class="card-content">
+          <div><strong>Order Ref:</strong> <span style="font-family:monospace;">${escapeHtml(order.id)}</span></div>
+          <div><strong>Production Quantity:</strong> <strong style="color:#E17055;">${Number(order.quantity).toLocaleString()} units</strong></div>
+          <div><strong>Target Due Date:</strong> ${order.paymentDueDate ? escapeHtml(order.paymentDueDate) : 'Standard Factory Turnaround'}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Technical Print & Finishing Specifications</div>
+      <table class="specs">
+        <tbody>
+          <tr><td class="label">Product / Substrate:</td><td class="val">${escapeHtml(order.productName)}</td></tr>
+          <tr><td class="label">Production Quantity:</td><td class="val">${Number(order.quantity).toLocaleString()} pcs</td></tr>
+          ${order.finishingSpecs?.lamination ? `<tr><td class="label">Lamination:</td><td class="val"><span class="badge" style="background:#dcfce7;color:#15803d;">${escapeHtml(order.finishingSpecs.lamination)}</span></td></tr>` : ''}
+          ${order.finishingSpecs?.foiling && order.finishingSpecs.foiling !== 'None' ? `<tr><td class="label">Hot Foil Stamping:</td><td class="val"><span class="badge" style="background:#fef3c7;color:#b45309;">${escapeHtml(order.finishingSpecs.foiling)}</span></td></tr>` : ''}
+          ${order.finishingSpecs?.uv && order.finishingSpecs.uv !== 'None' ? `<tr><td class="label">Spot UV Coating:</td><td class="val"><span class="badge" style="background:#e0f2fe;color:#0369a1;">${escapeHtml(order.finishingSpecs.uv)}</span></td></tr>` : ''}
+          ${order.finishingSpecs?.emboss && order.finishingSpecs.emboss !== 'None' ? `<tr><td class="label">Embossing:</td><td class="val"><span class="badge" style="background:#f3e8ff;color:#7e22ce;">${escapeHtml(order.finishingSpecs.emboss)}</span></td></tr>` : ''}
+          ${order.finishingSpecs?.dieCut ? `<tr><td class="label">Die-Cutting / Shape:</td><td class="val"><span class="badge">${escapeHtml(order.finishingSpecs.dieCut)}</span></td></tr>` : ''}
+          ${otherSpecs}
+        </tbody>
+      </table>
+    </div>
+
+    ${order.finishingSpecs?.customNotes || opts.specifications ? `
+      <div class="notes-box">
+        <strong style="display:block;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#14262C;margin-bottom:4px;">Pre-Press & Machine Operator Special Instructions:</strong>
+        ${escapeHtml(order.finishingSpecs?.customNotes || opts.specifications)}
+      </div>
+    ` : ''}
+
+    <div class="checklist">
+      <div class="checklist-title">Factory Floor Production & Quality Sign-Off</div>
+      <div class="checklist-grid">
+        <div class="check-step">
+          <div>1. PRE-PRESS</div>
+          <div class="check-box"></div>
+          <div class="sign-line">File & Proof Checked</div>
+        </div>
+        <div class="check-step">
+          <div>2. PRESS RUN</div>
+          <div class="check-box"></div>
+          <div class="sign-line">Operator Sign</div>
+        </div>
+        <div class="check-step">
+          <div>3. FINISHING</div>
+          <div class="check-box"></div>
+          <div class="sign-line">Lamination / Foiling</div>
+        </div>
+        <div class="check-step">
+          <div>4. QC & PACKING</div>
+          <div class="check-box"></div>
+          <div class="sign-line">QC Inspector Sign</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div><strong>${escapeHtml(brandName)}</strong> &bull; Production Floor Document</div>
+      <div>Confidential Factory Sheet &bull; Print Date: ${new Date().toLocaleString()}</div>
+    </div>
+  </div></div><script>window.onload=function(){window.print()}</script></body></html>`);
+  popup.document.close();
+}
+
+/* -------------------------------------------------------------------------- */
 /*                       JOB TICKET & BUSINESS ORDER DRAWER                   */
 /* -------------------------------------------------------------------------- */
 
@@ -2371,11 +2630,54 @@ function BusinessOrderModal({
   onClose: () => void;
   onChanged: () => Promise<void>;
 }) {
+  const [activeSubTab, setActiveSubTab] = useState<'production' | 'finance'>('production');
   const [costPrice, setCostPrice] = useState(order.costPrice || 0);
   const [sellPrice, setSellPrice] = useState(order.sellPrice || order.totalPrice || 0);
+  const [currency, setCurrency] = useState(order.currency || 'PKR');
+
+  // Payment Form State
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<string>('Bank Transfer');
+  const [paymentReference, setPaymentReference] = useState<string>('');
+  const [paymentNotes, setPaymentNotes] = useState<string>('');
+
+  const getDefaultRate = (curr: string) => {
+    switch (curr.toUpperCase()) {
+      case 'USD': return 280;
+      case 'GBP': return 360;
+      case 'EUR': return 300;
+      case 'AED': return 76;
+      case 'SAR': return 74;
+      case 'CAD': return 205;
+      case 'AUD': return 185;
+      default: return 1;
+    }
+  };
+
+  const [exchangeRate, setExchangeRate] = useState<number>(getDefaultRate(order.currency || 'PKR'));
+  const [pkrAmount, setPkrAmount] = useState<number>(0);
   const [loading, setLoading] = useState(false);
+
+  const handlePaymentAmountChange = (amt: number) => {
+    setPaymentAmount(amt);
+    if (currency === 'PKR') {
+      setPkrAmount(amt);
+    } else {
+      setPkrAmount(Number((amt * exchangeRate).toFixed(2)));
+    }
+  };
+
+  const handleExchangeRateChange = (rate: number) => {
+    setExchangeRate(rate);
+    setPkrAmount(Number((paymentAmount * rate).toFixed(2)));
+  };
+
+  const handlePkrAmountChange = (pkr: number) => {
+    setPkrAmount(pkr);
+    if (paymentAmount > 0) {
+      setExchangeRate(Number((pkr / paymentAmount).toFixed(4)));
+    }
+  };
 
   const isCancelled = order.status === 'cancelled';
   const total = sellPrice;
@@ -2386,8 +2688,9 @@ function BusinessOrderModal({
     e.preventDefault();
     setLoading(true);
     try {
-      await DataService.updateOrderFinance(order.id, { costPrice, sellPrice });
+      await DataService.updateOrderFinance(order.id, { costPrice, sellPrice, currency });
       await onChanged();
+      alert('Order costing and currency saved.');
     } finally {
       setLoading(false);
     }
@@ -2398,8 +2701,31 @@ function BusinessOrderModal({
     if (paymentAmount <= 0) return;
     setLoading(true);
     try {
-      await DataService.addPayment(order.id, { amount: paymentAmount, paymentMethod });
+      await DataService.addPayment(order.id, {
+        amount: paymentAmount,
+        currency,
+        pkrAmount: currency === 'PKR' ? paymentAmount : pkrAmount,
+        exchangeRate: currency === 'PKR' ? 1 : exchangeRate,
+        paymentMethod,
+        reference: paymentReference,
+        notes: paymentNotes,
+      });
       setPaymentAmount(0);
+      setPkrAmount(0);
+      setPaymentReference('');
+      setPaymentNotes('');
+      await onChanged();
+      alert('Payment record added.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!confirm('Are you sure you want to delete this payment entry?')) return;
+    setLoading(true);
+    try {
+      await DataService.deletePayment(paymentId);
       await onChanged();
     } finally {
       setLoading(false);
@@ -2410,17 +2736,25 @@ function BusinessOrderModal({
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-end z-50">
       <div className="bg-white h-full w-full max-w-2xl shadow-2xl flex flex-col overflow-hidden animate-slideLeft">
         {/* Drawer Header */}
-        <div className="h-16 px-6 bg-slate-900 text-white flex items-center justify-between shrink-0">
+        <div className="h-16 px-6 bg-[#14262C] text-white flex items-center justify-between shrink-0 border-b border-[#1E373F]">
           <div>
             <h2 className="font-bold text-sm">Print Job Ticket {order.pjoNumber || `#${order.id.slice(0, 8)}`}</h2>
-            <p className="text-[11px] text-slate-400">{order.productName} &bull; {order.quantity} pcs</p>
+            <p className="text-[11px] text-slate-300">{order.productName} &bull; {order.quantity} pcs</p>
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => window.print()}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 text-slate-200 transition-colors cursor-pointer"
+              onClick={() => printPjoJobTicket(order, settings)}
+              title="Print Production Ticket without financial or price data"
+              className="px-3 py-1.5 bg-[#2D545E] hover:bg-[#1E373F] text-xs font-semibold rounded-lg flex items-center gap-1.5 text-white transition-colors cursor-pointer border border-cyan-800"
             >
-              <Printer className="w-3.5 h-3.5" /> Print Job Ticket
+              <Printer className="w-3.5 h-3.5" /> Print Production PJO
+            </button>
+            <button
+              onClick={() => printClientInvoice(order, settings)}
+              title="Print official invoice with billing & payments"
+              className="px-3 py-1.5 bg-[#E17055] hover:bg-[#D45F44] text-xs font-semibold rounded-lg flex items-center gap-1.5 text-white transition-colors cursor-pointer shadow-xs"
+            >
+              <Printer className="w-3.5 h-3.5" /> Branded Invoice
             </button>
             <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
               <X className="w-5 h-5" />
@@ -2428,160 +2762,341 @@ function BusinessOrderModal({
           </div>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="flex border-b border-slate-200 bg-slate-50 px-6">
+          <button
+            onClick={() => setActiveSubTab('production')}
+            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+              activeSubTab === 'production'
+                ? 'border-[#2D545E] text-[#2D545E] bg-white'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Production Specifications (PJO)
+          </button>
+          <button
+            onClick={() => setActiveSubTab('finance')}
+            className={`py-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+              activeSubTab === 'finance'
+                ? 'border-[#2D545E] text-[#2D545E] bg-white'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Accounting & Costing (Admin Only)
+          </button>
+        </div>
+
         {/* Scrollable Body */}
-        <div id="printable-job-sheet" className="flex-1 p-6 overflow-y-auto space-y-6">
-          {/* Customer Card */}
-          {(() => {
-            const opts = order.options || {};
-            const phoneNum = String(opts.phone || opts.Phone || opts.phoneNumber || '');
-            return (
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Customer Contact Information</h3>
-                  {phoneNum && (
-                    <a
-                      href={`tel:${phoneNum}`}
-                      className="px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
-                    >
-                      <Phone className="w-3.5 h-3.5" /> Call {phoneNum}
-                    </a>
-                  )}
-                </div>
-                <div className="text-xs text-slate-800 space-y-1">
-                  <p className="font-bold text-slate-900 text-sm">{order.userName || 'Guest Customer'}</p>
-                  <p className="font-mono text-slate-600">{order.userEmail}</p>
-                  {phoneNum && (
-                    <p className="font-bold text-emerald-600 flex items-center gap-1 text-xs">
-                      <Phone className="w-3.5 h-3.5" /> {phoneNum}
-                    </p>
-                  )}
-                  <p className="text-slate-400 text-[10px]">PJO Created: {new Date(order.createdAt).toLocaleString()}</p>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Specifications & Finishing Options */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Print & Finishing Specifications</h3>
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Substrate / Product:</span>
-                <span className="font-bold text-slate-900">{order.productName}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Production Quantity:</span>
-                <span className="font-bold text-slate-900">{order.quantity} pcs</span>
-              </div>
-
-              {order.finishingSpecs?.lamination && (
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Lamination:</span>
-                  <span className="font-bold text-emerald-700">{order.finishingSpecs.lamination}</span>
-                </div>
-              )}
-              {order.finishingSpecs?.foiling && order.finishingSpecs.foiling !== 'None' && (
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Hot Foil Stamping:</span>
-                  <span className="font-bold text-amber-600">{order.finishingSpecs.foiling}</span>
-                </div>
-              )}
-              {order.finishingSpecs?.uv && order.finishingSpecs.uv !== 'None' && (
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Spot UV Coating:</span>
-                  <span className="font-bold text-cyan-700">{order.finishingSpecs.uv}</span>
-                </div>
-              )}
-              {order.finishingSpecs?.emboss && order.finishingSpecs.emboss !== 'None' && (
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Embossing:</span>
-                  <span className="font-bold text-purple-700">{order.finishingSpecs.emboss}</span>
-                </div>
-              )}
-              {order.finishingSpecs?.dieCut && (
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Die-Cutting:</span>
-                  <span className="font-semibold text-slate-900">{order.finishingSpecs.dieCut}</span>
-                </div>
-              )}
-
-              {Object.entries(order.options || {})
-                .filter(([key]) => !['phone', 'Phone', 'phoneNumber', 'companyName', 'specifications', 'artworkFile'].includes(key))
-                .map(([key, val]) => (
-                  <div key={key} className="flex justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500 capitalize">{key}:</span>
-                    <span className="font-semibold text-slate-900">{String(val)}</span>
+        <div className="flex-1 p-6 overflow-y-auto space-y-6">
+          {activeSubTab === 'production' ? (
+            <>
+              {/* Customer Card */}
+              {(() => {
+                const opts = order.options || {};
+                const phoneNum = String(opts.phone || opts.Phone || opts.phoneNumber || '');
+                return (
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Customer Contact Information</h3>
+                      {phoneNum && (
+                        <a
+                          href={`tel:${phoneNum}`}
+                          className="px-3 py-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                        >
+                          <Phone className="w-3.5 h-3.5" /> Call {phoneNum}
+                        </a>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-800 space-y-1">
+                      <p className="font-bold text-slate-900 text-sm">{order.userName || 'Guest Customer'}</p>
+                      {opts.companyName && <p className="font-bold text-[#2D545E] text-xs">{String(opts.companyName)}</p>}
+                      <p className="font-mono text-slate-600">{order.userEmail}</p>
+                      {phoneNum && (
+                        <p className="font-bold text-emerald-600 flex items-center gap-1 text-xs">
+                          <Phone className="w-3.5 h-3.5" /> {phoneNum}
+                        </p>
+                      )}
+                      <p className="text-slate-400 text-[10px]">PJO Created: {new Date(order.createdAt).toLocaleString()}</p>
+                    </div>
                   </div>
-                ))}
-            </div>
-          </div>
+                );
+              })()}
 
-          {/* Financial Breakdown */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-4">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Costing & Profit Margins</h3>
-            <form onSubmit={handleUpdateFinance} className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Estimated Cost Price ($)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={costPrice}
-                  onChange={(e) => setCostPrice(Number(e.target.value))}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
-                />
+              {/* Specifications & Finishing Options */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Print & Finishing Specifications</h3>
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-500">Substrate / Product:</span>
+                    <span className="font-bold text-slate-900">{order.productName}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-100">
+                    <span className="text-slate-500">Production Quantity:</span>
+                    <span className="font-bold text-[#E17055] text-sm">{order.quantity} pcs</span>
+                  </div>
+
+                  {order.finishingSpecs?.lamination && (
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-500">Lamination:</span>
+                      <span className="font-bold text-emerald-700">{order.finishingSpecs.lamination}</span>
+                    </div>
+                  )}
+                  {order.finishingSpecs?.foiling && order.finishingSpecs.foiling !== 'None' && (
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-500">Hot Foil Stamping:</span>
+                      <span className="font-bold text-amber-600">{order.finishingSpecs.foiling}</span>
+                    </div>
+                  )}
+                  {order.finishingSpecs?.uv && order.finishingSpecs.uv !== 'None' && (
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-500">Spot UV Coating:</span>
+                      <span className="font-bold text-cyan-700">{order.finishingSpecs.uv}</span>
+                    </div>
+                  )}
+                  {order.finishingSpecs?.emboss && order.finishingSpecs.emboss !== 'None' && (
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-500">Embossing:</span>
+                      <span className="font-bold text-purple-700">{order.finishingSpecs.emboss}</span>
+                    </div>
+                  )}
+                  {order.finishingSpecs?.dieCut && (
+                    <div className="flex justify-between py-1 border-b border-slate-100">
+                      <span className="text-slate-500">Die-Cutting:</span>
+                      <span className="font-semibold text-slate-900">{order.finishingSpecs.dieCut}</span>
+                    </div>
+                  )}
+
+                  {Object.entries(order.options || {})
+                    .filter(([key]) => !['phone', 'Phone', 'phoneNumber', 'companyName', 'specifications', 'artworkFile', 'isQuotation', 'costPrice', 'sellPrice', 'quotedPrice'].includes(key))
+                    .map(([key, val]) => (
+                      <div key={key} className="flex justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500 capitalize">{key}:</span>
+                        <span className="font-semibold text-slate-900">{String(val)}</span>
+                      </div>
+                    ))}
+                </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Customer Sell Price ($)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={sellPrice}
-                  onChange={(e) => setSellPrice(Number(e.target.value))}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
-                />
+              {/* Operator Notes */}
+              {(order.finishingSpecs?.customNotes || order.notes) && (
+                <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200/80 space-y-1">
+                  <h3 className="text-xs font-bold text-amber-900 uppercase tracking-wider">Operator Instructions</h3>
+                  <p className="text-xs text-slate-800 whitespace-pre-wrap">{order.finishingSpecs?.customNotes || order.notes}</p>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Financial Breakdown */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-4">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Costing & Profit Margins (Admin Only)</h3>
+                <form onSubmit={handleUpdateFinance} className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Currency</label>
+                      <select
+                        value={currency}
+                        onChange={(e) => {
+                          const newCurr = e.target.value;
+                          setCurrency(newCurr);
+                          setExchangeRate(getDefaultRate(newCurr));
+                        }}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:border-slate-400"
+                      >
+                        <option value="PKR">PKR (Rs. Pakistani Rupee)</option>
+                        <option value="USD">USD ($ US Dollar)</option>
+                        <option value="GBP">GBP (£ British Pound)</option>
+                        <option value="EUR">EUR (€ Euro)</option>
+                        <option value="AED">AED (AED UAE Dirham)</option>
+                        <option value="SAR">SAR (SAR Saudi Riyal)</option>
+                        <option value="CAD">CAD ($ Canadian Dollar)</option>
+                        <option value="AUD">AUD ($ Australian Dollar)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Cost Price ({currency})</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={costPrice}
+                        onChange={(e) => setCostPrice(Number(e.target.value))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Sell Price ({currency})</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={sellPrice}
+                        onChange={(e) => setSellPrice(Number(e.target.value))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <span className="text-xs text-slate-500 font-medium">
+                      Profit Margin ({currency}): <strong className="text-[#2D545E]">{formatCurrency(sellPrice - costPrice, currency)}</strong>
+                    </span>
+                    <button type="submit" disabled={loading} className="px-3 py-1.5 bg-[#2D545E] text-white rounded-lg text-xs font-semibold cursor-pointer">
+                      Update Costing & Currency
+                    </button>
+                  </div>
+                </form>
               </div>
 
-              <div className="col-span-2 flex items-center justify-between pt-2">
-                <span className="text-xs text-slate-500 font-medium">Estimated Profit Margin: <strong className="text-[#2D545E]">${(sellPrice - costPrice).toFixed(2)}</strong></span>
-                <button type="submit" disabled={loading} className="px-3 py-1.5 bg-[#2D545E] text-white rounded-lg text-xs font-semibold cursor-pointer">
-                  Update Margin
-                </button>
+              {/* Record Payment */}
+              <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Record Payment</h3>
+                  <span className="text-xs font-bold text-slate-900">
+                    Balance Due: <span className="text-rose-600">{formatCurrency(balance, currency)}</span>
+                  </span>
+                </div>
+
+                <form onSubmit={handleAddPayment} className="space-y-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                        Amount ({currency}) *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder={`0.00 ${currency}`}
+                        value={paymentAmount || ''}
+                        onChange={(e) => handlePaymentAmountChange(Number(e.target.value))}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 outline-none focus:border-slate-400"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                        Payment Method
+                      </label>
+                      <select
+                        value={paymentMethod}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+                      >
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Credit Card">Credit Card</option>
+                        <option value="Cheque">Cheque</option>
+                        <option value="Online / Gateway">Online / Gateway</option>
+                        <option value="JazzCash / Easypaisa">JazzCash / Easypaisa</option>
+                      </select>
+                    </div>
+
+                    <div className="col-span-2 sm:col-span-1">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                        Reference / Cheque #
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="TRX-12345"
+                        value={paymentReference}
+                        onChange={(e) => setPaymentReference(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Multi-Currency PKR Conversion Option */}
+                  {currency !== 'PKR' && (
+                    <div className="p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between text-xs font-bold text-amber-900">
+                        <span>PKR Conversion for Unified Profit & Ledger Tracking</span>
+                        <span className="text-[11px] font-mono text-amber-700">1 {currency} = Rs. {exchangeRate}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] font-semibold text-amber-800 mb-1">Exchange Rate (PKR per 1 {currency})</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={exchangeRate}
+                            onChange={(e) => handleExchangeRateChange(Number(e.target.value))}
+                            className="w-full bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-amber-800 mb-1">Converted PKR Amount (Rs.)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={pkrAmount || ''}
+                            onChange={(e) => handlePkrAmountChange(Number(e.target.value))}
+                            className="w-full bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 outline-none"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-amber-700 italic">
+                        The converted PKR amount will be stored in database to maintain unified profit calculation across all orders.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-1">
+                    <input
+                      type="text"
+                      placeholder="Optional internal notes..."
+                      value={paymentNotes}
+                      onChange={(e) => setPaymentNotes(e.target.value)}
+                      className="flex-1 max-w-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none mr-3"
+                    />
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="px-5 py-2 bg-[#2D545E] hover:bg-[#1E373F] text-white font-bold rounded-xl text-xs cursor-pointer shadow-xs"
+                    >
+                      Record Payment
+                    </button>
+                  </div>
+                </form>
+
+                {/* Payment History List */}
+                {order.payments && order.payments.length > 0 && (
+                  <div className="pt-3 border-t border-slate-100 space-y-2">
+                    <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Payment Transaction History</h4>
+                    <div className="space-y-2">
+                      {order.payments.map((pmt) => (
+                        <div key={pmt.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900 font-mono">{formatCurrency(pmt.amount, pmt.currency || currency)}</span>
+                              {pmt.currency && pmt.currency !== 'PKR' && pmt.pkrAmount && (
+                                <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                  Rs. {Number(pmt.pkrAmount).toLocaleString()} PKR (Rate: {pmt.exchangeRate || (pmt.pkrAmount / pmt.amount).toFixed(2)})
+                                </span>
+                              )}
+                              <span className="text-[11px] text-slate-500 bg-slate-200/70 px-2 py-0.5 rounded-full font-medium">{pmt.paymentMethod}</span>
+                            </div>
+                            <div className="text-[10px] text-slate-400 mt-1">
+                              Paid: {new Date(pmt.paidAt || (pmt as any).createdAt).toLocaleString()}
+                              {pmt.reference && ` • Ref: ${pmt.reference}`}
+                              {pmt.notes && ` • Notes: ${pmt.notes}`}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePayment(pmt.id)}
+                            className="text-rose-500 hover:text-rose-700 p-1 text-[11px] font-semibold hover:underline cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </form>
-          </div>
-
-          {/* Payment History */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Record Payment</h3>
-              <span className="text-xs font-bold text-slate-900">Balance: <span className="text-rose-600">${balance.toFixed(2)}</span></span>
-            </div>
-
-            <form onSubmit={handleAddPayment} className="flex gap-2">
-              <input
-                type="number"
-                step="0.01"
-                placeholder="Amount ($)"
-                value={paymentAmount || ''}
-                onChange={(e) => setPaymentAmount(Number(e.target.value))}
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none"
-              />
-              <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none"
-              >
-                <option value="Cash">Cash</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Credit Card">Credit Card</option>
-                <option value="Cheque">Cheque</option>
-              </select>
-              <button type="submit" disabled={loading} className="px-4 py-2 bg-[#2D545E] hover:bg-[#1E373F] text-white font-bold rounded-xl text-xs cursor-pointer">
-                Record
-              </button>
-            </form>
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -2606,6 +3121,7 @@ function CreateOrderModal({
   const [userName, setUserName] = useState('');
   const [quantity, setQuantity] = useState(100);
   const [customPrice, setCustomPrice] = useState<number | undefined>(undefined);
+  const [currency, setCurrency] = useState('PKR');
   const [loading, setLoading] = useState(false);
 
   const product = products.find(p => p.id === selectedProductId) || products[0];
@@ -2615,7 +3131,7 @@ function CreateOrderModal({
     if (!product || !userEmail) return;
     setLoading(true);
     try {
-      const totalPrice = customPrice ?? (product.price * quantity);
+      const totalPrice = customPrice ?? 0;
       const pjoNumber = `PJO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
       await onSave({
@@ -2624,6 +3140,7 @@ function CreateOrderModal({
         quantity,
         userEmail,
         userName: userName || userEmail,
+        currency,
         totalPrice,
         sellPrice: totalPrice,
         costPrice: totalPrice * 0.5,
@@ -2649,7 +3166,7 @@ function CreateOrderModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Customer Email</label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Customer Email *</label>
             <input
               type="email"
               placeholder="client@example.com"
@@ -2672,19 +3189,37 @@ function CreateOrderModal({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Select Product</label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Select Product *</label>
             <select
               value={selectedProductId}
               onChange={(e) => setSelectedProductId(e.target.value)}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
             >
               {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} (${p.price}/{p.unit})</option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Currency</label>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-2 text-xs font-bold outline-none"
+              >
+                <option value="PKR">PKR (Rs)</option>
+                <option value="USD">USD ($)</option>
+                <option value="GBP">GBP (£)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="AED">AED (AED)</option>
+                <option value="SAR">SAR (SAR)</option>
+                <option value="CAD">CAD (C$)</option>
+                <option value="AUD">AUD (A$)</option>
+              </select>
+            </div>
+
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Quantity</label>
               <input
@@ -2697,11 +3232,11 @@ function CreateOrderModal({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Custom Price ($)</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Price ({currency})</label>
               <input
                 type="number"
                 step="0.01"
-                placeholder={product ? String(product.price * quantity) : 'Auto'}
+                placeholder="0.00"
                 value={customPrice !== undefined ? customPrice : ''}
                 onChange={(e) => setCustomPrice(e.target.value ? Number(e.target.value) : undefined)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
@@ -2744,6 +3279,7 @@ function CreateQuotationModal({
   const [quantity, setQuantity] = useState(500);
   const [specifications, setSpecifications] = useState('');
   const [customPrice, setCustomPrice] = useState<number | undefined>(undefined);
+  const [currency, setCurrency] = useState('PKR');
   const [loading, setLoading] = useState(false);
 
   const product = products.find(p => p.id === selectedProductId) || products[0];
@@ -2753,7 +3289,7 @@ function CreateQuotationModal({
     if (!product || !userEmail) return;
     setLoading(true);
     try {
-      const quotedPrice = customPrice ?? (product.price * quantity);
+      const quotedPrice = customPrice ?? 0;
       await onSave({
         userId: `cust_${Date.now()}`,
         productId: product.id,
@@ -2763,6 +3299,7 @@ function CreateQuotationModal({
         userName: userName || userEmail,
         phone,
         companyName,
+        currency,
         quotedPrice,
         totalPrice: quotedPrice,
         sellPrice: quotedPrice,
@@ -2844,12 +3381,30 @@ function CreateQuotationModal({
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
             >
               {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} (${p.price}/{p.unit})</option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Currency</label>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-2 text-xs font-bold outline-none"
+              >
+                <option value="PKR">PKR (Rs)</option>
+                <option value="USD">USD ($)</option>
+                <option value="GBP">GBP (£)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="AED">AED (AED)</option>
+                <option value="SAR">SAR (SAR)</option>
+                <option value="CAD">CAD (C$)</option>
+                <option value="AUD">AUD (A$)</option>
+              </select>
+            </div>
+
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Quantity *</label>
               <input
@@ -2860,12 +3415,13 @@ function CreateQuotationModal({
                 required
               />
             </div>
+
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Est. Quote Price ($)</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Price ({currency})</label>
               <input
                 type="number"
                 step="0.01"
-                placeholder={product ? String(product.price * quantity) : 'Auto'}
+                placeholder="0.00"
                 value={customPrice !== undefined ? customPrice : ''}
                 onChange={(e) => setCustomPrice(e.target.value ? Number(e.target.value) : undefined)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
@@ -2889,7 +3445,7 @@ function CreateQuotationModal({
               Cancel
             </button>
             <button type="submit" disabled={loading} className="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold shadow-xs">
-              Save Quotation Draft
+              Create Quote Request
             </button>
           </div>
         </form>

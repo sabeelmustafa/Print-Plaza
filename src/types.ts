@@ -147,6 +147,9 @@ export interface PaymentRecord {
   id: string;
   orderId: string;
   amount: number;
+  currency?: string;
+  pkrAmount?: number;
+  exchangeRate?: number;
   paymentMethod: string;
   reference?: string;
   notes?: string;

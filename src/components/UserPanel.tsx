@@ -4,12 +4,12 @@ import { DataService } from '../lib/dataService';
 import { useAuth } from '../lib/AuthContext';
 import { Order, SiteSettings } from '../types';
 
-function normalizeCurrencyCode(currency?: string) {
+export function normalizeCurrencyCode(currency?: string) {
   const code = String(currency || 'PKR').trim().toUpperCase();
   return /^[A-Z]{3}$/.test(code) ? code : 'PKR';
 }
 
-function money(value: number, currency = 'PKR') {
+export function money(value: number, currency = 'PKR') {
   const currencyCode = normalizeCurrencyCode(currency);
   try {
     return new Intl.NumberFormat('en-US', {
@@ -40,6 +40,7 @@ function escapeInvoice(value: unknown) {
 }
 
 function statusClass(status: Order['status']) {
+  if (status === 'delivered') return 'bg-teal-100 text-teal-800';
   if (status === 'completed') return 'bg-green-100 text-green-700';
   if (status === 'processing') return 'bg-blue-100 text-blue-700';
   if (status === 'cancelled') return 'bg-red-100 text-red-700';
@@ -52,7 +53,7 @@ function paymentClass(status?: Order['paymentStatus']) {
   return 'bg-red-50 text-red-600';
 }
 
-function printClientInvoice(order: Order, settings: SiteSettings) {
+export function printClientInvoice(order: Order, settings: SiteSettings) {
   const currency = normalizeCurrencyCode(order.currency);
   const sell = Number(order.sellPrice ?? order.totalPrice ?? 0);
   const paid = Number(order.paidAmount || 0);
