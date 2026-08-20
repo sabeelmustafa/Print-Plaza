@@ -198,6 +198,102 @@ async function sendWelcomeEmail(customerEmail, customerName, plainPassword) {
   return { success: true, mode: 'simulated' };
 }
 
+async function sendQuotationUpdateEmail(customerEmail, customerName, quoteObj) {
+  const email = String(customerEmail).trim().toLowerCase();
+  const name = String(customerName || 'Valued Customer').trim();
+  const transporter = createSmtpTransporter();
+  let fromAddress = process.env.SMTP_FROM || '"Print Plaza HQ" <sales@printplaza.net>';
+  if (!fromAddress.includes('<') && (process.env.SMTP_USER || email)) {
+    const senderName = fromAddress.replace(/"/g, '').trim() || 'Print Plaza HQ';
+    const senderEmail = process.env.SMTP_USER || 'sales@printplaza.net';
+    fromAddress = `"${senderName}" <${senderEmail}>`;
+  }
+  const portalUrl = (process.env.APP_URL || 'https://printplaza.net').replace(/\/$/, '');
+
+  const quoteId = String(quoteObj.id || quoteObj.quoteNumber || 'QUOTE').slice(0, 8).toUpperCase();
+  const quotedPrice = Number(quoteObj.quoted_price || quoteObj.quotedPrice || 0).toFixed(2);
+  const currency = String(quoteObj.currency_code || quoteObj.currency || 'USD').toUpperCase();
+  const productName = quoteObj.product_name || quoteObj.productName || 'Custom Print Job';
+  const quantity = quoteObj.quantity || 1;
+  const status = String(quoteObj.status || quoteObj.quoteStatus || 'Updated').toUpperCase();
+
+  const specs = typeof quoteObj.finishing_specs === 'string'
+    ? (parseJson(quoteObj.finishing_specs, {}))
+    : (quoteObj.finishing_specs || {});
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: Arial, sans-serif; background-color: #f4f6f8; margin: 0; padding: 30px;">
+      <table max-width="600" align="center" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; width: 100%;">
+        <tr style="background-color: #2D545E; color: #ffffff;">
+          <td style="padding: 30px; text-align: center;">
+            <h1 style="margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 1px;">PRINT PLAZA</h1>
+            <p style="margin: 5px 0 0; font-size: 13px; opacity: 0.8;">Quotation Update Notification</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 35px; color: #1e293b;">
+            <h2 style="margin-top: 0; color: #2D545E; font-size: 20px;">Your Custom Print Quote Has Been Updated</h2>
+            <p style="font-size: 14px; line-height: 1.6; color: #475569;">
+              Hello <strong>${name}</strong>, our print engineering team has reviewed and updated your quotation request <strong>#${quoteId}</strong>.
+            </p>
+            
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #E17055; padding: 20px; border-radius: 8px; margin: 25px 0;">
+              <h3 style="margin-top: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #E17055;">Quotation Summary</h3>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Product:</strong> ${productName}</p>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Quantity:</strong> ${quantity} pcs</p>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Quoted Price:</strong> <span style="font-size: 18px; font-weight: bold; color: #2D545E;">${currency} $${quotedPrice}</span></p>
+              <p style="margin: 8px 0; font-size: 14px;"><strong>Status:</strong> <span style="background: #e2e8f0; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${status}</span></p>
+              ${specs.lamination ? `<p style="margin: 6px 0; font-size: 13px; color: #64748b;">Lamination: ${specs.lamination}</p>` : ''}
+              ${specs.foiling ? `<p style="margin: 6px 0; font-size: 13px; color: #64748b;">Foil Stamping: ${specs.foiling}</p>` : ''}
+              ${specs.uv ? `<p style="margin: 6px 0; font-size: 13px; color: #64748b;">Spot UV: ${specs.uv}</p>` : ''}
+              ${specs.emboss ? `<p style="margin: 6px 0; font-size: 13px; color: #64748b;">Embossing: ${specs.emboss}</p>` : ''}
+            </div>
+
+            <div style="text-align: center; margin-top: 30px;">
+              <a href="${portalUrl}" style="background-color: #E17055; color: #ffffff; text-decoration: none; padding: 14px 30px; font-weight: bold; border-radius: 8px; display: inline-block; font-size: 14px;">View & Approve in Client Portal</a>
+            </div>
+
+            <p style="font-size: 12px; color: #94a3b8; margin-top: 35px; line-height: 1.5;">
+              If you have any questions or require adjustments to this quotation, simply reply to this email or log in to your Client Portal.
+            </p>
+          </td>
+        </tr>
+        <tr style="background-color: #f1f5f9; color: #64748b; font-size: 11px; text-align: center;">
+          <td style="padding: 15px;">
+            &copy; ${new Date().getFullYear()} Print Plaza Press. All rights reserved.
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+
+  if (transporter) {
+    try {
+      await transporter.sendMail({
+        from: fromAddress,
+        to: email,
+        subject: `Quotation Update #${quoteId} - Print Plaza`,
+        html: htmlContent,
+      });
+      console.log(`[EMAIL] Quotation update email sent to ${email}`);
+      return { success: true, mode: 'live' };
+    } catch (err) {
+      console.error(`[EMAIL ERROR] Failed to send quote update email to ${email}:`, err.message);
+    }
+  }
+
+  console.log(`\n======================================================`);
+  console.log(`[QUOTE UPDATE EMAIL SIMULATION] To: ${email}`);
+  console.log(`Quote #${quoteId} | Price: ${currency} $${quotedPrice} | Status: ${status}`);
+  console.log(`======================================================\n`);
+
+  return { success: true, mode: 'simulated' };
+}
+
 async function upsertCustomer(email, name, phone, company, notes) {
   const targetEmail = String(email || '').trim().toLowerCase();
   if (!targetEmail) return null;
@@ -1031,14 +1127,22 @@ app.patch('/api/quotations/:id', requireDb, async (req, res, next) => {
       params.push(normalizeCurrency(currency));
     }
 
-    if (!updates.length) {
-      res.json({ ok: true });
-      return;
+    if (updates.length) {
+      params.push(quoteId);
+      await pool.query(`UPDATE quotations SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, params);
     }
 
-    params.push(quoteId);
-    await pool.query(`UPDATE quotations SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, params);
-    res.json({ ok: true });
+    let emailSent = false;
+    if (req.body.notifyCustomer) {
+      const [updatedRows] = await pool.query('SELECT * FROM quotations WHERE id = ?', [quoteId]);
+      if (updatedRows.length) {
+        const quoteObj = updatedRows[0];
+        await sendQuotationUpdateEmail(quoteObj.user_email, quoteObj.user_name, quoteObj);
+        emailSent = true;
+      }
+    }
+
+    res.json({ ok: true, emailSent });
   } catch (error) {
     next(error);
   }

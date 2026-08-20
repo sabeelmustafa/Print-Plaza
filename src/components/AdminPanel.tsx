@@ -992,6 +992,8 @@ function QuotationDrawer({
   const opts = quotation.options || {};
   const [costPrice, setCostPrice] = useState(quotation.costPrice || (quotation.totalPrice * 0.5));
   const [sellPrice, setSellPrice] = useState(quotation.sellPrice || quotation.totalPrice || 0);
+  const [currency, setCurrency] = useState(quotation.currency || 'USD');
+  const [quoteStatus, setQuoteStatus] = useState(quotation.quoteStatus || 'new');
 
   // Finishing Specs State
   const [lamination, setLamination] = useState(quotation.finishingSpecs?.lamination || 'None');
@@ -1017,10 +1019,32 @@ function QuotationDrawer({
     try {
       await DataService.updateQuotation(quotation.id, {
         quotedPrice: sellPrice,
+        currency,
+        quoteStatus,
         finishingSpecs,
-        quoteStatus: 'negotiating'
       });
       alert('Quotation draft saved.');
+    } catch (err: any) {
+      alert(err?.message || 'Failed to save quote draft.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSaveAndEmail = async () => {
+    setSubmitting(true);
+    try {
+      await DataService.updateQuotation(quotation.id, {
+        quotedPrice: sellPrice,
+        currency,
+        quoteStatus,
+        finishingSpecs,
+        notifyCustomer: true
+      });
+      alert(`Quotation #${quotation.id.slice(0, 8)} updated and notification email sent to ${quotation.userEmail}!`);
+      onClose();
+    } catch (err: any) {
+      alert(err?.message || 'Failed to update quote or send email.');
     } finally {
       setSubmitting(false);
     }
@@ -1045,14 +1069,14 @@ function QuotationDrawer({
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-end z-50">
       <div className="bg-white h-full w-full max-w-2xl shadow-2xl flex flex-col overflow-hidden animate-slideLeft">
         {/* Header */}
-        <div className="h-16 px-6 bg-slate-900 text-white flex items-center justify-between shrink-0">
+        <div className="h-16 px-6 bg-[#14262C] text-white flex items-center justify-between shrink-0 border-b border-[#1E373F]">
           <div>
             <h2 className="font-bold text-sm flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-cyan-400" /> Quotation Builder #{quotation.id.slice(0, 8)}
+              <Sliders className="w-4 h-4 text-[#E17055]" /> Quotation Builder #{quotation.id.slice(0, 8)}
             </h2>
             <p className="text-[11px] text-slate-400">{quotation.productName} &bull; {quotation.quantity} pcs</p>
           </div>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-[#1E373F] transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1101,25 +1125,68 @@ function QuotationDrawer({
                     </div>
                   )}
                 </div>
-                {opts.artworkFile && (
-                  <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-xs">
-                    <span className="text-slate-500 font-medium">Submitted Artwork File:</span>
-                    <a href={String(opts.artworkFile)} target="_blank" rel="noreferrer" className="text-[#2D545E] font-bold underline hover:text-[#1E373F] flex items-center gap-1">
-                      View Artwork <ArrowUpRight className="w-3.5 h-3.5" />
-                    </a>
-                  </div>
-                )}
               </div>
             );
           })()}
 
-          {/* Submitted Customer Requirements */}
-          {opts.specifications && (
-            <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200/80 space-y-1">
-              <h3 className="text-xs font-bold text-amber-800 uppercase tracking-wider">Customer Notes & Specs</h3>
-              <p className="text-xs text-amber-900 whitespace-pre-wrap leading-relaxed">{String(opts.specifications)}</p>
+          {/* Customer Submitted Specifications Card */}
+          <div className="bg-[#14262C] text-white p-4.5 rounded-2xl space-y-3 shadow-md border border-[#1E373F]">
+            <div className="flex items-center justify-between border-b border-[#1E373F] pb-2">
+              <h3 className="text-xs font-bold text-[#E17055] uppercase tracking-wider flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5" /> Customer Submitted Specifications
+              </h3>
+              <span className="text-[10px] font-mono bg-[#1E373F] text-slate-300 px-2 py-0.5 rounded-full font-bold">
+                Website Quote Desk Request
+              </span>
             </div>
-          )}
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <span className="text-slate-400 text-[10px] uppercase font-mono block">Product Type</span>
+                <span className="font-bold text-white">{quotation.productName}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 text-[10px] uppercase font-mono block">Quantity Requested</span>
+                <span className="font-bold text-emerald-400 font-mono">{quotation.quantity?.toLocaleString()} pcs</span>
+              </div>
+              {opts.material && (
+                <div>
+                  <span className="text-slate-400 text-[10px] uppercase font-mono block">Material / Paperboard</span>
+                  <span className="font-semibold text-slate-200">{String(opts.material)}</span>
+                </div>
+              )}
+              {opts.dimensions && (
+                <div>
+                  <span className="text-slate-400 text-[10px] uppercase font-mono block">Dimensions (WxHxD)</span>
+                  <span className="font-semibold text-slate-200">{String(opts.dimensions)}</span>
+                </div>
+              )}
+              {opts.finish && (
+                <div>
+                  <span className="text-slate-400 text-[10px] uppercase font-mono block">Requested Finish</span>
+                  <span className="font-semibold text-slate-200">{String(opts.finish)}</span>
+                </div>
+              )}
+            </div>
+
+            {opts.specifications && (
+              <div className="pt-2 border-t border-[#1E373F] space-y-1">
+                <span className="text-slate-400 text-[10px] uppercase font-mono block">Customer Requirements & Notes:</span>
+                <p className="text-xs text-slate-300 bg-[#0A1317] p-2.5 rounded-xl border border-[#1E373F] whitespace-pre-wrap leading-relaxed font-mono">
+                  {String(opts.specifications)}
+                </p>
+              </div>
+            )}
+
+            {opts.artworkFile && (
+              <div className="pt-2 border-t border-[#1E373F] flex items-center justify-between text-xs">
+                <span className="text-slate-400 font-medium">Submitted Artwork Preview File:</span>
+                <a href={String(opts.artworkFile)} target="_blank" rel="noreferrer" className="text-[#E17055] font-bold underline hover:text-[#D45F44] flex items-center gap-1">
+                  View File Preview <ArrowUpRight className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            )}
+          </div>
 
           {/* Interactive Finishing & Press Specs Form */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
@@ -1210,11 +1277,43 @@ function QuotationDrawer({
             </div>
           </div>
 
-          {/* Pricing & Margin Calculator */}
+          {/* Pricing, Currency & Quote Status Finalization */}
           <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
-              Costing & Approved Price Finalization
+              Costing & Quote Price Finalization
             </h3>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Quote Status</label>
+                <select
+                  value={quoteStatus}
+                  onChange={(e) => setQuoteStatus(e.target.value as any)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none"
+                >
+                  <option value="new">New Request</option>
+                  <option value="negotiating">In Discussion</option>
+                  <option value="approved">Price Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Currency Code</label>
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none"
+                >
+                  <option value="USD">USD ($)</option>
+                  <option value="PKR">PKR (Rs)</option>
+                  <option value="EUR">EUR (€)</option>
+                  <option value="GBP">GBP (£)</option>
+                  <option value="AED">AED (AED)</option>
+                  <option value="CAD">CAD ($)</option>
+                </select>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -1229,7 +1328,7 @@ function QuotationDrawer({
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Final Agreed Customer Price ($)</label>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Final Quoted Customer Price ($)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -1248,21 +1347,30 @@ function QuotationDrawer({
         </div>
 
         {/* Drawer Action Bar */}
-        <div className="p-4 bg-[#14262C] border-t border-[#223E47] flex items-center justify-between gap-3 shrink-0">
-          <button
-            onClick={handleSaveDraft}
-            disabled={submitting}
-            className="px-4 py-2.5 bg-[#1E373F] hover:bg-[#284852] text-slate-200 rounded-xl text-xs font-semibold cursor-pointer"
-          >
-            Save Quote Draft
-          </button>
+        <div className="p-4 bg-[#14262C] border-t border-[#223E47] flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSaveDraft}
+              disabled={submitting}
+              className="px-3.5 py-2.5 bg-[#1E373F] hover:bg-[#284852] text-slate-200 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
+            >
+              Save Draft
+            </button>
+            <button
+              onClick={handleSaveAndEmail}
+              disabled={submitting}
+              className="px-3.5 py-2.5 bg-[#2D545E] hover:bg-[#23424A] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-xs"
+            >
+              <Mail className="w-3.5 h-3.5 text-[#E17055]" /> Save & Email Customer
+            </button>
+          </div>
 
           <button
             onClick={handleConvertToPjo}
             disabled={submitting}
-            className="px-5 py-2.5 bg-[#E17055] hover:bg-[#D45F44] text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-md transition-all"
+            className="px-4 py-2.5 bg-[#E17055] hover:bg-[#D45F44] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md transition-all shrink-0"
           >
-            <Sparkles className="w-4 h-4" /> Create Print Job Order (PJO) &rarr;
+            <Sparkles className="w-4 h-4" /> Create PJO &rarr;
           </button>
         </div>
       </div>

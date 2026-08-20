@@ -345,15 +345,20 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-2 flex items-center justify-between gap-3">
                     <label className="bg-white border border-slate-200 hover:bg-slate-100 text-slate-800 text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5 shrink-0 transition-colors shadow-xs">
                       <Upload className="w-3.5 h-3.5 text-slate-500" /> Choose File
-                      <input type="file" onChange={handleFileChange} className="hidden" />
+                      <input type="file" onChange={handleFileChange} className="hidden" accept="image/png,image/jpeg,image/jpg,.pdf,.ai,.eps,.zip" />
                     </label>
                     <span className="text-xs text-slate-500 font-mono truncate flex-1">
                       {artworkFile ? artworkFile.name : 'No file chosen'}
                     </span>
                   </div>
-                  <span className="text-[10px] text-slate-400 mt-1 block">
-                    Optional &bull; JPG, PNG, PDF, AI, EPS or ZIP &bull; Max 10MB
-                  </span>
+                  <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-2.5 mt-2 space-y-0.5">
+                    <span className="text-[11px] text-amber-900 font-bold block">
+                      📁 Artwork File Guidelines:
+                    </span>
+                    <span className="text-[10px] text-amber-800 leading-normal block">
+                      Please upload a <strong>JPG or PNG preview image</strong> above. For original vector/CAD print files (AI, EPS, PDF, CDR, ZIP), please email them directly to <strong className="font-mono text-amber-950">sales@printplaza.net</strong> after submitting this quote.
+                    </span>
+                  </div>
                 </div>
 
                 {/* Row 6: Submit CTA */}
