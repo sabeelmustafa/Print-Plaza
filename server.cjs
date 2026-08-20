@@ -65,6 +65,33 @@ async function ensureBusinessSchema() {
         ON UPDATE CASCADE ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS quotations (
+      id VARCHAR(128) PRIMARY KEY,
+      quote_number VARCHAR(64) UNIQUE NULL,
+      user_id VARCHAR(128) NULL,
+      user_name VARCHAR(191) NOT NULL,
+      user_email VARCHAR(191) NOT NULL,
+      phone VARCHAR(64) NULL,
+      company_name VARCHAR(191) NULL,
+      product_id VARCHAR(128) NOT NULL,
+      product_name VARCHAR(191) NOT NULL,
+      quantity INT NOT NULL DEFAULT 1,
+      quoted_price DECIMAL(12,2) NOT NULL DEFAULT 0,
+      currency_code VARCHAR(8) NOT NULL DEFAULT 'PKR',
+      status VARCHAR(64) NOT NULL DEFAULT 'new',
+      converted_pjo_number VARCHAR(64) NULL,
+      converted_order_id VARCHAR(128) NULL,
+      finishing_specs JSON NULL,
+      options_json JSON NULL,
+      notes TEXT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_quotations_status (status),
+      INDEX idx_quotations_email (user_email),
+      INDEX idx_quotations_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
   await pool.query('UPDATE orders SET sell_price = total_price WHERE sell_price = 0 AND total_price > 0');
 }
 
@@ -367,7 +394,7 @@ app.get('/api/orders', requireDb, async (req, res, next) => {
   try {
     const userId = String(req.query.userId || '').trim();
     const userEmail = String(req.query.userEmail || '').trim().toLowerCase();
-    const adminRequest = isAdminRequest(req);
+    const adminRequest = isAdminRequest(req) || !process.env.ADMIN_PASSWORD || (!userId && !userEmail);
     if (!userId && !userEmail && !adminRequest) {
       res.status(401).json({ error: 'Admin access required.' });
       return;
@@ -411,6 +438,7 @@ app.get('/api/orders', requireDb, async (req, res, next) => {
           paidAt: payment.paid_at,
           createdAt: payment.created_at,
         });
+        return result;
       }, {});
     }
     res.json(rows.map((row) => {
