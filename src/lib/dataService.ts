@@ -178,12 +178,52 @@ export const DataService = {
     currency?: string;
     invoiceNotes?: string;
     paymentDueDate?: string;
+    finishingSpecs?: any;
+    quoteStatus?: any;
   }) => {
-    await request(`/api/admin/orders/${encodeURIComponent(orderId)}/finance`, {
-      method: 'PATCH',
-      body: JSON.stringify(details),
-    });
-    return DataService.getOrders();
+    try {
+      await request(`/api/admin/orders/${encodeURIComponent(orderId)}/finance`, {
+        method: 'PATCH',
+        body: JSON.stringify(details),
+      });
+      return DataService.getOrders();
+    } catch (_error) {
+      const updated = getLocalOrders().map(o =>
+        o.id === orderId ? { ...o, ...details, updatedAt: new Date().toISOString() } : o
+      );
+      localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
+      return updated;
+    }
+  },
+
+  convertToPjo: async (orderId: string, pjoData: {
+    sellPrice: number;
+    costPrice: number;
+    finishingSpecs?: any;
+  }) => {
+    const pjoNumber = `PJO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const updatePayload = {
+      ...pjoData,
+      isQuotation: false,
+      quoteStatus: 'converted' as const,
+      pjoNumber,
+      status: 'pending' as const, // Ready for Pre-Press / Proofing stage in pipeline
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      await request(`/api/admin/orders/${encodeURIComponent(orderId)}/finance`, {
+        method: 'PATCH',
+        body: JSON.stringify(updatePayload),
+      });
+      return DataService.getOrders();
+    } catch (_error) {
+      const updated = getLocalOrders().map(o =>
+        o.id === orderId ? { ...o, ...updatePayload } : o
+      );
+      localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
+      return updated;
+    }
   },
 
   addPayment: async (orderId: string, payment: {

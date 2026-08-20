@@ -127,6 +127,18 @@ export interface Order {
   paymentDueDate?: string;
   payments?: PaymentRecord[];
   status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  isQuotation?: boolean;
+  pjoNumber?: string;
+  quoteStatus?: 'new' | 'negotiating' | 'approved' | 'converted' | 'declined';
+  finishingSpecs?: {
+    lamination?: string;
+    foiling?: string;
+    uv?: string;
+    emboss?: string;
+    dieCut?: string;
+    specialStock?: string;
+    customNotes?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }

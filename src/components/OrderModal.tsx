@@ -76,6 +76,8 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
         costPrice: estimatedTotalPrice * 0.5,
         status: 'pending' as const,
         paymentStatus: 'unpaid' as const,
+        isQuotation: true,
+        quoteStatus: 'new' as const,
       };
 
       await DataService.saveOrder(orderData);
@@ -210,10 +212,10 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                 {/* Header */}
                 <div className="pr-8">
                   <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight font-display">
-                    Get A Custom Packaging Quote
+                    Get A Custom Print Quote
                   </h2>
                   <p className="text-xs text-slate-500 mt-1 font-medium">
-                    Tell us what you need and our packaging team will get back to you with a custom quote.
+                    Tell us what you need for <strong className="text-slate-800">{product.name}</strong> and our print engineering team will get back to you with a custom quote.
                   </p>
                 </div>
 
@@ -327,10 +329,10 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
 
                 {/* Row 4: Packaging & Specifications Textarea */}
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Packaging Specifications</label>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Print & Production Specifications</label>
                   <textarea
                     rows={3}
-                    placeholder="Tell us about your box style, dimensions, material, printing, finish, or other requirements..."
+                    placeholder="Tell us about your required dimensions, paper stock/material, printing colors, finishing options, or special custom requirements..."
                     value={specifications}
                     onChange={(e) => setSpecifications(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 focus:border-slate-400 focus:bg-white rounded-xl p-3 text-xs font-medium text-slate-800 outline-none transition-all resize-y placeholder:text-slate-400"

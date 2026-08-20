@@ -35,7 +35,10 @@ import {
   DollarSign,
   Sliders,
   Eye,
-  RefreshCw
+  RefreshCw,
+  Sparkles,
+  MessageSquare,
+  ArrowUpRight
 } from 'lucide-react';
 import { DataService } from '../lib/dataService';
 import { MediaAsset, NavMenuItem, Order, OrderItem, Product, ProductOption, ServiceCategory, SiteSettings } from '../types';
@@ -43,7 +46,7 @@ import Hero from './Hero';
 import ProductCard from './ProductCard';
 import ServiceGrid from './ServiceGrid';
 
-type AdminTab = 'dashboard' | 'orders' | 'products' | 'categories' | 'customers' | 'business' | 'media' | 'site';
+type AdminTab = 'dashboard' | 'quotations' | 'orders' | 'products' | 'categories' | 'customers' | 'business' | 'media' | 'site';
 type WebsiteSection = 'header' | 'hero' | 'products' | 'services' | 'footer' | 'theme';
 
 const fieldTypes: ProductOption['type'][] = ['text', 'textarea', 'number', 'select', 'checkbox', 'file'];
@@ -128,11 +131,12 @@ export default function AdminPanel() {
   const [settings, setSettings] = useState<SiteSettings>(defaultSettings);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Modals
+  // Modals & Drawers
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [editingCategory, setEditingCategory] = useState<Partial<ServiceCategory> | null>(null);
   const [editingMedia, setEditingMedia] = useState<Partial<MediaAsset>>({ title: '', url: '', altText: '' });
   const [businessOrder, setBusinessOrder] = useState<Order | null>(null);
+  const [activeQuotation, setActiveQuotation] = useState<Order | null>(null);
   const [creatingOrder, setCreatingOrder] = useState(false);
   
   const [loading, setLoading] = useState(true);
@@ -174,7 +178,7 @@ export default function AdminPanel() {
 
   const flash = (message: string) => {
     setNotice(message);
-    setTimeout(() => setNotice(''), 2800);
+    setTimeout(() => setNotice(''), 3000);
   };
 
   const saveProduct = async (event: React.FormEvent) => {
@@ -218,9 +222,13 @@ export default function AdminPanel() {
     window.location.href = '/admin';
   };
 
+  // Filtered Lists for Workflow Separation
+  const pendingQuotations = orders.filter(o => o.isQuotation || o.quoteStatus === 'new' || o.quoteStatus === 'negotiating');
+  const confirmedPjos = orders.filter(o => !o.isQuotation || o.quoteStatus === 'converted');
+
   // Metrics
   const totalRevenue = orders.reduce((sum, o) => sum + (o.sellPrice || o.totalPrice || 0), 0);
-  const activeJobs = orders.filter(o => o.status === 'pending' || o.status === 'processing').length;
+  const activeJobs = confirmedPjos.filter(o => o.status === 'pending' || o.status === 'processing').length;
   const pendingPayments = orders.filter(o => o.paymentStatus !== 'paid').reduce((sum, o) => sum + (o.balanceDue ?? (o.totalPrice - (o.paidAmount || 0))), 0);
 
   return (
@@ -242,6 +250,7 @@ export default function AdminPanel() {
         <div className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
           <div className="px-3 py-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Operations</div>
           <SidebarNav tab="dashboard" activeTab={activeTab} onClick={setActiveTab} icon={<LayoutDashboard />} label="Dashboard" />
+          <SidebarNav tab="quotations" activeTab={activeTab} onClick={setActiveTab} icon={<FileText />} label="Quotations Desk" badge={pendingQuotations.length ? String(pendingQuotations.length) : undefined} badgeColor="bg-cyan-500/20 text-cyan-400" />
           <SidebarNav tab="orders" activeTab={activeTab} onClick={setActiveTab} icon={<ShoppingBag />} label="Print Job Pipeline" badge={activeJobs ? String(activeJobs) : undefined} badgeColor="bg-amber-500/20 text-amber-400" />
           <SidebarNav tab="customers" activeTab={activeTab} onClick={setActiveTab} icon={<Users />} label="Customer Directory" badge={String(new Set(orders.map(o => o.userEmail)).size)} />
           <SidebarNav tab="business" activeTab={activeTab} onClick={setActiveTab} icon={<ReceiptText />} label="Invoices & Finance" badge={pendingPayments > 0 ? `$${Math.round(pendingPayments)} due` : undefined} badgeColor="bg-emerald-500/20 text-emerald-400" />
@@ -287,7 +296,8 @@ export default function AdminPanel() {
           <div className="flex items-center gap-4">
             <h1 className="text-lg font-bold text-slate-900 capitalize tracking-tight">
               {activeTab === 'dashboard' && 'Operations Dashboard'}
-              {activeTab === 'orders' && 'Print Jobs & Production Queue'}
+              {activeTab === 'quotations' && 'Storefront Quotations Desk'}
+              {activeTab === 'orders' && 'Print Job Pipeline (PJOs)'}
               {activeTab === 'products' && 'Product & Substrates Manager'}
               {activeTab === 'categories' && 'Service Category Manager'}
               {activeTab === 'customers' && 'Customer Ledger'}
@@ -306,7 +316,7 @@ export default function AdminPanel() {
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search jobs, customers..."
+                placeholder="Search jobs, quotes, customers..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:border-slate-400 transition-colors"
@@ -358,27 +368,38 @@ export default function AdminPanel() {
             <>
               {activeTab === 'dashboard' && (
                 <DashboardOverview
-                  orders={orders}
+                  orders={confirmedPjos}
+                  quotations={pendingQuotations}
                   products={products}
                   totalRevenue={totalRevenue}
                   activeJobs={activeJobs}
                   pendingPayments={pendingPayments}
                   onNewJob={() => setCreatingOrder(true)}
                   onManageJob={setBusinessOrder}
+                  onManageQuotation={setActiveQuotation}
                   onViewOrders={() => setActiveTab('orders')}
+                  onViewQuotations={() => setActiveTab('quotations')}
+                />
+              )}
+
+              {activeTab === 'quotations' && (
+                <QuotationsEditor
+                  quotations={pendingQuotations}
+                  searchQuery={searchQuery}
+                  onManageQuotation={setActiveQuotation}
                 />
               )}
 
               {activeTab === 'orders' && (
                 <OrdersEditor
-                  orders={orders}
+                  orders={confirmedPjos}
                   searchQuery={searchQuery}
                   onCreate={() => setCreatingOrder(true)}
                   onManage={setBusinessOrder}
                   onStatus={async (id, status) => {
                     await DataService.updateOrderStatus(id, status);
                     await loadAll();
-                    flash(`Order status updated to ${status}.`);
+                    flash(`Job Order status updated to ${status}.`);
                   }}
                 />
               )}
@@ -463,7 +484,21 @@ export default function AdminPanel() {
         />
       )}
 
-      {/* Order Management & Job Ticket Drawer */}
+      {/* Interactive Quotation & Finishing Specs Builder Drawer */}
+      {activeQuotation && (
+        <QuotationDrawer
+          quotation={activeQuotation}
+          onClose={() => setActiveQuotation(null)}
+          onConverted={async () => {
+            await loadAll();
+            setActiveQuotation(null);
+            setActiveTab('orders');
+            flash('Quotation finalized & converted into a Print Job Order (PJO)!');
+          }}
+        />
+      )}
+
+      {/* PJO Management & Job Ticket Drawer */}
       {businessOrder && (
         <BusinessOrderModal
           order={businessOrder}
@@ -537,22 +572,28 @@ function SidebarNav({ tab, activeTab, onClick, icon, label, badge, badgeColor }:
 
 function DashboardOverview({
   orders,
+  quotations,
   products,
   totalRevenue,
   activeJobs,
   pendingPayments,
   onNewJob,
   onManageJob,
-  onViewOrders
+  onManageQuotation,
+  onViewOrders,
+  onViewQuotations
 }: {
   orders: Order[];
+  quotations: Order[];
   products: Product[];
   totalRevenue: number;
   activeJobs: number;
   pendingPayments: number;
   onNewJob: () => void;
   onManageJob: (o: Order) => void;
+  onManageQuotation: (q: Order) => void;
   onViewOrders: () => void;
+  onViewQuotations: () => void;
 }) {
   return (
     <div className="space-y-6">
@@ -571,12 +612,23 @@ function DashboardOverview({
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Active Press Jobs</span>
+            <span>Pending Quotations</span>
+            <div className="w-8 h-8 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center"><FileText className="w-4 h-4" /></div>
+          </div>
+          <div className="text-2xl font-bold text-slate-900 mt-2">{quotations.length}</div>
+          <div className="text-[11px] text-cyan-600 font-medium mt-1 cursor-pointer" onClick={onViewQuotations}>
+            Incoming customer requests &rarr;
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
+            <span>Active Press PJOs</span>
             <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center"><Printer className="w-4 h-4" /></div>
           </div>
           <div className="text-2xl font-bold text-slate-900 mt-2">{activeJobs}</div>
           <div className="text-[11px] text-amber-600 font-medium mt-1 flex items-center gap-1">
-            <Clock className="w-3 h-3" /> Currently in production
+            <Clock className="w-3 h-3" /> Confirmed job orders
           </div>
         </div>
 
@@ -588,16 +640,28 @@ function DashboardOverview({
           <div className="text-2xl font-bold text-slate-900 mt-2">${pendingPayments.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
           <div className="text-[11px] text-slate-500 font-medium mt-1">Outstanding payments</div>
         </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Total Orders</span>
-            <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center"><ShoppingBag className="w-4 h-4" /></div>
-          </div>
-          <div className="text-2xl font-bold text-slate-900 mt-2">{orders.length}</div>
-          <div className="text-[11px] text-purple-600 font-medium mt-1">Processed orders</div>
-        </div>
       </div>
+
+      {/* Pending Storefront Quotes Alert Box */}
+      {quotations.length > 0 && (
+        <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-5 rounded-2xl shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-white">You have {quotations.length} new customer quote request{quotations.length > 1 ? 's' : ''}</h3>
+              <p className="text-xs text-slate-300">Review specs, configure laminations & hot foils, finalize prices, and convert to Print Job Orders (PJOs).</p>
+            </div>
+          </div>
+          <button
+            onClick={onViewQuotations}
+            className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-xl transition-colors cursor-pointer shrink-0"
+          >
+            Open Quotations Desk &rarr;
+          </button>
+        </div>
+      )}
 
       {/* Main Grid: Recent Activity & Quick Quote Estimator */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -605,10 +669,10 @@ function DashboardOverview({
         <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-slate-500" /> Recent Production Queue
+              <Clock className="w-4 h-4 text-slate-500" /> Active Print Job Orders (PJOs)
             </h2>
             <button onClick={onViewOrders} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1 cursor-pointer">
-              View all jobs <ChevronRight className="w-3.5 h-3.5" />
+              View all PJOs <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
@@ -616,10 +680,10 @@ function DashboardOverview({
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-100 text-slate-400 font-semibold uppercase text-[10px]">
-                  <th className="pb-3">Job ID</th>
+                  <th className="pb-3">PJO / ID</th>
                   <th className="pb-3">Customer</th>
                   <th className="pb-3">Product</th>
-                  <th className="pb-3">Status</th>
+                  <th className="pb-3">Stage</th>
                   <th className="pb-3 text-right">Price</th>
                   <th className="pb-3 text-right">Action</th>
                 </tr>
@@ -627,21 +691,23 @@ function DashboardOverview({
               <tbody className="divide-y divide-slate-100 font-medium">
                 {orders.slice(0, 5).map((order) => (
                   <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 font-mono text-slate-500">#{order.id.slice(0, 8)}</td>
+                    <td className="py-3 font-mono text-slate-900 font-bold">
+                      {order.pjoNumber || `#${order.id.slice(0, 8)}`}
+                    </td>
                     <td className="py-3 font-semibold text-slate-900">{order.userName || order.userEmail}</td>
                     <td className="py-3 text-slate-600">{order.productName} ({order.quantity} pcs)</td>
                     <td className="py-3"><StatusBadge status={order.status} /></td>
                     <td className="py-3 text-right font-semibold text-slate-900">${(order.sellPrice || order.totalPrice).toFixed(2)}</td>
                     <td className="py-3 text-right">
                       <button onClick={() => onManageJob(order)} className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-[11px] font-semibold transition-colors cursor-pointer">
-                        Manage
+                        Manage PJO
                       </button>
                     </td>
                   </tr>
                 ))}
                 {orders.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-400">No print jobs found yet.</td>
+                    <td colSpan={6} className="py-8 text-center text-slate-400">No active job orders in pipeline.</td>
                   </tr>
                 )}
               </tbody>
@@ -724,6 +790,393 @@ function QuickQuoteEstimator({ products, onNewJob }: { products: Product[]; onNe
 }
 
 /* -------------------------------------------------------------------------- */
+/*                            QUOTATIONS DESK TAB                             */
+/* -------------------------------------------------------------------------- */
+
+function QuotationsEditor({
+  quotations,
+  searchQuery,
+  onManageQuotation
+}: {
+  quotations: Order[];
+  searchQuery: string;
+  onManageQuotation: (q: Order) => void;
+}) {
+  const filteredQuotations = quotations.filter((q) => {
+    const opts = q.options || {};
+    const searchStr = `${q.id} ${q.userEmail} ${q.userName} ${q.productName} ${opts.phone || ''} ${opts.companyName || ''}`.toLowerCase();
+    return searchStr.includes(searchQuery.toLowerCase());
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* Info Banner */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-sm font-bold text-slate-900">Storefront Quotation Desk ({quotations.length} Pending Requests)</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Review customer requirements, configure finishing options (Laminations, Hot Foils, Spot UV), finalize pricing, and convert into Print Job Orders (PJOs).</p>
+        </div>
+      </div>
+
+      {/* Quotations Table */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
+                <th className="py-3.5 px-4">Quote ID & Date</th>
+                <th className="py-3.5 px-4">Customer Contact</th>
+                <th className="py-3.5 px-4">Product Requested</th>
+                <th className="py-3.5 px-4">Est. Qty</th>
+                <th className="py-3.5 px-4">Status</th>
+                <th className="py-3.5 px-4 text-right">Est. Total</th>
+                <th className="py-3.5 px-4 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+              {filteredQuotations.map((quote) => {
+                const opts = quote.options || {};
+                return (
+                  <tr key={quote.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="py-3.5 px-4">
+                      <span className="font-mono font-bold text-slate-900 block">#{quote.id.slice(0, 8)}</span>
+                      <span className="text-[10px] text-slate-400 block">{new Date(quote.createdAt).toLocaleDateString()}</span>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="font-bold text-slate-900 block">{quote.userName || 'Customer'}</span>
+                      <span className="text-slate-500 text-[11px] font-mono block">{quote.userEmail}</span>
+                      {opts.phone && <span className="text-slate-400 text-[10px] block">Tel: {String(opts.phone)}</span>}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="font-semibold text-slate-900 block">{quote.productName}</span>
+                      {opts.companyName && <span className="text-slate-400 text-[10px] block">{String(opts.companyName)}</span>}
+                    </td>
+                    <td className="py-3.5 px-4 font-mono font-bold text-slate-800">
+                      {quote.quantity.toLocaleString()} pcs
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <QuoteStatusBadge status={quote.quoteStatus || 'new'} />
+                    </td>
+                    <td className="py-3.5 px-4 text-right font-bold text-slate-900">
+                      ${(quote.sellPrice || quote.totalPrice).toFixed(2)}
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <button
+                        onClick={() => onManageQuotation(quote)}
+                        className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 ml-auto transition-colors cursor-pointer"
+                      >
+                        <Sliders className="w-3.5 h-3.5" /> Configure Specs & PJO
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {filteredQuotations.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400">
+                    No quote requests pending review.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuoteStatusBadge({ status }: { status: string }) {
+  switch (status) {
+    case 'converted':
+      return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">PJO Converted</span>;
+    case 'approved':
+      return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Price Approved</span>;
+    case 'negotiating':
+      return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">In Discussion</span>;
+    default:
+      return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">New Request</span>;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*             INTERACTIVE QUOTATION & FINISHING SPECS DRAWER                 */
+/* -------------------------------------------------------------------------- */
+
+function QuotationDrawer({
+  quotation,
+  onClose,
+  onConverted
+}: {
+  quotation: Order;
+  onClose: () => void;
+  onConverted: () => Promise<void>;
+}) {
+  const opts = quotation.options || {};
+  const [costPrice, setCostPrice] = useState(quotation.costPrice || (quotation.totalPrice * 0.5));
+  const [sellPrice, setSellPrice] = useState(quotation.sellPrice || quotation.totalPrice || 0);
+
+  // Finishing Specs State
+  const [lamination, setLamination] = useState(quotation.finishingSpecs?.lamination || 'None');
+  const [foiling, setFoiling] = useState(quotation.finishingSpecs?.foiling || 'None');
+  const [uv, setUv] = useState(quotation.finishingSpecs?.uv || 'None');
+  const [emboss, setEmboss] = useState(quotation.finishingSpecs?.emboss || 'None');
+  const [dieCut, setDieCut] = useState(quotation.finishingSpecs?.dieCut || 'Standard Straight Cut');
+  const [customNotes, setCustomNotes] = useState(quotation.finishingSpecs?.customNotes || '');
+  
+  const [submitting, setSubmitting] = useState(false);
+
+  const finishingSpecs = {
+    lamination,
+    foiling,
+    uv,
+    emboss,
+    dieCut,
+    customNotes
+  };
+
+  const handleSaveDraft = async () => {
+    setSubmitting(true);
+    try {
+      await DataService.updateOrderFinance(quotation.id, {
+        costPrice,
+        sellPrice,
+        finishingSpecs,
+        quoteStatus: 'negotiating'
+      });
+      alert('Quotation draft saved.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleConvertToPjo = async () => {
+    if (!confirm(`Finalize quote and create Print Job Order (PJO) for ${quotation.userName || quotation.userEmail}?`)) return;
+    setSubmitting(true);
+    try {
+      await DataService.convertToPjo(quotation.id, {
+        sellPrice,
+        costPrice,
+        finishingSpecs
+      });
+      await onConverted();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-end z-50">
+      <div className="bg-white h-full w-full max-w-2xl shadow-2xl flex flex-col overflow-hidden animate-slideLeft">
+        {/* Header */}
+        <div className="h-16 px-6 bg-slate-900 text-white flex items-center justify-between shrink-0">
+          <div>
+            <h2 className="font-bold text-sm flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-cyan-400" /> Quotation Builder #{quotation.id.slice(0, 8)}
+            </h2>
+            <p className="text-[11px] text-slate-400">{quotation.productName} &bull; {quotation.quantity} pcs</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 p-6 overflow-y-auto space-y-6">
+          {/* Customer Contact Details */}
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Customer Contact Info</h3>
+            <div className="grid grid-cols-2 gap-3 text-xs text-slate-800">
+              <div>
+                <span className="text-slate-400 block text-[10px]">FULL NAME</span>
+                <span className="font-bold text-slate-900">{quotation.userName || 'Customer'}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">EMAIL ADDRESS</span>
+                <span className="font-mono font-semibold text-slate-800">{quotation.userEmail}</span>
+              </div>
+              {opts.phone && (
+                <div>
+                  <span className="text-slate-400 block text-[10px]">PHONE NUMBER</span>
+                  <span className="font-semibold text-slate-800">{String(opts.phone)}</span>
+                </div>
+              )}
+              {opts.companyName && (
+                <div>
+                  <span className="text-slate-400 block text-[10px]">COMPANY / BRAND</span>
+                  <span className="font-semibold text-slate-800">{String(opts.companyName)}</span>
+                </div>
+              )}
+            </div>
+            {opts.artworkFile && (
+              <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-xs">
+                <span className="text-slate-500">Submitted Artwork:</span>
+                <a href={String(opts.artworkFile)} target="_blank" rel="noreferrer" className="text-cyan-600 font-bold underline hover:text-cyan-700 flex items-center gap-1">
+                  View File <ArrowUpRight className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            )}
+          </div>
+
+          {/* Submitted Customer Requirements */}
+          {opts.specifications && (
+            <div className="bg-amber-50/50 p-4 rounded-xl border border-amber-200/80 space-y-1">
+              <h3 className="text-xs font-bold text-amber-800 uppercase tracking-wider">Customer Notes & Specs</h3>
+              <p className="text-xs text-amber-900 whitespace-pre-wrap leading-relaxed">{String(opts.specifications)}</p>
+            </div>
+          )}
+
+          {/* Interactive Finishing & Press Specs Form */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500" /> Press Finishing & Production Options
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Lamination Coating</label>
+                <select
+                  value={lamination}
+                  onChange={(e) => setLamination(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none"
+                >
+                  <option value="None">None (Uncoated)</option>
+                  <option value="Matte Lamination">Matte Lamination</option>
+                  <option value="Gloss Lamination">Gloss Lamination</option>
+                  <option value="Soft-Touch Velvet">Soft-Touch Velvet</option>
+                  <option value="Anti-Scratch Matte">Anti-Scratch Matte</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Hot Foil Stamping</label>
+                <select
+                  value={foiling}
+                  onChange={(e) => setFoiling(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none"
+                >
+                  <option value="None">None</option>
+                  <option value="Gold Foil">Gold Foil</option>
+                  <option value="Silver Foil">Silver Foil</option>
+                  <option value="Rose Gold Foil">Rose Gold Foil</option>
+                  <option value="Holographic Foil">Holographic Foil</option>
+                  <option value="Copper Foil">Copper Foil</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Spot UV Coating</label>
+                <select
+                  value={uv}
+                  onChange={(e) => setUv(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none"
+                >
+                  <option value="None">None</option>
+                  <option value="Flat Spot UV">Flat Spot UV</option>
+                  <option value="Raised 3D Spot UV">Raised 3D Spot UV</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Embossing / Debossing</label>
+                <select
+                  value={emboss}
+                  onChange={(e) => setEmboss(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none"
+                >
+                  <option value="None">None</option>
+                  <option value="Blind Emboss">Blind Emboss</option>
+                  <option value="Blind Deboss">Blind Deboss</option>
+                  <option value="Foil Emboss">Foil Emboss</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Die-Cutting & Shape Specs</label>
+              <input
+                type="text"
+                placeholder="e.g. Custom die-cut shape with rounded corners"
+                value={dieCut}
+                onChange={(e) => setDieCut(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Press Production Notes</label>
+              <textarea
+                rows={2}
+                placeholder="Internal notes for prepress & press operators..."
+                value={customNotes}
+                onChange={(e) => setCustomNotes(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 outline-none"
+              />
+            </div>
+          </div>
+
+          {/* Pricing & Margin Calculator */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
+              Costing & Approved Price Finalization
+            </h3>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Est. Base Cost Price ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={costPrice}
+                  onChange={(e) => setCostPrice(Number(e.target.value))}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Final Agreed Customer Price ($)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={sellPrice}
+                  onChange={(e) => setSellPrice(Number(e.target.value))}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-emerald-600 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-3 rounded-xl flex items-center justify-between text-xs">
+              <span className="text-slate-500 font-medium">Calculated Profit Margin:</span>
+              <span className="font-bold text-emerald-600 text-sm">${(sellPrice - costPrice).toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Drawer Action Bar */}
+        <div className="p-4 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-3 shrink-0">
+          <button
+            onClick={handleSaveDraft}
+            disabled={submitting}
+            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold cursor-pointer"
+          >
+            Save Quote Draft
+          </button>
+
+          <button
+            onClick={handleConvertToPjo}
+            disabled={submitting}
+            className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer shadow-md transition-all"
+          >
+            <Sparkles className="w-4 h-4" /> Create Print Job Order (PJO) &rarr;
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /*                            ORDERS & KANBAN PIPELINE                        */
 /* -------------------------------------------------------------------------- */
 
@@ -744,8 +1197,9 @@ function OrdersEditor({
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const filteredOrders = orders.filter((o) => {
+    const pjo = o.pjoNumber || o.id;
     const matchesSearch =
-      o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pjo.toLowerCase().includes(searchQuery.toLowerCase()) ||
       o.userEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (o.userName && o.userName.toLowerCase().includes(searchQuery.toLowerCase())) ||
       o.productName.toLowerCase().includes(searchQuery.toLowerCase());
@@ -765,8 +1219,8 @@ function OrdersEditor({
             onChange={(e) => setStatusFilter(e.target.value)}
             className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-slate-400"
           >
-            <option value="all">All Stages ({orders.length})</option>
-            <option value="pending">Pending ({orders.filter(o => o.status === 'pending').length})</option>
+            <option value="all">All Pipeline Stages ({orders.length})</option>
+            <option value="pending">Proofing / Pre-Press ({orders.filter(o => o.status === 'pending').length})</option>
             <option value="processing">In Production ({orders.filter(o => o.status === 'processing').length})</option>
             <option value="completed">Completed ({orders.filter(o => o.status === 'completed').length})</option>
             <option value="cancelled">Cancelled ({orders.filter(o => o.status === 'cancelled').length})</option>
@@ -808,9 +1262,9 @@ function OrdersEditor({
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
-                  <th className="py-3.5 px-4">Order ID & Date</th>
+                  <th className="py-3.5 px-4">PJO Number</th>
                   <th className="py-3.5 px-4">Customer Details</th>
-                  <th className="py-3.5 px-4">Product Specifications</th>
+                  <th className="py-3.5 px-4">Product Specs</th>
                   <th className="py-3.5 px-4">Stage</th>
                   <th className="py-3.5 px-4">Payment</th>
                   <th className="py-3.5 px-4 text-right">Price</th>
@@ -821,12 +1275,12 @@ function OrdersEditor({
                 {filteredOrders.map((order) => (
                   <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3.5 px-4">
-                      <span className="font-mono font-bold text-slate-900 block">#{order.id.slice(0, 8)}</span>
+                      <span className="font-mono font-bold text-slate-900 block">{order.pjoNumber || `#${order.id.slice(0, 8)}`}</span>
                       <span className="text-[10px] text-slate-400 block">{new Date(order.createdAt).toLocaleDateString()}</span>
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="font-bold text-slate-900 block">{order.userName || 'Guest Customer'}</span>
-                      <span className="text-slate-500 text-[11px] block">{order.userEmail}</span>
+                      <span className="text-slate-500 text-[11px] block font-mono">{order.userEmail}</span>
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="font-semibold text-slate-900 block">{order.productName}</span>
@@ -838,7 +1292,7 @@ function OrdersEditor({
                         onChange={(e) => onStatus(order.id, e.target.value)}
                         className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold outline-none focus:border-slate-400"
                       >
-                        <option value="pending">Pending</option>
+                        <option value="pending">Proofing / Pre-Press</option>
                         <option value="processing">In Production</option>
                         <option value="completed">Completed</option>
                         <option value="cancelled">Cancelled</option>
@@ -855,7 +1309,7 @@ function OrdersEditor({
                         onClick={() => onManage(order)}
                         className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-colors cursor-pointer"
                       >
-                        Manage Ticket
+                        Job Ticket
                       </button>
                     </td>
                   </tr>
@@ -864,7 +1318,7 @@ function OrdersEditor({
                 {filteredOrders.length === 0 && (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-slate-400">
-                      No print orders match the selected filters.
+                      No print job orders in pipeline.
                     </td>
                   </tr>
                 )}
@@ -889,7 +1343,7 @@ function KanbanPipelineBoard({
   onStatus: (id: string, status: string) => Promise<void>;
 }) {
   const columns = [
-    { id: 'pending', title: 'Pending Queue', color: 'border-amber-400' },
+    { id: 'pending', title: 'Proofing / Pre-Press', color: 'border-amber-400' },
     { id: 'processing', title: 'In Production', color: 'border-blue-400' },
     { id: 'completed', title: 'Ready / Completed', color: 'border-emerald-400' },
     { id: 'cancelled', title: 'Cancelled', color: 'border-slate-300' },
@@ -915,7 +1369,7 @@ function KanbanPipelineBoard({
                   className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-slate-300 transition-all space-y-3"
                 >
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-mono font-bold text-slate-500">#{order.id.slice(0, 8)}</span>
+                    <span className="font-mono font-bold text-slate-900">{order.pjoNumber || `#${order.id.slice(0, 8)}`}</span>
                     <span className="font-bold text-slate-900">${(order.sellPrice || order.totalPrice).toFixed(2)}</span>
                   </div>
 
@@ -925,13 +1379,19 @@ function KanbanPipelineBoard({
                     <p className="text-[11px] text-slate-400 mt-1 truncate">{order.userName || order.userEmail}</p>
                   </div>
 
+                  {order.finishingSpecs?.lamination && (
+                    <div className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                      Finish: {order.finishingSpecs.lamination}
+                    </div>
+                  )}
+
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                     <select
                       value={order.status}
                       onChange={(e) => onStatus(order.id, e.target.value)}
                       className="bg-slate-50 border border-slate-200 rounded-md px-2 py-1 text-[10px] font-semibold text-slate-700 outline-none"
                     >
-                      <option value="pending">Pending</option>
+                      <option value="pending">Proofing</option>
                       <option value="processing">In Production</option>
                       <option value="completed">Completed</option>
                       <option value="cancelled">Cancelled</option>
@@ -970,7 +1430,7 @@ function StatusBadge({ status }: { status: string }) {
     case 'cancelled':
       return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Cancelled</span>;
     default:
-      return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Pending</span>;
+      return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Proofing</span>;
   }
 }
 
@@ -1229,7 +1689,7 @@ function BusinessEditor({
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
-                <th className="py-3.5 px-4">Invoice #</th>
+                <th className="py-3.5 px-4">Invoice / Job #</th>
                 <th className="py-3.5 px-4">Customer</th>
                 <th className="py-3.5 px-4">Total Price</th>
                 <th className="py-3.5 px-4">Paid</th>
@@ -1246,7 +1706,9 @@ function BusinessEditor({
 
                 return (
                   <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900">INV-#{order.id.slice(0, 8)}</td>
+                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
+                      {order.pjoNumber || `INV-#${order.id.slice(0, 8)}`}
+                    </td>
                     <td className="py-3.5 px-4 font-semibold text-slate-900">{order.userEmail}</td>
                     <td className="py-3.5 px-4 font-bold text-slate-900">${total.toFixed(2)}</td>
                     <td className="py-3.5 px-4 text-emerald-600 font-semibold">${paid.toFixed(2)}</td>
@@ -1639,15 +2101,15 @@ function BusinessOrderModal({
         {/* Drawer Header */}
         <div className="h-16 px-6 bg-slate-900 text-white flex items-center justify-between shrink-0">
           <div>
-            <h2 className="font-bold text-sm">Print Job Ticket #{order.id.slice(0, 8)}</h2>
+            <h2 className="font-bold text-sm">Print Job Ticket {order.pjoNumber || `#${order.id.slice(0, 8)}`}</h2>
             <p className="text-[11px] text-slate-400">{order.productName} &bull; {order.quantity} pcs</p>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => window.print()}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 text-slate-200 transition-colors"
+              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-lg flex items-center gap-1.5 text-slate-200 transition-colors cursor-pointer"
             >
-              <Printer className="w-3.5 h-3.5" /> Print Ticket
+              <Printer className="w-3.5 h-3.5" /> Print Job Ticket
             </button>
             <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800">
               <X className="w-5 h-5" />
@@ -1663,22 +2125,53 @@ function BusinessOrderModal({
             <div className="text-xs text-slate-800 space-y-1">
               <p className="font-bold text-slate-900 text-sm">{order.userName || 'Guest Customer'}</p>
               <p className="font-mono text-slate-600">{order.userEmail}</p>
-              <p className="text-slate-400 text-[10px]">Job Received: {new Date(order.createdAt).toLocaleString()}</p>
+              <p className="text-slate-400 text-[10px]">PJO Created: {new Date(order.createdAt).toLocaleString()}</p>
             </div>
           </div>
 
-          {/* Specifications */}
+          {/* Specifications & Finishing Options */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Print Specifications & Options</h3>
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Print & Finishing Specifications</h3>
             <div className="space-y-2 text-xs">
               <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Base Substrate:</span>
+                <span className="text-slate-500">Substrate / Product:</span>
                 <span className="font-bold text-slate-900">{order.productName}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Quantity:</span>
+                <span className="text-slate-500">Production Quantity:</span>
                 <span className="font-bold text-slate-900">{order.quantity} pcs</span>
               </div>
+
+              {order.finishingSpecs?.lamination && (
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500">Lamination:</span>
+                  <span className="font-bold text-emerald-700">{order.finishingSpecs.lamination}</span>
+                </div>
+              )}
+              {order.finishingSpecs?.foiling && order.finishingSpecs.foiling !== 'None' && (
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500">Hot Foil Stamping:</span>
+                  <span className="font-bold text-amber-600">{order.finishingSpecs.foiling}</span>
+                </div>
+              )}
+              {order.finishingSpecs?.uv && order.finishingSpecs.uv !== 'None' && (
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500">Spot UV Coating:</span>
+                  <span className="font-bold text-cyan-700">{order.finishingSpecs.uv}</span>
+                </div>
+              )}
+              {order.finishingSpecs?.emboss && order.finishingSpecs.emboss !== 'None' && (
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500">Embossing:</span>
+                  <span className="font-bold text-purple-700">{order.finishingSpecs.emboss}</span>
+                </div>
+              )}
+              {order.finishingSpecs?.dieCut && (
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500">Die-Cutting:</span>
+                  <span className="font-semibold text-slate-900">{order.finishingSpecs.dieCut}</span>
+                </div>
+              )}
 
               {Object.entries(order.options || {}).map(([key, val]) => (
                 <div key={key} className="flex justify-between py-1 border-b border-slate-100">
@@ -1789,6 +2282,8 @@ function CreateOrderModal({
     setLoading(true);
     try {
       const totalPrice = customPrice ?? (product.price * quantity);
+      const pjoNumber = `PJO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
       await onSave({
         productId: product.id,
         productName: product.name,
@@ -1801,6 +2296,8 @@ function CreateOrderModal({
         options: {},
         status: 'pending',
         paymentStatus: 'unpaid',
+        isQuotation: false,
+        pjoNumber,
         createdAt: new Date().toISOString()
       });
     } finally {
@@ -1812,7 +2309,7 @@ function CreateOrderModal({
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden">
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-900">Create New Print Work Order</h2>
+          <h2 className="text-base font-bold text-slate-900">Create New Print Work Order (PJO)</h2>
           <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
         </div>
 
@@ -1883,7 +2380,7 @@ function CreateOrderModal({
               Cancel
             </button>
             <button type="submit" disabled={loading} className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold shadow-xs">
-              Create Job Ticket
+              Create PJO Ticket
             </button>
           </div>
         </form>
