@@ -150,11 +150,15 @@ export default function AdminPanel() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadAll();
+    loadAll(true);
+    const interval = setInterval(() => {
+      loadAll(false);
+    }, 10000);
+    return () => clearInterval(interval);
   }, []);
 
-  const loadAll = async () => {
-    setLoading(true);
+  const loadAll = async (showSpinner = false) => {
+    if (showSpinner) setLoading(true);
     setError('');
     try {
       const [nextProducts, nextCategories, nextOrders, nextQuotations, nextCustomers, nextSettings, nextMedia] = await Promise.all([
@@ -180,9 +184,9 @@ export default function AdminPanel() {
       });
       setMedia(nextMedia);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Could not load admin data.');
+      if (showSpinner) setError(caught instanceof Error ? caught.message : 'Could not load admin data.');
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
@@ -344,7 +348,7 @@ export default function AdminPanel() {
             </div>
 
             {/* Refresh Button */}
-            <button onClick={loadAll} className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors" title="Refresh Data">
+            <button onClick={() => loadAll(true)} className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors" title="Refresh Data">
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
 
@@ -1722,13 +1726,20 @@ function CustomersEditor({
     const phone = String(opts.phone || opts.Phone || opts.phoneNumber || '');
     const company = String(opts.companyName || '');
     const existing = customerMap.get(key);
-    const amount = o.sellPrice || o.totalPrice || 0;
+    
+    // Quotations and cancelled jobs DO NOT count towards orders count or lifetime spend
+    const isQuotation = Boolean(o.isQuotation || opts.isQuotation || o.quoteStatus);
+    const isCancelled = o.status === 'cancelled';
+    const isConfirmedPaidOrder = !isQuotation && !isCancelled;
+    const amount = isConfirmedPaidOrder ? (o.sellPrice || o.totalPrice || 0) : 0;
 
     if (existing) {
       existing.orderList.push(o);
       if (!customerList.length) {
-        existing.totalOrders += 1;
-        existing.totalSpent += amount;
+        if (isConfirmedPaidOrder) {
+          existing.totalOrders += 1;
+          existing.totalSpent += amount;
+        }
         if (new Date(o.createdAt) > new Date(existing.lastOrder)) {
           existing.lastOrder = o.createdAt;
         }
@@ -1741,7 +1752,7 @@ function CustomersEditor({
         name: o.userName || 'Customer',
         phone,
         company,
-        totalOrders: 1,
+        totalOrders: isConfirmedPaidOrder ? 1 : 0,
         totalSpent: amount,
         lastOrder: o.createdAt || new Date().toISOString(),
         orderList: [o]
@@ -1757,20 +1768,10 @@ function CustomersEditor({
   );
 
   const handleSendWelcomeEmail = async (cust: { id?: string; email: string }) => {
-    let targetId = cust.id;
-    if (!targetId) {
-      const match = customerList.find(c => String(c.email).toLowerCase() === cust.email.toLowerCase());
-      targetId = match?.id;
-    }
-
-    if (!targetId) {
-      alert(`Customer profile '${cust.email}' is not saved in the database yet. Please click Add New Customer first.`);
-      return;
-    }
-
+    const targetIdOrEmail = cust.id || cust.email;
     setSendingEmail(cust.email);
     try {
-      const res = await DataService.sendWelcomeEmail(targetId);
+      const res = await DataService.sendWelcomeEmail(targetIdOrEmail);
       alert(res?.message || `Welcome credentials email sent to ${cust.email}!`);
     } catch (err: any) {
       alert(err?.message || 'Failed to dispatch welcome email.');

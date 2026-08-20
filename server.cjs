@@ -1072,8 +1072,8 @@ app.get('/api/admin/customers', requireDb, async (_req, res, next) => {
     const [rows] = await pool.query(`
       SELECT 
         c.*,
-        COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN COALESCE(o.sell_price, o.total_price, 0) ELSE 0 END), 0) AS total_spent,
-        COUNT(DISTINCT CASE WHEN o.status != 'cancelled' THEN o.id END) AS total_orders,
+        COALESCE(SUM(CASE WHEN o.status != 'cancelled' AND (o.options_json IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(o.options_json, '$.isQuotation')) != 'true') THEN COALESCE(o.sell_price, o.total_price, 0) ELSE 0 END), 0) AS total_spent,
+        COUNT(DISTINCT CASE WHEN o.status != 'cancelled' AND (o.options_json IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(o.options_json, '$.isQuotation')) != 'true') THEN o.id END) AS total_orders,
         MAX(o.created_at) AS last_order_at
       FROM customers c
       LEFT JOIN orders o ON LOWER(o.user_email) = LOWER(c.user_email)
@@ -1125,14 +1125,8 @@ app.post('/api/admin/customers', requireDb, async (req, res, next) => {
       return;
     }
 
-    const id = createId('cust');
-    await pool.query(
-      `INSERT INTO customers (id, user_email, user_name, phone, company_name, notes)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, targetEmail, targetName, targetPhone || null, targetCompany || null, targetNotes || null]
-    );
-
-    res.status(201).json({ id, email: targetEmail, name: targetName });
+    const upserted = await upsertCustomer(targetEmail, targetName, targetPhone, targetCompany, targetNotes);
+    res.status(201).json({ id: upserted.id, email: targetEmail, name: targetName });
   } catch (error) {
     next(error);
   }
@@ -1168,30 +1162,51 @@ app.patch('/api/admin/customers/:id', requireDb, async (req, res, next) => {
 
 app.post('/api/admin/customers/:id/send-welcome-email', requireDb, async (req, res, next) => {
   try {
-    const customerId = req.params.id;
-    const [rows] = await pool.query('SELECT * FROM customers WHERE id = ?', [customerId]);
+    const rawIdOrEmail = decodeURIComponent(req.params.id || '');
+    const { email, name, phone, companyName } = req.body || {};
+    const targetEmail = String(email || (rawIdOrEmail.includes('@') ? rawIdOrEmail : '')).trim().toLowerCase();
 
-    if (!rows.length) {
-      res.status(404).json({ error: 'Customer not found.' });
-      return;
+    let customer = null;
+
+    // 1. Try finding by ID
+    let [rows] = await pool.query('SELECT * FROM customers WHERE id = ?', [rawIdOrEmail]);
+    if (rows.length) {
+      customer = rows[0];
+    } else if (targetEmail) {
+      // 2. Try finding by email
+      [rows] = await pool.query('SELECT * FROM customers WHERE LOWER(user_email) = ?', [targetEmail]);
+      if (rows.length) {
+        customer = rows[0];
+      }
     }
 
-    const customer = rows[0];
+    // 3. If customer is not in DB yet, create profile on the fly!
+    if (!customer) {
+      const finalEmail = targetEmail || (rawIdOrEmail.includes('@') ? rawIdOrEmail : '');
+      if (!finalEmail) {
+        res.status(400).json({ error: 'Customer profile or email is required.' });
+        return;
+      }
+      const upserted = await upsertCustomer(finalEmail, name || finalEmail, phone, companyName);
+      const [newRows] = await pool.query('SELECT * FROM customers WHERE id = ? OR LOWER(user_email) = ?', [upserted.id, finalEmail]);
+      customer = newRows[0];
+    }
+
     let plainPass = customer.password_plain;
     if (!plainPass) {
       plainPass = generatePassword();
-      await pool.query('UPDATE customers SET password_plain = ? WHERE id = ?', [plainPass, customerId]);
+      await pool.query('UPDATE customers SET password_plain = ? WHERE id = ?', [plainPass, customer.id]);
     }
 
     const emailResult = await sendWelcomeEmail(customer.user_email, customer.user_name, plainPass);
-    await pool.query('UPDATE customers SET welcome_sent_at = CURRENT_TIMESTAMP WHERE id = ?', [customerId]);
+    await pool.query('UPDATE customers SET welcome_sent_at = CURRENT_TIMESTAMP WHERE id = ?', [customer.id]);
 
     res.json({
       ok: true,
       email: customer.user_email,
       name: customer.user_name,
       mode: emailResult.mode,
-      message: `Welcome credentials email sent to ${customer.user_email}`,
+      message: `Welcome credentials email sent to ${customer.user_email}!`,
     });
   } catch (error) {
     next(error);
