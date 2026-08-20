@@ -7,9 +7,10 @@ import { useAuth } from '../lib/AuthContext';
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
-export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
+export default function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
   const { setCustomUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,6 +27,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
       const res = await DataService.customerLogin({ email, password });
       if (res?.authenticated && res?.user) {
         setCustomUser(res.user);
+        onSuccess?.();
         onClose();
       } else {
         setError(res?.error || 'Invalid credentials.');

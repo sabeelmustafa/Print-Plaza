@@ -189,6 +189,13 @@ function AppContent() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [view, setView] = useState<'main' | 'dashboard'>('main');
 
+  // Auto-navigate authenticated clients directly to their Client Portal
+  useEffect(() => {
+    if (user && !isAdmin) {
+      setView('dashboard');
+    }
+  }, [user, isAdmin]);
+
   useEffect(() => {
     fetchCmsData();
   }, [view]); // Refresh when coming back from dashboard
@@ -264,7 +271,11 @@ function AppContent() {
         {servicePage ? <ServicePage page={servicePage} /> : <PrivacyPolicyPage />}
 
         <SiteFooter siteSettings={siteSettings} />
-        <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+        <AuthModal 
+          isOpen={showAuthModal} 
+          onClose={() => setShowAuthModal(false)} 
+          onSuccess={() => setView('dashboard')}
+        />
       </div>
     );
   }
@@ -382,7 +393,11 @@ function AppContent() {
 
       <SiteFooter siteSettings={siteSettings} />
 
-      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+        onSuccess={() => setView('dashboard')}
+      />
 
       <AnimatePresence>
         {selectedProduct && (

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, CalendarDays, CheckCircle, Clock, Download, FileText, Package, ReceiptText, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle, CheckCircle2, Clock, Download, FileText, Package, ReceiptText, ShoppingBag, Sparkles } from 'lucide-react';
 import { DataService } from '../lib/dataService';
 import { useAuth } from '../lib/AuthContext';
 import { Order, SiteSettings } from '../types';
@@ -92,6 +92,7 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
   const [quotations, setQuotations] = useState<any[]>([]);
   const [settings, setSettings] = useState<SiteSettings>({});
   const [loading, setLoading] = useState(true);
+  const [convertingId, setConvertingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'quotations' | 'orders' | 'invoices' | 'new_quote'>('quotations');
 
   // New quote form state
@@ -100,6 +101,29 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
   const [notes, setNotes] = useState('');
   const [submittingQuote, setSubmittingQuote] = useState(false);
   const [quoteSuccess, setQuoteSuccess] = useState('');
+
+  const handleProceedWithProduction = async (q: any) => {
+    const formattedPrice = q.quotedPrice ? money(q.quotedPrice, q.currency) : 'the quoted price';
+    if (!window.confirm(`Proceed with production order for "${q.productName}" at ${formattedPrice}?\n\nThis will generate your Print Job Order (PJO) and immediately queue it into PlazaHQ production.`)) {
+      return;
+    }
+
+    setConvertingId(q.id);
+    try {
+      await DataService.convertQuotationToPjo(q.id, {
+        sellPrice: q.quotedPrice,
+        currency: q.currency,
+        finishingSpecs: q.finishingSpecs,
+      });
+      await fetchClientArea();
+      setActiveTab('orders');
+    } catch (err: any) {
+      console.error('Failed to convert quotation to production order:', err);
+      alert('Could not proceed with production order. Please try again or contact support.');
+    } finally {
+      setConvertingId(null);
+    }
+  };
 
   useEffect(() => {
     if (user) fetchClientArea();
@@ -302,6 +326,62 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
                           </span>
                         </div>
                       </div>
+
+                      {/* Approved: Proceed with Production CTA */}
+                      {q.quoteStatus === 'approved' && (
+                        <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-gradient-to-r from-emerald-50/90 via-cyan-50/40 to-slate-50 p-4 sm:p-5 rounded-xl border border-emerald-200/80 shadow-xs">
+                          <div className="flex items-center gap-3.5">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                              <CheckCircle className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <p className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
+                                Quotation Approved by PlazaHQ Press
+                                <span className="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded uppercase">Ready for Production</span>
+                              </p>
+                              <p className="text-[11px] text-slate-600 mt-0.5">
+                                Proceed to create your Print Job Order (PJO) and queue this order directly into the press & finishing pipeline.
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleProceedWithProduction(q)}
+                            disabled={convertingId === q.id}
+                            className="w-full md:w-auto px-6 py-3 bg-[#2D545E] hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 shrink-0"
+                          >
+                            {convertingId === q.id ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                <span>Queueing into Pipeline...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>Proceed with Production Order</span>
+                                <ArrowRight className="w-4 h-4 text-[#E17055]" />
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Converted: Link to Production Order */}
+                      {q.quoteStatus === 'converted' && (
+                        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                          <div className="flex items-center gap-2.5 text-xs text-slate-700">
+                            <Package className="w-4 h-4 text-[#2D545E]" />
+                            <span>Print Job Order Active in Pipeline: <strong className="font-mono text-[#2D545E]">{q.convertedPjoNumber || 'PJO Generated'}</strong></span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab('orders')}
+                            className="text-xs font-bold text-[#2D545E] hover:text-[#E17055] transition-colors flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <span>View in My Print Orders</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
