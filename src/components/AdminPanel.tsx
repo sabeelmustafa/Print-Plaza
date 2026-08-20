@@ -140,6 +140,8 @@ export default function AdminPanel() {
   const [businessOrder, setBusinessOrder] = useState<Order | null>(null);
   const [activeQuotation, setActiveQuotation] = useState<Order | null>(null);
   const [creatingOrder, setCreatingOrder] = useState(false);
+  const [creatingQuotation, setCreatingQuotation] = useState(false);
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
   
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
@@ -224,14 +226,18 @@ export default function AdminPanel() {
     window.location.href = '/admin';
   };
 
-  // Filtered Lists for Workflow Separation
-  const pendingQuotations = orders.filter(o => o.isQuotation || o.quoteStatus === 'new' || o.quoteStatus === 'negotiating');
-  const confirmedPjos = orders.filter(o => !o.isQuotation || o.quoteStatus === 'converted');
+  // Filtered Lists for Workflow Separation (Only jobs with PJO numbers are in the Production Pipeline)
+  const pendingQuotations = orders.filter(o => !o.pjoNumber && o.quoteStatus !== 'converted');
+  const confirmedPjos = orders.filter(o => Boolean(o.pjoNumber) || o.quoteStatus === 'converted');
 
-  // Metrics
-  const totalRevenue = orders.reduce((sum, o) => sum + (o.sellPrice || o.totalPrice || 0), 0);
+  // Metrics (Exclude cancelled orders from revenue and balance due)
+  const totalRevenue = orders
+    .filter(o => o.status !== 'cancelled')
+    .reduce((sum, o) => sum + (o.sellPrice || o.totalPrice || 0), 0);
   const activeJobs = confirmedPjos.filter(o => o.status === 'pending' || o.status === 'processing').length;
-  const pendingPayments = orders.filter(o => o.paymentStatus !== 'paid').reduce((sum, o) => sum + (o.balanceDue ?? (o.totalPrice - (o.paidAmount || 0))), 0);
+  const pendingPayments = orders
+    .filter(o => o.status !== 'cancelled' && o.paymentStatus !== 'paid')
+    .reduce((sum, o) => sum + (o.balanceDue ?? Math.max(0, (o.sellPrice || o.totalPrice || 0) - (o.paidAmount || 0))), 0);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex font-sans antialiased">
@@ -388,6 +394,7 @@ export default function AdminPanel() {
                 <QuotationsEditor
                   quotations={pendingQuotations}
                   searchQuery={searchQuery}
+                  onCreateQuotation={() => setCreatingQuotation(true)}
                   onManageQuotation={setActiveQuotation}
                 />
               )}
@@ -431,7 +438,12 @@ export default function AdminPanel() {
               )}
 
               {activeTab === 'customers' && (
-                <CustomersEditor orders={orders} searchQuery={searchQuery} onManageOrder={setBusinessOrder} />
+                <CustomersEditor
+                  orders={orders}
+                  searchQuery={searchQuery}
+                  onCreateCustomer={() => setCreatingCustomer(true)}
+                  onManageOrder={setBusinessOrder}
+                />
               )}
 
               {activeTab === 'business' && (
@@ -529,6 +541,33 @@ export default function AdminPanel() {
             setCreatingOrder(false);
             await loadAll();
             flash('New print job created.');
+          }}
+        />
+      )}
+
+      {/* Create Quotation Modal */}
+      {creatingQuotation && (
+        <CreateQuotationModal
+          products={products}
+          onClose={() => setCreatingQuotation(false)}
+          onSave={async order => {
+            await DataService.createAdminOrder(order);
+            setCreatingQuotation(false);
+            await loadAll();
+            flash('New quotation request created.');
+          }}
+        />
+      )}
+
+      {/* Create Customer Modal */}
+      {creatingCustomer && (
+        <CreateCustomerModal
+          onClose={() => setCreatingCustomer(false)}
+          onSave={async order => {
+            await DataService.createAdminOrder(order);
+            setCreatingCustomer(false);
+            await loadAll();
+            flash('New customer profile saved.');
           }}
         />
       )}
@@ -798,10 +837,12 @@ function QuickQuoteEstimator({ products, onNewJob }: { products: Product[]; onNe
 function QuotationsEditor({
   quotations,
   searchQuery,
+  onCreateQuotation,
   onManageQuotation
 }: {
   quotations: Order[];
   searchQuery: string;
+  onCreateQuotation: () => void;
   onManageQuotation: (q: Order) => void;
 }) {
   const filteredQuotations = quotations.filter((q) => {
@@ -818,6 +859,12 @@ function QuotationsEditor({
           <h2 className="text-sm font-bold text-slate-900">Storefront Quotation Desk ({quotations.length} Pending Requests)</h2>
           <p className="text-xs text-slate-500 mt-0.5">Review customer requirements, configure finishing options (Laminations, Hot Foils, Spot UV), finalize pricing, and convert into Print Job Orders (PJOs).</p>
         </div>
+        <button
+          onClick={onCreateQuotation}
+          className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs py-2 px-4 rounded-xl flex items-center gap-2 transition-all shadow-xs cursor-pointer shrink-0"
+        >
+          <Plus className="w-4 h-4" /> Create Manual Quote Request
+        </button>
       </div>
 
       {/* Quotations Table */}
@@ -1224,7 +1271,7 @@ function OrdersEditor({
   onManage: (order: Order) => void;
   onStatus: (id: string, status: string) => Promise<void>;
 }) {
-  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
+  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('kanban');
   const [statusFilter, setStatusFilter] = useState<string>('active_pipeline');
 
   const filteredOrders = orders.filter((o) => {
@@ -1622,10 +1669,12 @@ function CategoriesEditor({
 function CustomersEditor({
   orders,
   searchQuery,
+  onCreateCustomer,
   onManageOrder
 }: {
   orders: Order[];
   searchQuery: string;
+  onCreateCustomer: () => void;
   onManageOrder: (o: Order) => void;
 }) {
   // Aggregate customer statistics
@@ -1663,7 +1712,13 @@ function CustomersEditor({
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
       <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Customer Ledger ({customers.length} Accounts)</h2>
+        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Customer Directory Ledger ({customers.length} Accounts)</h2>
+        <button
+          onClick={onCreateCustomer}
+          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold text-xs py-2 px-4 rounded-xl flex items-center gap-2 transition-all shadow-xs cursor-pointer"
+        >
+          <Plus className="w-4 h-4" /> Add New Customer
+        </button>
       </div>
 
       <div className="overflow-x-auto">
@@ -1743,9 +1798,10 @@ function BusinessEditor({
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {filteredOrders.map((order) => {
+                const isCancelled = order.status === 'cancelled';
                 const total = order.sellPrice || order.totalPrice || 0;
                 const paid = order.paidAmount || (order.paymentStatus === 'paid' ? total : 0);
-                const due = order.balanceDue ?? (total - paid);
+                const due = isCancelled ? 0 : (order.balanceDue ?? Math.max(0, total - paid));
 
                 return (
                   <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
@@ -1755,8 +1811,20 @@ function BusinessEditor({
                     <td className="py-3.5 px-4 font-semibold text-slate-900">{order.userEmail}</td>
                     <td className="py-3.5 px-4 font-bold text-slate-900">${total.toFixed(2)}</td>
                     <td className="py-3.5 px-4 text-emerald-600 font-semibold">${paid.toFixed(2)}</td>
-                    <td className="py-3.5 px-4 text-rose-600 font-bold">${due > 0 ? due.toFixed(2) : '0.00'}</td>
-                    <td className="py-3.5 px-4"><PaymentBadge status={order.paymentStatus || 'unpaid'} /></td>
+                    <td className="py-3.5 px-4 font-bold">
+                      {isCancelled ? (
+                        <span className="text-slate-400 text-xs">$0.00 <span className="text-[10px] italic">(Cancelled)</span></span>
+                      ) : (
+                        <span className="text-rose-600">${due.toFixed(2)}</span>
+                      )}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      {isCancelled ? (
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">Cancelled Order</span>
+                      ) : (
+                        <PaymentBadge status={order.paymentStatus || 'unpaid'} />
+                      )}
+                    </td>
                     <td className="py-3.5 px-4 text-right">
                       <button
                         onClick={() => onManage(order)}
@@ -2110,9 +2178,10 @@ function BusinessOrderModal({
   const [paymentMethod, setPaymentMethod] = useState<string>('Bank Transfer');
   const [loading, setLoading] = useState(false);
 
+  const isCancelled = order.status === 'cancelled';
   const total = sellPrice;
   const paid = order.paidAmount || (order.paymentStatus === 'paid' ? total : 0);
-  const balance = order.balanceDue ?? (total - paid);
+  const balance = isCancelled ? 0 : (order.balanceDue ?? Math.max(0, total - paid));
 
   const handleUpdateFinance = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2447,6 +2516,309 @@ function CreateOrderModal({
             </button>
             <button type="submit" disabled={loading} className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold shadow-xs">
               Create PJO Ticket
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                         CREATE MANUAL QUOTATION MODAL                      */
+/* -------------------------------------------------------------------------- */
+
+function CreateQuotationModal({
+  products,
+  onClose,
+  onSave
+}: {
+  products: Product[];
+  onClose: () => void;
+  onSave: (order: Partial<Order>) => Promise<void>;
+}) {
+  const [selectedProductId, setSelectedProductId] = useState<string>(products[0]?.id || '');
+  const [userEmail, setUserEmail] = useState('');
+  const [userName, setUserName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [quantity, setQuantity] = useState(500);
+  const [specifications, setSpecifications] = useState('');
+  const [customPrice, setCustomPrice] = useState<number | undefined>(undefined);
+  const [loading, setLoading] = useState(false);
+
+  const product = products.find(p => p.id === selectedProductId) || products[0];
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!product || !userEmail) return;
+    setLoading(true);
+    try {
+      const totalPrice = customPrice ?? (product.price * quantity);
+      await onSave({
+        userId: `cust_${Date.now()}`,
+        productId: product.id,
+        productName: product.name,
+        quantity,
+        userEmail,
+        userName: userName || userEmail,
+        totalPrice,
+        sellPrice: totalPrice,
+        costPrice: totalPrice * 0.5,
+        options: {
+          phone,
+          companyName,
+          specifications,
+        },
+        status: 'pending',
+        paymentStatus: 'unpaid',
+        isQuotation: true,
+        quoteStatus: 'new',
+        createdAt: new Date().toISOString()
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-900">Create Manual Quote Request</h2>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Customer Email *</label>
+            <input
+              type="email"
+              placeholder="client@example.com"
+              value={userEmail}
+              onChange={(e) => setUserEmail(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Full Name</label>
+              <input
+                type="text"
+                placeholder="John Doe"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Phone Number</label>
+              <input
+                type="tel"
+                placeholder="(555) 123-4567"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Company / Brand Name</label>
+            <input
+              type="text"
+              placeholder="Company name"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Product / Substrate *</label>
+            <select
+              value={selectedProductId}
+              onChange={(e) => setSelectedProductId(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+            >
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>{p.name} (${p.price}/{p.unit})</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Quantity *</label>
+              <input
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(Number(e.target.value))}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Est. Quote Price ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                placeholder={product ? String(product.price * quantity) : 'Auto'}
+                value={customPrice !== undefined ? customPrice : ''}
+                onChange={(e) => setCustomPrice(e.target.value ? Number(e.target.value) : undefined)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Specifications & Requirements</label>
+            <textarea
+              rows={3}
+              placeholder="Dimensions, stock, colors, custom finish..."
+              value={specifications}
+              onChange={(e) => setSpecifications(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs outline-none focus:border-slate-400"
+            />
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold">
+              Cancel
+            </button>
+            <button type="submit" disabled={loading} className="px-5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold shadow-xs">
+              Save Quotation Draft
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*                         CREATE MANUAL CUSTOMER MODAL                       */
+/* -------------------------------------------------------------------------- */
+
+function CreateCustomerModal({
+  onClose,
+  onSave
+}: {
+  onClose: () => void;
+  onSave: (order: Partial<Order>) => Promise<void>;
+}) {
+  const [userEmail, setUserEmail] = useState('');
+  const [userName, setUserName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [notes, setNotes] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userEmail) return;
+    setLoading(true);
+    try {
+      await onSave({
+        userId: `cust_${Date.now()}`,
+        productId: 'custom-account',
+        productName: 'Customer Profile',
+        quantity: 1,
+        userEmail,
+        userName: userName || userEmail,
+        totalPrice: 0,
+        sellPrice: 0,
+        costPrice: 0,
+        options: {
+          phone,
+          companyName,
+          specifications: notes || 'Registered customer profile',
+        },
+        status: 'pending',
+        paymentStatus: 'unpaid',
+        isQuotation: true,
+        quoteStatus: 'new',
+        createdAt: new Date().toISOString()
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-900">Add New Customer Profile</h2>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Customer Email *</label>
+            <input
+              type="email"
+              placeholder="client@example.com"
+              value={userEmail}
+              onChange={(e) => setUserEmail(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Full Name</label>
+              <input
+                type="text"
+                placeholder="John Doe"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Phone Number</label>
+              <input
+                type="tel"
+                placeholder="(555) 123-4567"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Company / Brand Name</label>
+            <input
+              type="text"
+              placeholder="Acme Corp"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold outline-none focus:border-slate-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Notes / Address</label>
+            <textarea
+              rows={2}
+              placeholder="Customer notes or address..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs outline-none focus:border-slate-400"
+            />
+          </div>
+
+          <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold">
+              Cancel
+            </button>
+            <button type="submit" disabled={loading} className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-xl text-xs font-bold shadow-xs">
+              Save Customer Profile
             </button>
           </div>
         </form>

@@ -411,37 +411,48 @@ app.get('/api/orders', requireDb, async (req, res, next) => {
           paidAt: payment.paid_at,
           createdAt: payment.created_at,
         });
-        return result;
       }, {});
     }
-    res.json(rows.map((row) => ({
-      ...(adminRequest ? {
-        costPrice: Number(row.cost_price || 0),
-      } : {}),
-      paidAmount: Number(row.paid_amount || 0),
-      balanceDue: Math.max(0, Number(row.sell_price || row.total_price || 0) - Number(row.paid_amount || 0)),
-      invoiceNotes: row.invoice_notes || '',
-      paymentDueDate: row.payment_due_date,
-      payments: paymentsByOrder[row.id] || [],
-      id: row.id,
-      userId: row.user_id,
-      userName: row.user_name,
-      userEmail: row.user_email,
-      productId: row.product_id,
-      productName: row.product_name,
-      quantity: Number(row.quantity),
-      items: parseJson(row.items_json, []),
-      options: parseJson(row.options_json, {}),
-      totalPrice: Number(row.total_price),
-      currency: normalizeCurrency(row.currency_code),
-      sellPrice: Number(row.sell_price || row.total_price || 0),
-      paymentStatus: Number(row.paid_amount || 0) >= Number(row.sell_price || row.total_price || 0) && Number(row.sell_price || row.total_price || 0) > 0
-        ? 'paid'
-        : Number(row.paid_amount || 0) > 0 ? 'partial' : 'unpaid',
-      status: row.status,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    })));
+    res.json(rows.map((row) => {
+      const optionsObj = parseJson(row.options_json, {});
+      const isQuotation = optionsObj.isQuotation !== false && !optionsObj.pjoNumber;
+      const pjoNumber = optionsObj.pjoNumber || null;
+      const quoteStatus = optionsObj.quoteStatus || (isQuotation ? 'new' : 'converted');
+      const finishingSpecs = optionsObj.finishingSpecs || null;
+
+      return {
+        ...(adminRequest ? {
+          costPrice: Number(row.cost_price || 0),
+        } : {}),
+        paidAmount: Number(row.paid_amount || 0),
+        balanceDue: row.status === 'cancelled' ? 0 : Math.max(0, Number(row.sell_price || row.total_price || 0) - Number(row.paid_amount || 0)),
+        invoiceNotes: row.invoice_notes || '',
+        paymentDueDate: row.payment_due_date,
+        payments: paymentsByOrder[row.id] || [],
+        id: row.id,
+        userId: row.user_id,
+        userName: row.user_name,
+        userEmail: row.user_email,
+        productId: row.product_id,
+        productName: row.product_name,
+        quantity: Number(row.quantity),
+        items: parseJson(row.items_json, []),
+        options: optionsObj,
+        isQuotation,
+        pjoNumber,
+        quoteStatus,
+        finishingSpecs,
+        totalPrice: Number(row.total_price),
+        currency: normalizeCurrency(row.currency_code),
+        sellPrice: Number(row.sell_price || row.total_price || 0),
+        paymentStatus: Number(row.paid_amount || 0) >= Number(row.sell_price || row.total_price || 0) && Number(row.sell_price || row.total_price || 0) > 0
+          ? 'paid'
+          : Number(row.paid_amount || 0) > 0 ? 'partial' : 'unpaid',
+        status: row.status,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+    }));
   } catch (error) {
     next(error);
   }
@@ -455,6 +466,12 @@ app.post('/api/orders', requireDb, async (req, res, next) => {
     const totalPrice = items.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0);
     const quantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 1;
     const productName = summarizeOrderTitle(items, order.productName);
+    const optionsObj = {
+      ...(order.options || {}),
+      isQuotation: true,
+      quoteStatus: 'new',
+    };
+
     await pool.query(
       `INSERT INTO orders (
          id, user_id, user_name, user_email, product_id, product_name,
@@ -469,7 +486,7 @@ app.post('/api/orders', requireDb, async (req, res, next) => {
         items[0]?.productId || order.productId,
         productName,
         quantity,
-        JSON.stringify(order.options || {}),
+        JSON.stringify(optionsObj),
         JSON.stringify(items),
         totalPrice,
         totalPrice,
@@ -486,7 +503,7 @@ app.post('/api/admin/orders', requireDb, requireAdmin, async (req, res, next) =>
   try {
     const order = req.body;
     const id = createId('order');
-    const allowedStatuses = ['pending', 'processing', 'completed', 'cancelled'];
+    const allowedStatuses = ['pending', 'processing', 'completed', 'delivered', 'cancelled'];
     const status = allowedStatuses.includes(order.status) ? order.status : 'pending';
     const items = normalizeOrderItems(order);
     const itemsSellPrice = items.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0);
@@ -494,6 +511,14 @@ app.post('/api/admin/orders', requireDb, requireAdmin, async (req, res, next) =>
     const costPrice = Math.max(0, Number(order.costPrice || 0));
     const quantity = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || Math.max(1, Number(order.quantity || 1));
     const productName = summarizeOrderTitle(items, order.productName);
+    const optionsObj = {
+      ...(order.options || {}),
+      isQuotation: Boolean(order.isQuotation),
+      quoteStatus: order.quoteStatus || (order.isQuotation ? 'new' : 'converted'),
+      ...(order.pjoNumber ? { pjoNumber: order.pjoNumber } : {}),
+      ...(order.finishingSpecs ? { finishingSpecs: order.finishingSpecs } : {}),
+    };
+
     await pool.query(
       `INSERT INTO orders (
          id, user_id, user_name, user_email, product_id, product_name,
@@ -508,7 +533,7 @@ app.post('/api/admin/orders', requireDb, requireAdmin, async (req, res, next) =>
         String(items[0]?.productId || order.productId || 'manual-order'),
         productName,
         quantity,
-        JSON.stringify(order.options || {}),
+        JSON.stringify(optionsObj),
         JSON.stringify(items),
         sellPrice,
         costPrice,
@@ -544,6 +569,22 @@ app.patch('/api/admin/orders/:id/finance', requireDb, requireAdmin, async (req, 
         req.params.id,
       ]
     );
+
+    // Update options_json for quotation & finishing fields
+    if (req.body.isQuotation !== undefined || req.body.pjoNumber || req.body.finishingSpecs || req.body.quoteStatus) {
+      const [orderRows] = await pool.query('SELECT options_json FROM orders WHERE id = ?', [req.params.id]);
+      if (orderRows.length) {
+        const currentOpts = parseJson(orderRows[0].options_json, {});
+        const updatedOpts = {
+          ...currentOpts,
+          ...(req.body.isQuotation !== undefined ? { isQuotation: req.body.isQuotation } : {}),
+          ...(req.body.pjoNumber ? { pjoNumber: req.body.pjoNumber } : {}),
+          ...(req.body.quoteStatus ? { quoteStatus: req.body.quoteStatus } : {}),
+          ...(req.body.finishingSpecs ? { finishingSpecs: req.body.finishingSpecs } : {}),
+        };
+        await pool.query('UPDATE orders SET options_json = ? WHERE id = ?', [JSON.stringify(updatedOpts), req.params.id]);
+      }
+    }
     res.json({ ok: true });
   } catch (error) {
     next(error);
@@ -589,7 +630,7 @@ app.delete('/api/admin/payments/:id', requireDb, requireAdmin, async (req, res, 
 
 app.patch('/api/admin/orders/:id/status', requireDb, requireAdmin, async (req, res, next) => {
   try {
-    const allowed = ['pending', 'processing', 'completed', 'cancelled'];
+    const allowed = ['pending', 'processing', 'completed', 'delivered', 'cancelled'];
     if (!allowed.includes(req.body.status)) {
       res.status(400).json({ error: 'Invalid status.' });
       return;
