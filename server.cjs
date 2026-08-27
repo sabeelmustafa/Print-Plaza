@@ -3,8 +3,17 @@ const crypto = require('crypto');
 const fs = require('fs');
 const express = require('express');
 const mysql = require('mysql2/promise');
-const { renderRouteHtml } = require('./serverSeoData.cjs');
 require('dotenv').config();
+
+let renderRouteHtml = (html) => html;
+try {
+  const seoDataModule = require('./serverSeoData.cjs');
+  if (typeof seoDataModule.renderRouteHtml === 'function') {
+    renderRouteHtml = seoDataModule.renderRouteHtml;
+  }
+} catch (err) {
+  console.warn('[SEO] serverSeoData.cjs fallback active:', err.message);
+}
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -211,13 +220,19 @@ function createSmtpTransporter() {
 }
 
 function buildFromAddress() {
-  const rawFrom = (process.env.SMTP_FROM || '').trim().replace(/^["']|["']$/g, '');
+  const rawFrom = (process.env.SMTP_FROM || '').trim();
   const smtpUser = (process.env.SMTP_USER || 'sales@printplaza.net').trim().replace(/^["']|["']$/g, '');
 
-  if (rawFrom && rawFrom.includes('<')) return rawFrom;
+  if (rawFrom) {
+    const match = rawFrom.match(/^(?:"?([^"<]+)"?\s*)?<([^>]+)>$/);
+    if (match) {
+      const name = (match[1] || 'Print Plaza').trim();
+      const email = match[2].trim();
+      return `"${name}" <${email}>`;
+    }
+  }
 
-  const displayName = rawFrom || 'Print Plaza HQ';
-  return `"${displayName}" <${smtpUser}>`;
+  return `"Print Plaza" <${smtpUser}>`;
 }
 
 async function sendWelcomeEmail(customerEmail, customerName, plainPassword) {
@@ -237,37 +252,69 @@ async function sendWelcomeEmail(customerEmail, customerName, plainPassword) {
   const htmlContent = `
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"></head>
-<body style="font-family:Arial,sans-serif;background:#f4f6f8;margin:0;padding:30px">
-<table align="center" style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;width:100%;max-width:600px">
-  <tr style="background:#2D545E;color:#fff">
-    <td style="padding:28px 24px;text-align:center">
-      <a href="${portalUrl}" style="text-decoration:none;display:inline-block" target="_blank">
-        <img src="${logoUrl}" alt="Print Plaza" width="180" style="max-height:50px;max-width:210px;width:auto;height:auto;display:inline-block;border:0;outline:none;text-decoration:none;margin-bottom:8px" />
-      </a>
-      <p style="margin:4px 0 0;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#e2e8f0;font-family:Arial,sans-serif;font-weight:600">Press &amp; Packaging Production Portal</p>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#F1F5F9;margin:0;padding:24px 12px">
+<table align="center" style="background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E2E8F0;width:100%;max-width:600px;box-shadow:0 4px 16px rgba(0,0,0,0.04)" cellpadding="0" cellspacing="0" border="0">
+  <!-- Dual Accent Top Border -->
+  <tr>
+    <td style="padding:0">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="height:4px">
+        <tr>
+          <td width="50%" style="background:#2D545E;height:4px;font-size:1px;line-height:1px">&nbsp;</td>
+          <td width="50%" style="background:#E17055;height:4px;font-size:1px;line-height:1px">&nbsp;</td>
+        </tr>
+      </table>
     </td>
   </tr>
-  <tr><td style="padding:35px;color:#1e293b">
-    <h2 style="margin-top:0;color:#2D545E;font-size:20px">Welcome, ${toName}!</h2>
-    <p style="font-size:14px;line-height:1.6;color:#475569">
-      Your customer account has been set up. Log in to your Client Portal to track quotation requests, Print Job Orders, and invoices.
-    </p>
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #E17055;padding:20px;border-radius:8px;margin:25px 0">
-      <h3 style="margin-top:0;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:#E17055">Your Login Credentials</h3>
-      <p style="margin:8px 0;font-size:14px"><strong>Portal:</strong> <a href="${portalUrl}" style="color:#2D545E">${portalUrl}</a></p>
-      <p style="margin:8px 0;font-size:14px"><strong>Email:</strong> <span style="font-family:monospace">${toEmail}</span></p>
-      <p style="margin:8px 0;font-size:14px"><strong>Password:</strong> <span style="font-family:monospace;background:#e2e8f0;padding:2px 6px;border-radius:4px">${plainPassword}</span></p>
-    </div>
-    <div style="text-align:center;margin-top:30px">
-      <a href="${portalUrl}" style="background:#2D545E;color:#fff;text-decoration:none;padding:14px 30px;font-weight:bold;border-radius:8px;display:inline-block;font-size:14px">Log In to Client Portal</a>
-    </div>
-    <p style="font-size:12px;color:#94a3b8;margin-top:35px;line-height:1.5">
-      Questions? Reply to this email or contact us at sales@printplaza.net.
-    </p>
-  </td></tr>
-  <tr style="background:#f1f5f9;color:#64748b;font-size:11px;text-align:center">
-    <td style="padding:15px">&copy; ${new Date().getFullYear()} Print Plaza Press. All rights reserved.</td>
+  <!-- Clean High-Contrast White Header -->
+  <tr>
+    <td style="background:#FFFFFF;padding:32px 24px 24px;text-align:center;border-bottom:1px solid #F1F5F9">
+      <a href="${portalUrl}" style="text-decoration:none;display:inline-block" target="_blank">
+        <img src="${logoUrl}" alt="Print Plaza" width="220" style="max-height:56px;max-width:240px;width:auto;height:auto;display:inline-block;border:0;outline:none;text-decoration:none;margin:0 auto" />
+      </a>
+      <p style="margin:10px 0 0;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#64748B;font-weight:700">Press &amp; Packaging Production Portal</p>
+    </td>
+  </tr>
+  <!-- Content Body -->
+  <tr>
+    <td style="padding:36px 32px;color:#1E293B">
+      <h2 style="margin:0 0 12px;color:#0F172A;font-size:22px;font-weight:800;letter-spacing:-0.5px">Welcome to Print Plaza, ${toName}!</h2>
+      <p style="font-size:15px;line-height:1.65;color:#475569;margin:0 0 24px">
+        Your client account has been configured. You can now access your dedicated Client Portal to review instant quotes, download invoices, check job proofs, and track real-time press production.
+      </p>
+
+      <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-left:4px solid #E17055;padding:22px;border-radius:10px;margin:24px 0">
+        <h3 style="margin:0 0 14px;font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:#E17055;font-weight:800">Your Login Credentials</h3>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;color:#334155;line-height:1.7">
+          <tr>
+            <td width="100" style="color:#64748B;font-weight:600">Portal URL:</td>
+            <td><a href="${portalUrl}" style="color:#2D545E;font-weight:700;text-decoration:none">${portalUrl}</a></td>
+          </tr>
+          <tr>
+            <td style="color:#64748B;font-weight:600">Email:</td>
+            <td><strong style="color:#0F172A">${toEmail}</strong></td>
+          </tr>
+          <tr>
+            <td style="color:#64748B;font-weight:600">Password:</td>
+            <td><code style="font-family:Consolas,Monaco,monospace;background:#E2E8F0;padding:3px 8px;border-radius:4px;color:#0F172A;font-weight:700;font-size:14px">${plainPassword}</code></td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="text-align:center;margin:32px 0 16px">
+        <a href="${portalUrl}" style="background:#2D545E;color:#FFFFFF;text-decoration:none;padding:14px 34px;font-weight:800;border-radius:8px;display:inline-block;font-size:14px;letter-spacing:0.5px;text-transform:uppercase">Access Client Portal &rarr;</a>
+      </div>
+
+      <p style="font-size:13px;color:#94A3B8;margin:32px 0 0;line-height:1.5;border-top:1px solid #F1F5F9;padding-top:20px;text-align:center">
+        Need assistance with your artwork or print job? Reply directly to this email or reach us at <a href="mailto:sales@printplaza.net" style="color:#2D545E;text-decoration:none;font-weight:600">sales@printplaza.net</a>.
+      </p>
+    </td>
+  </tr>
+  <!-- Footer -->
+  <tr style="background:#F8FAFC;border-top:1px solid #E2E8F0">
+    <td style="padding:18px 24px;text-align:center;color:#64748B;font-size:12px;line-height:1.5">
+      &copy; ${new Date().getFullYear()} <strong>Print Plaza</strong>. Main Talagang Road, Chakwal 48800, Punjab, Pakistan.
+    </td>
   </tr>
 </table>
 </body></html>`;
@@ -291,6 +338,7 @@ async function sendWelcomeEmail(customerEmail, customerName, plainPassword) {
   // Simulation mode
   console.log(`\n=== [WELCOME EMAIL SIMULATION] ===`);
   console.log(`To: ${toEmail} | Name: ${toName} | Password: ${plainPassword}`);
+  console.log(`From: ${fromAddress}`);
   console.log(`Portal: ${portalUrl}`);
   console.log(`===================================\n`);
   return { success: true, mode: 'simulated' };
@@ -318,42 +366,77 @@ async function sendQuotationUpdateEmail(customerEmail, customerName, quoteObj) {
   const htmlContent = `
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"></head>
-<body style="font-family:Arial,sans-serif;background:#f4f6f8;margin:0;padding:30px">
-<table align="center" style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;width:100%;max-width:600px">
-  <tr style="background:#2D545E;color:#fff">
-    <td style="padding:28px 24px;text-align:center">
-      <a href="${portalUrl}" style="text-decoration:none;display:inline-block" target="_blank">
-        <img src="${logoUrl}" alt="Print Plaza" width="180" style="max-height:50px;max-width:210px;width:auto;height:auto;display:inline-block;border:0;outline:none;text-decoration:none;margin-bottom:8px" />
-      </a>
-      <p style="margin:4px 0 0;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#e2e8f0;font-family:Arial,sans-serif;font-weight:600">Quotation Update Notification</p>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#F1F5F9;margin:0;padding:24px 12px">
+<table align="center" style="background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid #E2E8F0;width:100%;max-width:600px;box-shadow:0 4px 16px rgba(0,0,0,0.04)" cellpadding="0" cellspacing="0" border="0">
+  <!-- Dual Accent Top Border -->
+  <tr>
+    <td style="padding:0">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="height:4px">
+        <tr>
+          <td width="50%" style="background:#2D545E;height:4px;font-size:1px;line-height:1px">&nbsp;</td>
+          <td width="50%" style="background:#E17055;height:4px;font-size:1px;line-height:1px">&nbsp;</td>
+        </tr>
+      </table>
     </td>
   </tr>
-  <tr><td style="padding:35px;color:#1e293b">
-    <h2 style="margin-top:0;color:#2D545E;font-size:20px">Your Quote Has Been Updated</h2>
-    <p style="font-size:14px;line-height:1.6;color:#475569">
-      Hello <strong>${toName}</strong>, your quotation <strong>#${quoteId}</strong> has been reviewed and updated.
-    </p>
-    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:4px solid #E17055;padding:20px;border-radius:8px;margin:25px 0">
-      <h3 style="margin-top:0;font-size:14px;text-transform:uppercase;letter-spacing:1px;color:#E17055">Quotation Summary</h3>
-      <p style="margin:8px 0;font-size:14px"><strong>Product:</strong> ${productName}</p>
-      <p style="margin:8px 0;font-size:14px"><strong>Quantity:</strong> ${quantity} pcs</p>
-      <p style="margin:8px 0;font-size:14px"><strong>Quoted Price:</strong> <span style="font-size:18px;font-weight:bold;color:#2D545E">${currency} ${quotedPrice}</span></p>
-      <p style="margin:8px 0;font-size:14px"><strong>Status:</strong> <span style="background:#e2e8f0;padding:2px 8px;border-radius:4px;font-weight:bold">${status}</span></p>
-      ${specs.lamination ? `<p style="margin:6px 0;font-size:13px;color:#64748b">Lamination: ${specs.lamination}</p>` : ''}
-      ${specs.foiling    ? `<p style="margin:6px 0;font-size:13px;color:#64748b">Foil Stamping: ${specs.foiling}</p>` : ''}
-      ${specs.uv         ? `<p style="margin:6px 0;font-size:13px;color:#64748b">Spot UV: ${specs.uv}</p>` : ''}
-      ${specs.emboss     ? `<p style="margin:6px 0;font-size:13px;color:#64748b">Embossing: ${specs.emboss}</p>` : ''}
-    </div>
-    <div style="text-align:center;margin-top:30px">
-      <a href="${portalUrl}" style="background:#E17055;color:#fff;text-decoration:none;padding:14px 30px;font-weight:bold;border-radius:8px;display:inline-block;font-size:14px">View &amp; Approve in Client Portal</a>
-    </div>
-    <p style="font-size:12px;color:#94a3b8;margin-top:35px;line-height:1.5">
-      Questions? Reply to this email or log in to your Client Portal.
-    </p>
-  </td></tr>
-  <tr style="background:#f1f5f9;color:#64748b;font-size:11px;text-align:center">
-    <td style="padding:15px">&copy; ${new Date().getFullYear()} Print Plaza Press. All rights reserved.</td>
+  <!-- Clean High-Contrast White Header -->
+  <tr>
+    <td style="background:#FFFFFF;padding:32px 24px 24px;text-align:center;border-bottom:1px solid #F1F5F9">
+      <a href="${portalUrl}" style="text-decoration:none;display:inline-block" target="_blank">
+        <img src="${logoUrl}" alt="Print Plaza" width="220" style="max-height:56px;max-width:240px;width:auto;height:auto;display:inline-block;border:0;outline:none;text-decoration:none;margin:0 auto" />
+      </a>
+      <p style="margin:10px 0 0;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#64748B;font-weight:700">Quotation Notification Desk</p>
+    </td>
+  </tr>
+  <!-- Content Body -->
+  <tr>
+    <td style="padding:36px 32px;color:#1E293B">
+      <h2 style="margin:0 0 12px;color:#0F172A;font-size:22px;font-weight:800;letter-spacing:-0.5px">Quotation Update — #${quoteId}</h2>
+      <p style="font-size:15px;line-height:1.65;color:#475569;margin:0 0 24px">
+        Hello <strong>${toName}</strong>, your quotation request <strong>#${quoteId}</strong> has been reviewed and updated by our production estimating team.
+      </p>
+
+      <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-left:4px solid #2D545E;padding:22px;border-radius:10px;margin:24px 0">
+        <h3 style="margin:0 0 14px;font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:#2D545E;font-weight:800">Job Specifications</h3>
+        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:14px;color:#334155;line-height:1.7">
+          <tr>
+            <td width="110" style="color:#64748B;font-weight:600">Product:</td>
+            <td><strong style="color:#0F172A">${productName}</strong></td>
+          </tr>
+          <tr>
+            <td style="color:#64748B;font-weight:600">Quantity:</td>
+            <td><strong>${quantity} pcs</strong></td>
+          </tr>
+          <tr>
+            <td style="color:#64748B;font-weight:600">Quoted Price:</td>
+            <td><span style="font-size:18px;font-weight:800;color:#2D545E">${currency} ${quotedPrice}</span></td>
+          </tr>
+          <tr>
+            <td style="color:#64748B;font-weight:600">Status:</td>
+            <td><span style="background:#E2E8F0;padding:2px 8px;border-radius:4px;font-weight:700;font-size:12px;color:#0F172A">${status}</span></td>
+          </tr>
+          ${specs.lamination ? `<tr><td style="color:#64748B;font-weight:600">Lamination:</td><td>${specs.lamination}</td></tr>` : ''}
+          ${specs.foiling    ? `<tr><td style="color:#64748B;font-weight:600">Foil Stamping:</td><td>${specs.foiling}</td></tr>` : ''}
+          ${specs.uv         ? `<tr><td style="color:#64748B;font-weight:600">Spot UV:</td><td>${specs.uv}</td></tr>` : ''}
+          ${specs.emboss     ? `<tr><td style="color:#64748B;font-weight:600">Embossing:</td><td>${specs.emboss}</td></tr>` : ''}
+        </table>
+      </div>
+
+      <div style="text-align:center;margin:32px 0 16px">
+        <a href="${portalUrl}" style="background:#E17055;color:#FFFFFF;text-decoration:none;padding:14px 34px;font-weight:800;border-radius:8px;display:inline-block;font-size:14px;letter-spacing:0.5px;text-transform:uppercase">Review &amp; Approve Quote &rarr;</a>
+      </div>
+
+      <p style="font-size:13px;color:#94A3B8;margin:32px 0 0;line-height:1.5;border-top:1px solid #F1F5F9;padding-top:20px;text-align:center">
+        Questions regarding this quote? Reply to this email or contact our estimating team at <a href="mailto:sales@printplaza.net" style="color:#2D545E;text-decoration:none;font-weight:600">sales@printplaza.net</a>.
+      </p>
+    </td>
+  </tr>
+  <!-- Footer -->
+  <tr style="background:#F8FAFC;border-top:1px solid #E2E8F0">
+    <td style="padding:18px 24px;text-align:center;color:#64748B;font-size:12px;line-height:1.5">
+      &copy; ${new Date().getFullYear()} <strong>Print Plaza</strong>. Main Talagang Road, Chakwal 48800, Punjab, Pakistan.
+    </td>
   </tr>
 </table>
 </body></html>`;
@@ -363,7 +446,7 @@ async function sendQuotationUpdateEmail(customerEmail, customerName, quoteObj) {
       await transporter.sendMail({
         from:    fromAddress,
         to:      toEmail,
-        subject: `Your Print Plaza Quote #${quoteId} Has Been Updated`,
+        subject: `Print Plaza — Quotation Update #${quoteId}`,
         html:    htmlContent,
       });
       console.log(`[EMAIL] Quote update email sent to ${toEmail}`);
@@ -374,7 +457,7 @@ async function sendQuotationUpdateEmail(customerEmail, customerName, quoteObj) {
     }
   }
 
-  console.log(`[QUOTE EMAIL SIMULATION] To:${toEmail} | #${quoteId} | ${currency} ${quotedPrice}`);
+  console.log(`[QUOTE EMAIL SIMULATION] To:${toEmail} | #${quoteId} | ${currency} ${quotedPrice} | From: ${fromAddress}`);
   return { success: true, mode: 'simulated' };
 }
 
@@ -1678,10 +1761,11 @@ app.use((error, _req, res, _next) => {
   });
 });
 
-ensureBusinessSchema()
-  .catch((error) => console.error('Business schema setup failed:', error.message))
-  .finally(() => {
-    app.listen(port, () => {
-      console.log(`PlazaHQ server running on port ${port}`);
+app.listen(port, () => {
+  console.log(`PlazaHQ server running on port ${port}`);
+  if (hasDbConfig) {
+    ensureBusinessSchema().catch((error) => {
+      console.warn('[SCHEMA] Background schema setup notice:', error.message);
     });
-  });
+  }
+});
