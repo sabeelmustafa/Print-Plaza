@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const express = require('express');
 const mysql = require('mysql2/promise');
+const { renderRouteHtml } = require('./serverSeoData.cjs');
 require('dotenv').config();
 
 const app = express();
@@ -27,12 +28,27 @@ const dbConfig = {
   database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 10),
+  maxIdle: Number(process.env.DB_MAX_IDLE || 10),
+  idleTimeout: 60000,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
   queueLimit: 0,
   charset: 'utf8mb4',
 };
 
 const hasDbConfig = Boolean(dbConfig.host && dbConfig.user && dbConfig.database);
 const pool = hasDbConfig ? mysql.createPool(dbConfig) : null;
+
+if (pool) {
+  // Keep-alive heartbeat ping every 30 seconds to prevent MySQL wait_timeout disconnections
+  setInterval(async () => {
+    try {
+      await pool.query('SELECT 1');
+    } catch (err) {
+      console.warn('[DB KEEPALIVE WARNING] Connection check ping failed:', err.message);
+    }
+  }, 30000);
+}
 
 async function ensureBusinessSchema() {
   if (!pool) return;
@@ -479,6 +495,36 @@ function safeEqual(left, right) {
   if (leftBuffer.length !== rightBuffer.length) return false;
   return crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
+
+app.get('/api/health', async (_req, res) => {
+  if (!pool) {
+    return res.status(503).json({
+      status: 'error',
+      database: 'disconnected',
+      message: 'Database connection pool is not configured.',
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  try {
+    const start = Date.now();
+    await pool.query('SELECT 1');
+    const latencyMs = Date.now() - start;
+    res.json({
+      status: 'ok',
+      database: 'connected',
+      latencyMs,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({
+      status: 'error',
+      database: 'disconnected',
+      error: err.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
 
 app.post('/api/admin/login', (req, res) => {
   if (!process.env.ADMIN_PASSWORD || !process.env.ADMIN_SESSION_SECRET) {
@@ -1587,8 +1633,40 @@ app.use(express.static(distDir, {
   },
 }));
 
-app.use((_req, res) => {
-  res.sendFile(path.join(distDir, 'index.html'));
+let cachedTemplateHtml = null;
+let lastTemplateReadTime = 0;
+
+function getIndexTemplate() {
+  const now = Date.now();
+  if (cachedTemplateHtml && (now - lastTemplateReadTime < 5000)) {
+    return cachedTemplateHtml;
+  }
+  const indexPath = fs.existsSync(path.join(distDir, 'index.html'))
+    ? path.join(distDir, 'index.html')
+    : path.join(__dirname, 'index.html');
+  try {
+    cachedTemplateHtml = fs.readFileSync(indexPath, 'utf8');
+    lastTemplateReadTime = now;
+    return cachedTemplateHtml;
+  } catch (err) {
+    console.error('Failed to read index.html template:', err);
+    return cachedTemplateHtml || '<!doctype html><html><head><title>Print Plaza</title></head><body><div id="root"></div></body></html>';
+  }
+}
+
+app.use((req, res) => {
+  // If the request looks like a static asset that wasn't found, return 404
+  if (/\.(js|css|png|jpg|jpeg|gif|svg|ico|json|map|woff|woff2|ttf|eot)$/i.test(req.path)) {
+    res.status(404).send('Asset not found');
+    return;
+  }
+
+  const templateHtml = getIndexTemplate();
+  const renderedHtml = renderRouteHtml(templateHtml, req.path);
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.send(renderedHtml);
 });
 
 app.use((error, _req, res, _next) => {

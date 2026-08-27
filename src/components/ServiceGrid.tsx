@@ -4,7 +4,7 @@
  */
 
 import { motion } from 'motion/react';
-import * as Icons from 'lucide-react';
+import { ChevronRight, ArrowUpRight } from 'lucide-react';
 import { ServiceCategory } from '../types';
 
 interface ServiceGridProps {
@@ -12,9 +12,26 @@ interface ServiceGridProps {
   onSelect: (category: ServiceCategory) => void;
 }
 
-import { ChevronRight } from 'lucide-react';
+const CATEGORY_ROUTES: Record<string, string> = {
+  'packaging': '/custom-packaging-printing',
+  'labels': '/product-label-printing',
+  'cards': '/business-card-printing',
+  'marketing': '/brochure-printing',
+  'large-format': '/poster-printing',
+  'signage': '/signage-printing',
+  'offset': '/offset-printing',
+  'digital': '/digital-printing',
+  'stickers': '/sticker-printing',
+};
 
 export default function ServiceGrid({ categories, onSelect }: ServiceGridProps) {
+  const navigateToPage = (path: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    history.pushState(null, '', path);
+    window.dispatchEvent(new Event('plaza:navigate'));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <section id="services" className="py-24 sm:py-36 bg-[#FDFCFB] relative overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-full bg-grainy opacity-[0.03] pointer-events-none" />
@@ -37,41 +54,54 @@ export default function ServiceGrid({ categories, onSelect }: ServiceGridProps) 
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-px bg-black/5 border border-black/5">
-          {categories.map((category, index) => (
-            <motion.div
-              key={category.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.1 }}
-              onClick={() => onSelect(category)}
-              className="group bg-[#FDFCFB] p-7 sm:p-8 cursor-pointer hover:bg-black transition-colors duration-500 flex flex-col min-h-[300px] sm:min-h-[360px]"
-            >
-              <div className="mb-8 sm:mb-10">
-                <span className="text-[9px] font-mono font-bold text-black/30 group-hover:text-white/40 block mb-4">
-                  UNIT_0{index + 1}
-                </span>
-                <h3 className="text-[1.85rem] sm:text-[2.2rem] font-display font-black leading-[0.92] uppercase group-hover:text-white transition-colors">
-                  {category.title.split(' ')[0]} <br/>
-                  <span className="opacity-20 group-hover:opacity-40">{category.title.split(' ')[1] || 'UNIT'}</span>
-                </h3>
-              </div>
-              
-              <p className="text-xs font-medium leading-relaxed text-black/54 group-hover:text-white/48 mb-8 sm:mb-10">
-                {category.description}
-              </p>
-              
-              <div className="mt-8 sm:mt-auto">
-                <div className="flex items-center justify-between">
-                  <div className="flex gap-1">
-                    <div className="w-1 h-3 bg-[#E17055]" />
-                    <div className="w-1 h-3 bg-[#2D545E]" />
-                  </div>
-                  <ChevronRight className="w-5 h-5 translate-x-0 group-hover:translate-x-2 transition-transform text-[#E17055]" />
+          {categories.map((category, index) => {
+            const dedicatedPath = CATEGORY_ROUTES[category.id] || `/custom-packaging-printing`;
+            return (
+              <motion.div
+                key={category.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.08 }}
+                onClick={() => onSelect(category)}
+                className="group bg-[#FDFCFB] p-7 sm:p-8 cursor-pointer hover:bg-black transition-colors duration-500 flex flex-col min-h-[320px] sm:min-h-[370px]"
+              >
+                <div className="mb-6 sm:mb-8">
+                  <span className="text-[9px] font-mono font-bold text-black/30 group-hover:text-white/40 block mb-4">
+                    UNIT_0{index + 1}
+                  </span>
+                  <h3 className="text-[1.75rem] sm:text-[2.1rem] font-display font-black leading-[0.92] uppercase group-hover:text-white transition-colors">
+                    {category.title.split(' ')[0]} <br/>
+                    <span className="opacity-20 group-hover:opacity-40">{category.title.split(' ')[1] || 'UNIT'}</span>
+                  </h3>
                 </div>
-              </div>
-            </motion.div>
-          ))}
+                
+                <p className="text-xs font-medium leading-relaxed text-black/54 group-hover:text-white/48 mb-6">
+                  {category.description}
+                </p>
+
+                <div className="mb-6">
+                  <a
+                    href={dedicatedPath}
+                    onClick={(e) => navigateToPage(dedicatedPath, e)}
+                    className="inline-flex items-center gap-1.5 text-[9px] font-mono font-bold uppercase tracking-wider text-[#E17055] group-hover:text-white transition-colors underline underline-offset-4"
+                  >
+                    Explore Dedicated Specs &rarr;
+                  </a>
+                </div>
+                
+                <div className="mt-auto pt-4 border-t border-black/5 group-hover:border-white/10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex gap-1">
+                      <div className="w-1 h-3 bg-[#E17055]" />
+                      <div className="w-1 h-3 bg-[#2D545E]" />
+                    </div>
+                    <ChevronRight className="w-5 h-5 translate-x-0 group-hover:translate-x-2 transition-transform text-[#E17055]" />
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </section>

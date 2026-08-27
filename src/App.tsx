@@ -13,7 +13,16 @@ import OrderModal from './components/OrderModal';
 import AuthModal from './components/AuthModal';
 import AdminPanel, { WebsiteEditorPage } from './components/AdminPanel';
 import UserPanel from './components/UserPanel';
+import {
+  AboutPage,
+  ContactPage,
+  PrivacyPolicyPage,
+  ServicePage,
+  SERVICE_PAGES,
+  useSeo,
+} from './components/SeoPages';
 import { SERVICES as CONSTANT_SERVICES } from './constants';
+import { ALL_SEO_ROUTES, BUSINESS_INFO } from './seoData';
 import { ServiceCategory, Product, SiteSettings } from './types';
 import { CheckCircle2, ChevronLeft } from 'lucide-react';
 import { AuthProvider, useAuth } from './lib/AuthContext';
@@ -154,36 +163,46 @@ function SiteFooter({ siteSettings }: { siteSettings: SiteSettings }) {
 
           <div>
             <h5 className="text-[10px] uppercase tracking-[0.28em] font-black mb-8 sm:mb-10 text-[#E17055]">
-              Departments
+              Dedicated Services
             </h5>
             <ul className="space-y-3 sm:space-y-4 text-xs font-bold tracking-tight opacity-75">
               <li>
-                <a href="#products" className="hover:text-[#E17055] transition-colors uppercase">
+                <a href="/custom-packaging-printing" className="hover:text-[#E17055] transition-colors uppercase">
                   Custom Packaging
                 </a>
               </li>
               <li>
-                <a href="#products" className="hover:text-[#E17055] transition-colors uppercase">
+                <a href="/product-label-printing" className="hover:text-[#E17055] transition-colors uppercase">
                   Product Labels
                 </a>
               </li>
               <li>
-                <a href="#products" className="hover:text-[#E17055] transition-colors uppercase">
+                <a href="/business-card-printing" className="hover:text-[#E17055] transition-colors uppercase">
                   Business Cards
                 </a>
               </li>
               <li>
-                <a href="#products" className="hover:text-[#E17055] transition-colors uppercase">
-                  Brochures & Flyers
+                <a href="/brochure-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                  Brochures & Catalogs
                 </a>
               </li>
               <li>
-                <a href="#products" className="hover:text-[#E17055] transition-colors uppercase">
-                  Posters & Banners
+                <a href="/flyer-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                  Bulk Flyers
                 </a>
               </li>
               <li>
-                <a href="#products" className="hover:text-[#E17055] transition-colors uppercase">
+                <a href="/poster-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                  Large Format Posters
+                </a>
+              </li>
+              <li>
+                <a href="/banner-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                  Vinyl Banners
+                </a>
+              </li>
+              <li>
+                <a href="/signage-printing" className="hover:text-[#E17055] transition-colors uppercase">
                   Rigid Signage
                 </a>
               </li>
@@ -197,19 +216,19 @@ function SiteFooter({ siteSettings }: { siteSettings: SiteSettings }) {
             <ul className="space-y-4 sm:space-y-5 text-xs font-medium leading-relaxed opacity-75 font-mono">
               <li>
                 <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Email</span>
-                <a href={`mailto:${siteSettings.footer?.email || 'sales@printplaza.net'}`} className="hover:text-white">
-                  {siteSettings.footer?.email || 'sales@printplaza.net'}
+                <a href={`mailto:${BUSINESS_INFO.email}`} className="hover:text-white">
+                  {BUSINESS_INFO.email}
                 </a>
               </li>
               <li>
                 <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Phone / WhatsApp</span>
-                <a href={`tel:${siteSettings.footer?.phone || '+923125747610'}`} className="hover:text-white">
-                  {siteSettings.footer?.phone || '+92 312 5747610'}
+                <a href={`tel:${BUSINESS_INFO.phone}`} className="hover:text-white">
+                  {BUSINESS_INFO.displayPhone}
                 </a>
               </li>
               <li>
                 <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Address</span>
-                <span>{siteSettings.footer?.address || 'Main Talagang Road, Chakwal, Punjab, Pakistan'}</span>
+                <span>{BUSINESS_INFO.formattedAddress}</span>
               </li>
               <li>
                 <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Hours</span>
@@ -222,14 +241,17 @@ function SiteFooter({ siteSettings }: { siteSettings: SiteSettings }) {
         <div className="mt-20 sm:mt-28 pt-10 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-8 text-[10px] font-black uppercase tracking-[0.32em] opacity-60 text-center md:text-left">
           <p>&copy; {new Date().getFullYear()} Print Plaza. High Quality Commercial Printing & Packaging.</p>
           <div className="flex flex-wrap gap-8 items-center justify-center">
-            <a href="#services" className="hover:opacity-100">
-              Services
+            <a href="/about" className="hover:opacity-100">
+              About Us
             </a>
-            <a href="#products" className="hover:opacity-100">
-              Production
-            </a>
-            <a href="#footer" className="hover:opacity-100">
+            <a href="/contact" className="hover:opacity-100">
               Contact
+            </a>
+            <a href="/privacy-policy" className="hover:opacity-100">
+              Privacy Policy
+            </a>
+            <a href="/sitemap.xml" className="hover:opacity-100">
+              Sitemap
             </a>
             <div className="flex gap-1">
               <div className="w-2 h-2 bg-[#2D545E]" />
@@ -244,6 +266,7 @@ function SiteFooter({ siteSettings }: { siteSettings: SiteSettings }) {
 
 function AppContent() {
   const { user, isAdmin, loading: authLoading } = useAuth();
+  const [currentPath, setCurrentPath] = useState(() => window.location.pathname.replace(/\/$/, '') || '/');
   const [services, setServices] = useState<ServiceCategory[]>(CONSTANT_SERVICES);
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({});
   const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | null>(null);
@@ -264,6 +287,16 @@ function AppContent() {
   useEffect(() => {
     fetchCmsData();
   }, [view]);
+
+  useEffect(() => {
+    const syncRoute = () => setCurrentPath(window.location.pathname.replace(/\/$/, '') || '/');
+    window.addEventListener('popstate', syncRoute);
+    window.addEventListener('plaza:navigate', syncRoute);
+    return () => {
+      window.removeEventListener('popstate', syncRoute);
+      window.removeEventListener('plaza:navigate', syncRoute);
+    };
+  }, []);
 
   const fetchCmsData = async () => {
     try {
@@ -320,6 +353,15 @@ function AppContent() {
     setTimeout(() => setShowSuccess(false), 5000);
   };
 
+  // Sync homepage SEO when on root
+  const homeSeo = ALL_SEO_ROUTES['/'];
+  useSeo(
+    homeSeo.metaTitle,
+    homeSeo.description,
+    '/',
+    homeSeo.schema
+  );
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-[#FDFCFB] flex items-center justify-center">
@@ -336,6 +378,94 @@ function AppContent() {
     );
   }
 
+  // Handle dedicated inner service & info routes
+  const servicePage = SERVICE_PAGES.find((page) => page.path === currentPath);
+  const isPrivacyPolicy = currentPath === '/privacy-policy';
+  const isAboutPage = currentPath === '/about';
+  const isContactPage = currentPath === '/contact';
+
+  if (servicePage || isPrivacyPolicy || isAboutPage || isContactPage) {
+    return (
+      <div className="min-h-screen bg-[#FDFCFB] font-sans text-black selection:bg-[#2D545E] selection:text-white relative">
+        <div className="fixed inset-0 bg-grainy opacity-[0.03] pointer-events-none z-50 overflow-hidden" />
+
+        <Navbar
+          onLogin={() => setShowAuthModal(true)}
+          onViewDashboard={() => setView('dashboard')}
+          onRequestQuote={() => handleOpenQuote()}
+          settings={{ ...siteSettings.header, useTransparentHeader: false }}
+        />
+
+        {servicePage && (
+          <ServicePage
+            page={servicePage}
+            onRequestQuote={(name) => handleOpenQuote(name)}
+          />
+        )}
+        {isAboutPage && <AboutPage />}
+        {isContactPage && <ContactPage onRequestQuote={() => handleOpenQuote()} />}
+        {isPrivacyPolicy && <PrivacyPolicyPage />}
+
+        <SiteFooter siteSettings={siteSettings} />
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={() => setView('dashboard')}
+        />
+
+        <AnimatePresence>
+          {(quoteModalOpen || selectedProduct) && (
+            <OrderModal
+              product={selectedProduct}
+              initialServiceName={initialServiceName}
+              products={services.flatMap((s) => s.products)}
+              categories={services}
+              onClose={() => {
+                setQuoteModalOpen(false);
+                setSelectedProduct(null);
+                setInitialServiceName(null);
+              }}
+              onSubmit={handleOrderSubmit}
+              onLoginRequest={() => setShowAuthModal(true)}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showSuccess && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="fixed bottom-6 sm:bottom-12 right-6 sm:right-12 left-6 sm:left-auto z-[70] bg-[#2D545E] text-white px-8 sm:px-10 py-6 sm:py-8 shadow-2xl flex flex-col gap-3 rounded-2xl border border-white/10 backdrop-blur-sm"
+            >
+              <div className="flex items-center gap-4 text-white">
+                <div className="bg-black p-2">
+                  <CheckCircle2 className="w-6 h-6 text-[#E17055]" />
+                </div>
+                <span className="text-sm font-black uppercase tracking-[0.3em]">Quote Request Sent.</span>
+              </div>
+              <p className="text-[11px] font-bold text-white/80 tracking-widest leading-relaxed max-w-[240px]">
+                We received your quotation request. Our team will review it before any project starts.
+              </p>
+              <div className="mt-2 flex gap-1">
+                <div className="w-full h-1 bg-white/20 overflow-hidden">
+                  <motion.div
+                    initial={{ width: '0%' }}
+                    animate={{ width: '100%' }}
+                    transition={{ duration: 5 }}
+                    className="h-full bg-[#E17055]"
+                  />
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  }
+
+  // Clean visual homepage (no long text blocks on homepage)
   return (
     <div className="min-h-screen bg-[#FDFCFB] font-sans text-black selection:bg-[#2D545E] selection:text-white relative">
       {/* Fixed Background Elements */}
@@ -403,7 +533,7 @@ function AppContent() {
           </div>
         </section>
 
-        {/* 2. Interactive Category Grid */}
+        {/* 2. Interactive Category Grid with Short Copy & Links to Dedicated Specs */}
         <ServiceGrid categories={services} onSelect={setSelectedCategory} />
 
         <AnimatePresence>
