@@ -139,6 +139,8 @@ export interface Order {
     specialStock?: string;
     customNotes?: string;
   };
+  quotedPrice?: number;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }

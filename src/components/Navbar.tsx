@@ -33,6 +33,8 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
     ? settings.navItems
     : [
         { id: 'services', label: settings?.servicesLabel || 'Services', url: '#services' },
+        { id: 'about', label: 'About Us', url: '/about' },
+        { id: 'contact', label: 'Contact', url: '/contact' },
         { id: 'products', label: settings?.productsLabel || 'Production', url: '#products' },
       ];
   const actionUrl = settings?.buttonUrl || '#products';
@@ -248,7 +250,7 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
                             0{index + 1} / {service.eyebrow}
                           </div>
                           <h4 className="font-display font-black uppercase tracking-tight text-2xl leading-[0.94] group-hover:text-[#2D545E] transition-colors">
-                            {service.title}
+                            {service.heading}
                           </h4>
                         </div>
                       </div>
@@ -293,7 +295,7 @@ export default function Navbar({ onLogin, onViewDashboard, settings }: NavbarPro
                           onClick={closeMenu}
                           className="border border-black/10 bg-[#F6F5F2] p-4 text-[11px] font-black uppercase tracking-[0.18em] text-black/70"
                         >
-                          {service.title}
+                          {service.heading}
                         </a>
                       ))}
                     </div>

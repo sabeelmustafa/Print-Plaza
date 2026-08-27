@@ -51,12 +51,32 @@
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": ["LocalBusiness", "ProfessionalService"],
+        "@type": ["LocalBusiness", "PrintingService", "ProfessionalService"],
         "name": "Print Plaza",
+        "legalName": "Print Plaza Printing & Packaging",
         "url": "https://printplaza.net/",
         "logo": "https://printplaza.net/brand/print-plaza-logo.png",
         "image": "https://printplaza.net/brand/print-plaza-logo.png",
-        "description": "Print Plaza offers high quality printing services including custom packaging, product labels, brochures, flyers, business cards, posters, banners, signage, offset printing, and digital printing.",
+        "description": "Print Plaza offers high quality commercial printing services including custom packaging, product labels, brochures, flyers, business cards, posters, banners, signage, offset printing, and digital printing.",
+        "telephone": "+923125747610",
+        "email": "sales@printplaza.net",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Main Talagang Road",
+          "addressLocality": "Chakwal",
+          "addressRegion": "Punjab",
+          "postalCode": "48800",
+          "addressCountry": "PK"
+        },
+        "priceRange": "$$",
+        "openingHoursSpecification": [
+          {
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+            "opens": "09:00",
+            "closes": "19:00"
+          }
+        ],
         "areaServed": [
           {
             "@type": "Country",
@@ -64,68 +84,152 @@
           },
           {
             "@type": "Place",
-            "name": "International customers"
+            "name": "Chakwal"
+          },
+          {
+            "@type": "Place",
+            "name": "Rawalpindi"
+          },
+          {
+            "@type": "Place",
+            "name": "Islamabad"
+          },
+          {
+            "@type": "Place",
+            "name": "Worldwide International Customers"
           }
         ],
         "sameAs": [],
-        "knowsAbout": [
-          "Custom packaging printing",
-          "Product label printing",
-          "Offset printing",
-          "Digital printing",
-          "Business card printing",
-          "Brochure printing",
-          "Flyer printing",
-          "Poster printing",
-          "Banner printing",
-          "Signage printing"
-        ],
-        "makesOffer": [
-          {
-            "@type": "Offer",
-            "itemOffered": {
-              "@type": "Service",
-              "name": "Custom Packaging Printing",
-              "description": "Printed product boxes and custom packaging for brands, retail, and e-commerce."
+        "hasOfferCatalog": {
+          "@type": "OfferCatalog",
+          "name": "Print Plaza Commercial Printing Services",
+          "itemListElement": [
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Custom Packaging Printing",
+                "description": "Custom boxes, folding cartons, mailers, sleeves, and retail packaging.",
+                "url": "https://printplaza.net/custom-packaging-printing"
+              }
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Product Label Printing",
+                "description": "Waterproof adhesive labels in custom shapes, rolls, and sheets.",
+                "url": "https://printplaza.net/product-label-printing"
+              }
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Business Card Printing",
+                "description": "Luxury cardstocks (350-700gsm), soft-touch, spot UV, and foil stamping.",
+                "url": "https://printplaza.net/business-card-printing"
+              }
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Brochure Printing",
+                "description": "Bi-fold, tri-fold, catalogs, and company profiles with clean folding.",
+                "url": "https://printplaza.net/brochure-printing"
+              }
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Flyer Printing",
+                "description": "Bulk promotional flyers and leaflets on single and double-sided art paper.",
+                "url": "https://printplaza.net/flyer-printing"
+              }
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Poster Printing",
+                "description": "High-resolution display posters in A3, A2, A1, A0, and custom sizes.",
+                "url": "https://printplaza.net/poster-printing"
+              }
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Banner Printing",
+                "description": "Heavy-duty vinyl banners, mesh outdoor media, and roll-up display stands.",
+                "url": "https://printplaza.net/banner-printing"
+              }
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Signage Printing",
+                "description": "Direct UV flatbed printing on acrylic, aluminum composite, and foam boards.",
+                "url": "https://printplaza.net/signage-printing"
+              }
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Offset Printing",
+                "description": "High-volume commercial lithography with exact Pantone PMS color matching.",
+                "url": "https://printplaza.net/offset-printing"
+              }
+            },
+            {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Service",
+                "name": "Digital Printing",
+                "description": "On-demand short-run digital printing with fast 24-48 hour turnaround.",
+                "url": "https://printplaza.net/digital-printing"
+              }
             }
-          },
-          {
-            "@type": "Offer",
-            "itemOffered": {
-              "@type": "Service",
-              "name": "Product Label Printing",
-              "description": "High quality adhesive labels in custom shapes, sizes, and finishes."
-            }
-          },
-          {
-            "@type": "Offer",
-            "itemOffered": {
-              "@type": "Service",
-              "name": "Business Printing",
-              "description": "Business cards, brochures, flyers, posters, banners, and branded marketing print materials."
-            }
-          },
-          {
-            "@type": "Offer",
-            "itemOffered": {
-              "@type": "Service",
-              "name": "Large Format Printing",
-              "description": "Large format banners, signage, posters, and display printing."
-            }
-          }
-        ]
+          ]
+        }
       }
     </script>
   </head>
   <body>
     <div id="root"></div>
     <noscript>
-      <main>
-        <h1>Print Plaza - High Quality Printing Services</h1>
+      <main style="max-width: 1000px; margin: 40px auto; padding: 20px; font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; color: #111;">
+        <h1>Print Plaza - High Quality Commercial Printing Services & Custom Packaging</h1>
         <p>
-          Print Plaza provides custom packaging, labels, brochures, flyers, business cards, posters,
-          banners, signage, offset printing, digital printing, and branded print production.
+          Print Plaza provides custom packaging boxes, waterproof product labels, brochures, flyers, business cards, posters,
+          banners, signage, offset lithography, digital printing, and branded print production.
         </p>
+        <h2>Our Core Print Services</h2>
+        <ul>
+          <li><a href="/custom-packaging-printing">Custom Packaging Printing</a> - Folding cartons, mailer boxes, product packaging, and sleeves.</li>
+          <li><a href="/product-label-printing">Product Label Printing</a> - Waterproof BOPP, paper, and vinyl roll/sheet labels.</li>
+          <li><a href="/business-card-printing">Business Card Printing</a> - Ultra-thick 350-700gsm cardstocks, soft-touch, foil, and spot UV.</li>
+          <li><a href="/brochure-printing">Brochure Printing</a> - Bi-fold, tri-fold, catalogs, and company profile booklets.</li>
+          <li><a href="/flyer-printing">Flyer Printing</a> - Cost-effective leaflets for marketing campaigns and events.</li>
+          <li><a href="/poster-printing">Poster Printing</a> - High-resolution gallery and display posters in A3, A2, A1, A0.</li>
+          <li><a href="/banner-printing">Banner Printing</a> - Vinyl outdoor banners, mesh banners, and roll-up pull-up display stands.</li>
+          <li><a href="/signage-printing">Signage Printing</a> - Direct UV flatbed printing on acrylic, aluminum composite, and foam boards.</li>
+          <li><a href="/offset-printing">Offset Printing Services</a> - High-volume commercial lithography with Pantone spot colors.</li>
+          <li><a href="/digital-printing">Digital Printing Services</a> - Fast on-demand short runs with zero plate setup costs.</li>
+          <li><a href="/sticker-printing">Sticker Printing</a> - Custom die-cut vinyl stickers and packaging seals.</li>
+        </ul>
+        <hr style="margin: 30px 0; border: 0; border-top: 1px solid #ddd;" />
+        <section>
+          <h2>Contact Print Plaza</h2>
+          <p><strong>Address:</strong> Main Talagang Road, Chakwal, Punjab, Pakistan</p>
+          <p><strong>Phone / WhatsApp:</strong> <a href="tel:+923125747610">+92 312 5747610</a></p>
+          <p><strong>Email:</strong> <a href="mailto:sales@printplaza.net">sales@printplaza.net</a></p>
+          <p><strong>Hours:</strong> Monday – Saturday: 9:00 AM – 7:00 PM</p>
+        </section>
       </main>
     </noscript>
     <script type="module" src="/src/main.tsx"></script>

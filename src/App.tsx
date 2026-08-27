@@ -13,12 +13,24 @@ import OrderModal from './components/OrderModal';
 import AuthModal from './components/AuthModal';
 import AdminPanel, { WebsiteEditorPage } from './components/AdminPanel';
 import UserPanel from './components/UserPanel';
-import { PrivacyPolicyPage, ServicePage, SERVICE_PAGES } from './components/SeoPages';
+import {
+  AboutPage,
+  ContactPage,
+  PrivacyPolicyPage,
+  ServicePage,
+  SERVICE_PAGES,
+  useSeo,
+} from './components/SeoPages';
+import {
+  HomeCoreServicesSection,
+  HomeAboutSection,
+  HomeContactSection,
+} from './components/HomeSeoSections';
 import { SERVICES as CONSTANT_SERVICES } from './constants';
+import { ALL_SEO_ROUTES, BUSINESS_INFO } from './seoData';
 import { ServiceCategory, Product, SiteSettings } from './types';
 import { CheckCircle2, ChevronLeft } from 'lucide-react';
 import { AuthProvider, useAuth } from './lib/AuthContext';
-
 import { DataService } from './lib/dataService';
 
 function AdminLoginPage() {
@@ -29,8 +41,8 @@ function AdminLoginPage() {
 
   useEffect(() => {
     fetch('/api/admin/session', { credentials: 'include' })
-      .then(response => response.json())
-      .then(data => setAuthenticated(Boolean(data.authenticated)))
+      .then((response) => response.json())
+      .then((data) => setAuthenticated(Boolean(data.authenticated)))
       .catch(() => setAuthenticated(false))
       .finally(() => setLoading(false));
   }, []);
@@ -64,7 +76,11 @@ function AdminLoginPage() {
   }
 
   if (authenticated) {
-    return window.location.pathname.startsWith('/admin/editor') ? <WebsiteEditorPage /> : <AdminPanel />;
+    return window.location.pathname.startsWith('/admin/editor') ? (
+      <WebsiteEditorPage />
+    ) : (
+      <AdminPanel />
+    );
   }
 
   return (
@@ -115,7 +131,9 @@ function AdminLoginPage() {
 
         <div className="mt-8 pt-6 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
           <span>Print Plaza Enterprise</span>
-          <span className="font-mono text-[10px] bg-slate-800/60 text-slate-400 px-2 py-0.5 rounded">v2.4.0</span>
+          <span className="font-mono text-[10px] bg-slate-800/60 text-slate-400 px-2 py-0.5 rounded">
+            v2.4.0
+          </span>
         </div>
       </div>
     </div>
@@ -124,7 +142,7 @@ function AdminLoginPage() {
 
 function SiteFooter({ siteSettings }: { siteSettings: SiteSettings }) {
   return (
-    <footer id="about" className="bg-black text-white pt-24 sm:pt-32 pb-16 relative overflow-hidden bg-grainy/5">
+    <footer id="footer" className="bg-black text-white pt-24 sm:pt-32 pb-16 relative overflow-hidden bg-grainy/5">
       {/* Duo-tone border top */}
       <div className="absolute top-0 left-0 w-full h-2 flex">
         <div className="flex-1 bg-[#2D545E]" />
@@ -135,38 +153,121 @@ function SiteFooter({ siteSettings }: { siteSettings: SiteSettings }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-16 md:gap-20">
           <div className="sm:col-span-2">
             <div className="mb-10 sm:mb-12">
-              <h6 className="font-display font-black text-4xl sm:text-5xl mb-4 tracking-tight uppercase leading-none">{siteSettings.footer?.brandText || 'Print Plaza.'}</h6>
-              <div className="text-[10px] uppercase tracking-[0.32em] font-black text-[#66A0AA]">{siteSettings.footer?.tagline || 'Creative Production Studio'}</div>
+              <h6 className="font-display font-black text-4xl sm:text-5xl mb-4 tracking-tight uppercase leading-none">
+                {siteSettings.footer?.brandText || 'Print Plaza.'}
+              </h6>
+              <div className="text-[10px] uppercase tracking-[0.32em] font-black text-[#66A0AA]">
+                {siteSettings.footer?.tagline || 'Commercial Print & Packaging Manufacturing Studio'}
+              </div>
             </div>
             <p className="text-sm leading-loose opacity-70 max-w-sm font-medium tracking-wide">
-              {siteSettings.footer?.description || 'High quality printing, packaging, labels, signage, and business print production with a focus on tactile excellence and tonal precision.'}
+              {siteSettings.footer?.description ||
+                'High quality commercial printing, custom packaging boxes, product labels, business cards, brochures, posters, banners, and signage with tactile precision.'}
             </p>
           </div>
 
           <div>
-            <h5 className="text-[10px] uppercase tracking-[0.28em] font-black mb-8 sm:mb-10 text-[#E17055]">Services</h5>
-            <ul className="space-y-4 sm:space-y-6 text-sm font-bold tracking-tight opacity-70">
-              <li><a href="/custom-packaging-printing" className="hover:text-[#E17055] transition-colors uppercase">Packaging</a></li>
-              <li><a href="/product-label-printing" className="hover:text-[#E17055] transition-colors uppercase">Labels</a></li>
-              <li><a href="/business-card-printing" className="hover:text-[#E17055] transition-colors uppercase">Business Cards</a></li>
-              <li><a href="/privacy-policy" className="hover:text-[#E17055] transition-colors uppercase">Privacy Policy</a></li>
+            <h5 className="text-[10px] uppercase tracking-[0.28em] font-black mb-8 sm:mb-10 text-[#E17055]">
+              Services & Pages
+            </h5>
+            <ul className="space-y-3 sm:space-y-4 text-xs font-bold tracking-tight opacity-75">
+              <li>
+                <a href="/custom-packaging-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                  Custom Packaging
+                </a>
+              </li>
+              <li>
+                <a href="/product-label-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                  Product Labels
+                </a>
+              </li>
+              <li>
+                <a href="/business-card-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                  Business Cards
+                </a>
+              </li>
+              <li>
+                <a href="/brochure-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                  Brochures
+                </a>
+              </li>
+              <li>
+                <a href="/flyer-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                  Flyers & Leaflets
+                </a>
+              </li>
+              <li>
+                <a href="/poster-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                  Posters & Displays
+                </a>
+              </li>
+              <li>
+                <a href="/banner-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                  Banners & Stands
+                </a>
+              </li>
+              <li>
+                <a href="/signage-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                  Rigid Signage
+                </a>
+              </li>
+              <li>
+                <a href="/offset-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                  Offset Lithography
+                </a>
+              </li>
+              <li>
+                <a href="/digital-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                  Digital Printing
+                </a>
+              </li>
             </ul>
           </div>
 
           <div>
-            <h5 className="text-[10px] uppercase tracking-[0.28em] font-black mb-8 sm:mb-10 text-[#66A0AA]">Plaza Studio</h5>
-            <ul className="space-y-4 sm:space-y-6 text-sm font-medium leading-relaxed opacity-70 font-mono">
-              <li>{siteSettings.footer?.email || 'hi@print.plaza'}</li>
-              <li>{siteSettings.footer?.phone || '+1 212 555 7788'}</li>
-              <li>{siteSettings.footer?.address || 'Studio Block A, Creative District, NY 10001'}</li>
+            <h5 className="text-[10px] uppercase tracking-[0.28em] font-black mb-8 sm:mb-10 text-[#66A0AA]">
+              Studio & Contact
+            </h5>
+            <ul className="space-y-4 sm:space-y-5 text-xs font-medium leading-relaxed opacity-75 font-mono">
+              <li>
+                <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Email</span>
+                <a href={`mailto:${BUSINESS_INFO.email}`} className="hover:text-white">
+                  {BUSINESS_INFO.email}
+                </a>
+              </li>
+              <li>
+                <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Phone / WhatsApp</span>
+                <a href={`tel:${BUSINESS_INFO.phone}`} className="hover:text-white">
+                  {BUSINESS_INFO.displayPhone}
+                </a>
+              </li>
+              <li>
+                <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Address</span>
+                <span>{BUSINESS_INFO.formattedAddress}</span>
+              </li>
+              <li>
+                <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Hours</span>
+                <span>Mon–Sat: 9:00 AM – 7:00 PM</span>
+              </li>
             </ul>
           </div>
         </div>
 
-        <div className="mt-24 sm:mt-40 pt-12 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-8 text-[10px] font-black uppercase tracking-[0.32em] opacity-50 text-center md:text-left">
-          <p>&copy; 2024 Print Plaza Hub. Creative Output.</p>
-          <div className="flex gap-12">
-            <a href="/privacy-policy" className="hover:opacity-100 italic">Privacy Policy</a>
+        <div className="mt-20 sm:mt-28 pt-10 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-8 text-[10px] font-black uppercase tracking-[0.32em] opacity-60 text-center md:text-left">
+          <p>&copy; {new Date().getFullYear()} Print Plaza. High Quality Commercial Printing & Packaging.</p>
+          <div className="flex flex-wrap gap-8 items-center justify-center">
+            <a href="/about" className="hover:opacity-100">
+              About Us
+            </a>
+            <a href="/contact" className="hover:opacity-100">
+              Contact
+            </a>
+            <a href="/privacy-policy" className="hover:opacity-100">
+              Privacy Policy
+            </a>
+            <a href="/sitemap.xml" className="hover:opacity-100">
+              Sitemap
+            </a>
             <div className="flex gap-1">
               <div className="w-2 h-2 bg-[#2D545E]" />
               <div className="w-2 h-2 bg-[#E17055]" />
@@ -198,7 +299,7 @@ function AppContent() {
 
   useEffect(() => {
     fetchCmsData();
-  }, [view]); // Refresh when coming back from dashboard
+  }, [view]);
 
   useEffect(() => {
     const syncRoute = () => setCurrentPath(window.location.pathname.replace(/\/$/, '') || '/');
@@ -218,12 +319,12 @@ function AppContent() {
         DataService.getSiteSettings(),
       ]);
       setSiteSettings(settings);
-      
+
       if (dbProducts.length > 0) {
         const sourceCategories = dbCategories.length > 0 ? dbCategories : CONSTANT_SERVICES;
-        const categories = sourceCategories.map(cat => ({
+        const categories = sourceCategories.map((cat) => ({
           ...cat,
-          products: dbProducts.filter(p => p.categoryId === cat.id)
+          products: dbProducts.filter((p) => p.categoryId === cat.id),
         }));
         setServices(categories);
       }
@@ -231,6 +332,15 @@ function AppContent() {
       console.error('Failed to fetch products:', error);
     }
   };
+
+  // Sync homepage SEO when on root
+  const homeSeo = ALL_SEO_ROUTES['/'];
+  useSeo(
+    homeSeo.metaTitle,
+    homeSeo.description,
+    '/',
+    homeSeo.schema
+  );
 
   if (authLoading) {
     return (
@@ -248,16 +358,18 @@ function AppContent() {
     );
   }
 
-  const handleOrderSubmit = (data: any) => {
+  const handleOrderSubmit = () => {
     setSelectedProduct(null);
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 5000);
   };
 
-  const servicePage = SERVICE_PAGES.find(page => page.path === currentPath);
+  const servicePage = SERVICE_PAGES.find((page) => page.path === currentPath);
   const isPrivacyPolicy = currentPath === '/privacy-policy';
+  const isAboutPage = currentPath === '/about';
+  const isContactPage = currentPath === '/contact';
 
-  if (servicePage || isPrivacyPolicy) {
+  if (servicePage || isPrivacyPolicy || isAboutPage || isContactPage) {
     return (
       <div className="min-h-screen bg-[#FDFCFB] font-sans text-black selection:bg-[#2D545E] selection:text-white relative">
         <div className="fixed inset-0 bg-grainy opacity-[0.03] pointer-events-none z-50 overflow-hidden" />
@@ -268,12 +380,15 @@ function AppContent() {
           settings={{ ...siteSettings.header, useTransparentHeader: false }}
         />
 
-        {servicePage ? <ServicePage page={servicePage} /> : <PrivacyPolicyPage />}
+        {servicePage && <ServicePage page={servicePage} />}
+        {isAboutPage && <AboutPage />}
+        {isContactPage && <ContactPage />}
+        {isPrivacyPolicy && <PrivacyPolicyPage />}
 
         <SiteFooter siteSettings={siteSettings} />
-        <AuthModal 
-          isOpen={showAuthModal} 
-          onClose={() => setShowAuthModal(false)} 
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
           onSuccess={() => setView('dashboard')}
         />
       </div>
@@ -284,25 +399,26 @@ function AppContent() {
     <div className="min-h-screen bg-[#FDFCFB] font-sans text-black selection:bg-[#2D545E] selection:text-white relative">
       {/* Fixed Background Elements */}
       <div className="fixed inset-0 bg-grainy opacity-[0.03] pointer-events-none z-50 overflow-hidden" />
-      
-      <Navbar 
-        onLogin={() => setShowAuthModal(true)} 
+
+      <Navbar
+        onLogin={() => setShowAuthModal(true)}
         onViewDashboard={() => setView('dashboard')}
         settings={siteSettings.header}
       />
-      
+
       <main>
         <Hero settings={siteSettings.homepage} theme={siteSettings.theme} />
-        
+
+        {/* 1. Production Unit / Fast Quote Grid */}
         <section id="products" className="py-24 sm:py-36 bg-[#FDFCFB] relative overflow-hidden border-b border-black/5">
           <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 relative">
             <div className="flex flex-col md:flex-row md:items-end justify-between mb-14 sm:mb-20 gap-12">
               <div className="max-w-2xl">
                 <div className="text-[10px] font-black uppercase tracking-[0.32em] text-[#2D545E] mb-6 flex items-center gap-4">
-                   <div className="w-8 h-px bg-[#2D545E]/30" /> Core Output
+                  <div className="w-8 h-px bg-[#2D545E]/30" /> Core Output
                 </div>
                 <h2 className="text-[2.8rem] sm:text-[4.8rem] md:text-[6.4rem] font-display font-black tracking-tight leading-[0.84] mb-7 sm:mb-9 uppercase">
-                  Production <br/>
+                  Production <br />
                   <span className="text-black/10 italic font-serif lowercase">Unit.</span>
                 </h2>
                 <p className="text-[15px] sm:text-base font-medium leading-[1.8] text-black/62 max-w-lg font-sans">
@@ -312,42 +428,50 @@ function AppContent() {
               <div className="flex flex-col items-start md:items-end gap-4 overflow-hidden">
                 <div className="text-[10px] font-mono font-bold bg-[#EBEAE8] px-4 sm:px-5 py-3 border border-black/10 flex items-center gap-3 sm:gap-4 max-w-full">
                   <div className="w-2 h-2 rounded-full bg-[#E17055] animate-pulse" />
-                  <span className="truncate">LIVE_FEED: ACTIVE_JOBS(24) // {new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="truncate">
+                    LIVE_FEED: ACTIVE_JOBS(24) // {new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
                 <div className="text-[9px] font-mono opacity-30 uppercase tracking-widest">
-                  Secure Connection Established
+                  Chakwal Facility Online
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-black/8 border border-black/8">
-              {services.flatMap(s => s.products).slice(0, 6).map(product => (
+              {services.flatMap((s) => s.products).slice(0, 6).map((product) => (
                 <div key={product.id} className="bg-[#FDFCFB]">
-                  <ProductCard 
-                    product={product} 
-                    onOrder={setSelectedProduct} 
-                  />
+                  <ProductCard product={product} onOrder={setSelectedProduct} />
                 </div>
               ))}
             </div>
-            
+
             <div className="mt-20 sm:mt-24 flex justify-center">
-              <button className="group flex flex-col items-center gap-6">
-                <span className="text-[10px] font-black uppercase tracking-[0.5em] text-black/30 group-hover:text-black transition-colors">Load Archive</span>
+              <a href="#core-services" className="group flex flex-col items-center gap-6">
+                <span className="text-[10px] font-black uppercase tracking-[0.5em] text-black/40 group-hover:text-black transition-colors">
+                  Explore All 8 Specialized Departments &darr;
+                </span>
                 <div className="w-px h-16 bg-gradient-to-b from-black/20 to-transparent group-hover:from-[#2D545E] transition-colors" />
-              </button>
+              </a>
             </div>
           </div>
         </section>
 
-        <ServiceGrid 
-          categories={services} 
-          onSelect={setSelectedCategory} 
-        />
+        {/* 2. Core 8 Services Deep-Dive Section (100-150 words per service) */}
+        <HomeCoreServicesSection />
+
+        {/* 3. Interactive Category Grid */}
+        <ServiceGrid categories={services} onSelect={setSelectedCategory} />
+
+        {/* 4. About Print Plaza Section */}
+        <HomeAboutSection />
+
+        {/* 5. Direct Contact & Studio Location Section */}
+        <HomeContactSection />
 
         <AnimatePresence>
           {selectedCategory && (
-            <motion.section 
+            <motion.section
               id="category-details"
               initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
@@ -358,8 +482,8 @@ function AppContent() {
 
               <div className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-20 sm:py-32">
                 <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 sm:mb-24 gap-12">
-                   <div className="max-w-2xl">
-                    <button 
+                  <div className="max-w-2xl">
+                    <button
                       onClick={() => setSelectedCategory(null)}
                       className="text-[9px] font-black uppercase tracking-[0.4em] text-[#2D545E]/40 hover:text-[#E17055] mb-10 flex items-center gap-3 transition-all group py-2.5 px-5 bg-black/5 rounded-full w-fit hover:bg-black hover:text-white"
                     >
@@ -368,7 +492,9 @@ function AppContent() {
                     <h2 className="text-4xl sm:text-7xl font-display font-black tracking-tighter leading-none mb-6 uppercase">
                       {selectedCategory.title}
                     </h2>
-                    <p className="text-base sm:text-lg font-medium leading-relaxed text-black/60 max-w-lg">{selectedCategory.description}</p>
+                    <p className="text-base sm:text-lg font-medium leading-relaxed text-black/60 max-w-lg">
+                      {selectedCategory.description}
+                    </p>
                   </div>
                   <div className="text-[10px] font-mono font-bold bg-[#E17055] text-white px-4 py-2 border-2 border-black self-start md:self-end shadow-[6px_6px_0_rgba(0,0,0,0.12)]">
                     BATCH_REF: {selectedCategory.id.toUpperCase()}
@@ -376,12 +502,9 @@ function AppContent() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-                  {selectedCategory.products.map(product => (
+                  {selectedCategory.products.map((product) => (
                     <div key={product.id} className="h-full">
-                      <ProductCard 
-                        product={product} 
-                        onOrder={setSelectedProduct} 
-                      />
+                      <ProductCard product={product} onOrder={setSelectedProduct} />
                     </div>
                   ))}
                 </div>
@@ -393,17 +516,17 @@ function AppContent() {
 
       <SiteFooter siteSettings={siteSettings} />
 
-      <AuthModal 
-        isOpen={showAuthModal} 
-        onClose={() => setShowAuthModal(false)} 
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
         onSuccess={() => setView('dashboard')}
       />
 
       <AnimatePresence>
         {selectedProduct && (
-          <OrderModal 
-            product={selectedProduct} 
-            onClose={() => setSelectedProduct(null)} 
+          <OrderModal
+            product={selectedProduct}
+            onClose={() => setSelectedProduct(null)}
             onSubmit={handleOrderSubmit}
             onLoginRequest={() => setShowAuthModal(true)}
           />
@@ -429,11 +552,11 @@ function AppContent() {
             </p>
             <div className="mt-2 flex gap-1">
               <div className="w-full h-1 bg-white/20 overflow-hidden">
-                <motion.div 
-                   initial={{ width: "0%" }}
-                   animate={{ width: "100%" }}
-                   transition={{ duration: 5 }}
-                   className="h-full bg-[#E17055]"
+                <motion.div
+                  initial={{ width: '0%' }}
+                  animate={{ width: '100%' }}
+                  transition={{ duration: 5 }}
+                  className="h-full bg-[#E17055]"
                 />
               </div>
             </div>
@@ -455,4 +578,3 @@ export default function App() {
     </AuthProvider>
   );
 }
-
