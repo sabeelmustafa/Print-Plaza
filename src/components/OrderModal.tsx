@@ -3,24 +3,143 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, FormEvent } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, Send, ChevronRight, Upload, CheckCircle2, FileText, Sparkles, Phone, Mail, User, Building, ArrowRight } from 'lucide-react';
-import { Product } from '../types';
+import React, { useState, useEffect, FormEvent } from 'react';
+import { motion } from 'motion/react';
+import { X, Upload, CheckCircle2, ArrowRight, Package, Layers, Sparkles } from 'lucide-react';
+import { Product, ServiceCategory } from '../types';
 import { useAuth } from '../lib/AuthContext';
 import { DataService } from '../lib/dataService';
+import { SERVICES as DEFAULT_SERVICES } from '../constants';
 
-interface OrderModalProps {
-  product: Product;
+export interface OrderModalProps {
+  product?: Product | null;
+  initialServiceName?: string | null;
+  products?: Product[];
+  categories?: ServiceCategory[];
   onClose: () => void;
   onSubmit: (orderData: any) => void;
-  onLoginRequest: () => void;
+  onLoginRequest?: () => void;
 }
 
-export default function OrderModal({ product, onClose, onSubmit, onLoginRequest }: OrderModalProps) {
+const DEFAULT_CATALOG_ITEMS = [
+  { id: 'custom-boxes', name: 'Custom Product Boxes', category: 'Packaging & Labels', description: 'Premium folding cartons, mailers & custom packaging.', image: 'https://images.unsplash.com/photo-1542319630-55fb7f7c944a?auto=format&fit=crop&q=80&w=800&h=600' },
+  { id: 'product-labels', name: 'Product Labels & Stickers', category: 'Packaging & Labels', description: 'Waterproof BOPP roll & sheet adhesive labels.', image: 'https://images.unsplash.com/photo-1626015270271-e73792040f7b?auto=format&fit=crop&q=80&w=800&h=600' },
+  { id: 'business-cards', name: 'Luxury Business Cards', category: 'Corporate Print', description: '350–700gsm heavy cardstocks, soft-touch & spot UV.', image: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=800&h=600' },
+  { id: 'bulk-flyers', name: 'Bulk Marketing Flyers', category: 'Offset Printing', description: 'Cost-effective leaflets for marketing campaigns and events.', image: 'https://images.unsplash.com/photo-1644342939989-1065672049e6?auto=format&fit=crop&q=80&w=800&h=600' },
+  { id: 'brochures-catalogs', name: 'Company Brochures & Catalogs', category: 'Commercial Print', description: 'Bi-fold, tri-fold, catalogs, and company profile booklets.', image: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?auto=format&fit=crop&q=80&w=800&h=600' },
+  { id: 'posters-displays', name: 'High-Resolution Wall Posters', category: 'Large Format', description: 'Gallery display posters in A3, A2, A1, A0 and custom dimensions.', image: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&q=80&w=800&h=600' },
+  { id: 'vinyl-banners', name: 'Vinyl Banners & Roll-Up Stands', category: 'Large Format', description: 'Heavy-duty 510gsm vinyl banners and retractable pull-up stands.', image: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&q=80&w=800&h=600' },
+  { id: 'rigid-signage', name: 'Rigid Signage (Acrylic & ACP)', category: 'Signage', description: 'Direct UV flatbed printing on acrylic, aluminum composite, and foam boards.', image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&q=80&w=800&h=600' },
+  { id: 'offset-litho', name: 'Offset Printing (High Volume)', category: 'Offset Printing', description: 'High-volume commercial lithography with exact Pantone PMS matching.', image: 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?auto=format&fit=crop&q=80&w=800&h=600' },
+  { id: 'digital-short-run', name: 'Digital Fast-Turnaround Printing', category: 'Digital Printing', description: 'On-demand short runs with fast 24-48 hour turnaround.', image: 'https://images.unsplash.com/photo-1508873696983-2df5293cb32b?auto=format&fit=crop&q=80&w=800&h=600' },
+  { id: 'custom-stickers', name: 'Custom Die-Cut Vinyl Stickers', category: 'Packaging & Labels', description: 'Die-cut vinyl stickers with matte, gloss, or holographic lamination.', image: 'https://images.unsplash.com/photo-1572375992501-4b0892d50c69?auto=format&fit=crop&q=80&w=800&h=600' },
+  { id: 'custom-bespoke', name: 'Bespoke / Custom Print Project', category: 'Custom Job', description: 'Have unique dimensions, specialty stock, or custom finishing? Tell us what you need.', image: 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?auto=format&fit=crop&q=80&w=800&h=600' },
+];
+
+export default function OrderModal({
+  product,
+  initialServiceName,
+  products = [],
+  categories = [],
+  onClose,
+  onSubmit,
+  onLoginRequest,
+}: OrderModalProps) {
   const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  // Compile full list of available products
+  const allAvailableProducts = React.useMemo(() => {
+    const list: Product[] = [];
+    const seen = new Set<string>();
+
+    if (product) {
+      list.push(product);
+      seen.add(product.id);
+    }
+
+    products.forEach((p) => {
+      if (!seen.has(p.id)) {
+        list.push(p);
+        seen.add(p.id);
+      }
+    });
+
+    categories.forEach((cat) => {
+      (cat.products || []).forEach((p) => {
+        if (!seen.has(p.id)) {
+          list.push(p);
+          seen.add(p.id);
+        }
+      });
+    });
+
+    if (list.length === 0) {
+      DEFAULT_SERVICES.forEach((cat) => {
+        (cat.products || []).forEach((p) => {
+          if (!seen.has(p.id)) {
+            list.push(p);
+            seen.add(p.id);
+          }
+        });
+      });
+    }
+
+    return list;
+  }, [product, products, categories]);
+
+  // Determine initial selected product ID or custom name
+  const findInitialProductId = () => {
+    if (product?.id) return product.id;
+    if (initialServiceName) {
+      const match = allAvailableProducts.find(
+        (p) =>
+          p.name.toLowerCase() === initialServiceName.toLowerCase() ||
+          initialServiceName.toLowerCase().includes(p.name.toLowerCase()) ||
+          p.name.toLowerCase().includes(initialServiceName.toLowerCase())
+      );
+      if (match) return match.id;
+      const catalogMatch = DEFAULT_CATALOG_ITEMS.find(
+        (item) =>
+          item.name.toLowerCase() === initialServiceName.toLowerCase() ||
+          initialServiceName.toLowerCase().includes(item.name.toLowerCase()) ||
+          item.name.toLowerCase().includes(initialServiceName.toLowerCase())
+      );
+      if (catalogMatch) return catalogMatch.id;
+      return 'custom-bespoke';
+    }
+    return '';
+  };
+
+  const [selectedProductId, setSelectedProductId] = useState<string>(findInitialProductId);
+  const [productType, setProductType] = useState<string>(() => {
+    if (product?.name) return product.name;
+    if (initialServiceName) return initialServiceName;
+    return '';
+  });
+
+  // Current active product resolution
+  const currentProduct = React.useMemo(() => {
+    if (selectedProductId) {
+      const matched = allAvailableProducts.find((p) => p.id === selectedProductId);
+      if (matched) return matched;
+      const defaultMatch = DEFAULT_CATALOG_ITEMS.find((item) => item.id === selectedProductId);
+      if (defaultMatch) {
+        return {
+          id: defaultMatch.id,
+          name: defaultMatch.name,
+          description: defaultMatch.description,
+          price: 0,
+          unit: 'units',
+          image: defaultMatch.image,
+          categoryId: defaultMatch.category,
+          options: [],
+        } as Product;
+      }
+    }
+    return product || null;
+  }, [selectedProductId, allAvailableProducts, product]);
 
   // Form State
   const [fullName, setFullName] = useState(user?.displayName || '');
@@ -28,12 +147,44 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
   const [phone, setPhone] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [quantity, setQuantity] = useState<number>(500);
-  const [productType, setProductType] = useState(product?.name || '');
   const [options, setOptions] = useState<Record<string, string | number | boolean>>({});
   const [specifications, setSpecifications] = useState('');
   const [artworkFile, setArtworkFile] = useState<File | null>(null);
 
-  if (!product) return null;
+  // Sync user credentials if auth arrives
+  useEffect(() => {
+    if (user?.displayName && !fullName) setFullName(user.displayName);
+    if (user?.email && !email) setEmail(user.email);
+  }, [user]);
+
+  // Handle product selection dropdown change
+  const handleProductSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setSelectedProductId(val);
+
+    if (!val) {
+      setProductType('');
+      setOptions({});
+      return;
+    }
+
+    const matched = allAvailableProducts.find((p) => p.id === val);
+    if (matched) {
+      setProductType(matched.name);
+      setOptions({});
+      return;
+    }
+
+    const defaultMatch = DEFAULT_CATALOG_ITEMS.find((item) => item.id === val);
+    if (defaultMatch) {
+      setProductType(defaultMatch.name);
+      setOptions({});
+      return;
+    }
+
+    setProductType(val);
+    setOptions({});
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -49,6 +200,8 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
       return;
     }
 
+    const finalProductName = productType || currentProduct?.name || 'Custom Print Job';
+
     setIsSubmitting(true);
     try {
       let artworkUrl = '';
@@ -61,22 +214,22 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
       }
 
       await DataService.submitQuoteRequest({
-        userId:      user?.uid || undefined,
-        userName:    fullName || email.split('@')[0],
-        userEmail:   email,
-        phone:       phone || undefined,
+        userId: user?.uid || undefined,
+        userName: fullName || email.split('@')[0],
+        userEmail: email,
+        phone: phone || undefined,
         companyName: companyName || undefined,
-        productId:   product.id,
-        productName: productType || product.name,
-        quantity:    Number(quantity) || 1,
+        productId: currentProduct?.id || selectedProductId || 'custom-quote',
+        productName: finalProductName,
+        quantity: Number(quantity) || 1,
         quotedPrice: 0,
-        options:     { ...options },
+        options: { ...options },
         finishingSpecs: {},
-        notes:       specifications || undefined,
-        artworkUrl:  artworkUrl || undefined,
+        notes: specifications || undefined,
+        artworkUrl: artworkUrl || undefined,
       });
 
-      onSubmit({ userEmail: email, userName: fullName, productName: productType || product.name });
+      onSubmit({ userEmail: email, userName: fullName, productName: finalProductName });
       setIsSuccess(true);
     } catch (_err) {
       console.error('[OrderModal] submitQuoteRequest failed:', _err);
@@ -85,6 +238,13 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
       setIsSubmitting(false);
     }
   };
+
+  // Visual header elements
+  const displayImage = currentProduct?.image || '/brand/print-plaza-logo.png';
+  const displayTitle = currentProduct?.name || (productType ? productType : 'Custom Print Production');
+  const displayDescription =
+    currentProduct?.description ||
+    'Custom print manufacturing tailored to your exact specifications. Select any service, substrate, and volume tier for itemized pricing.';
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-6 lg:p-8 overflow-y-auto">
@@ -127,7 +287,7 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
 
             <p className="text-sm text-slate-600 max-w-md leading-relaxed">
               Thank you, <strong className="text-[#14262C]">{fullName || 'Valued Customer'}</strong>! Our print engineering team has received your custom quote inquiry for{' '}
-              <strong className="text-[#2D545E]">{product.name} ({quantity} {product.unit}s)</strong>.
+              <strong className="text-[#2D545E]">{productType || currentProduct?.name || 'Custom Print Job'} ({quantity} pcs)</strong>.
             </p>
 
             <div className="bg-white p-4 rounded-2xl border border-slate-200 text-xs text-slate-500 font-mono space-y-1 shadow-xs">
@@ -157,11 +317,11 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                 </div>
 
                 {/* Product Image Card */}
-                <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#1E373F] shadow-xl group aspect-4/3 sm:aspect-square">
+                <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-[#1E373F] shadow-xl group aspect-4/3 sm:aspect-square flex items-center justify-center">
                   <div className="absolute top-0 left-0 w-full h-1 bg-[#E17055] z-20" />
                   <img
-                    src={product.image}
-                    alt={product.name}
+                    src={displayImage}
+                    alt={displayTitle}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-90"
                     referrerPolicy="no-referrer"
                   />
@@ -178,10 +338,10 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
 
                 <div>
                   <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white leading-tight font-display">
-                    {product.name}
+                    {displayTitle}
                   </h3>
                   <p className="text-xs text-[#EDEBE7]/80 mt-2 line-clamp-3 leading-relaxed font-sans">
-                    {product.description}
+                    {displayDescription}
                   </p>
                 </div>
               </div>
@@ -211,8 +371,74 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                     Get A Custom Print Quote
                   </h2>
                   <p className="text-xs text-slate-500 mt-1 font-medium">
-                    Tell us what you need for <strong className="text-[#2D545E]">{product.name}</strong> and our print engineering team will get back to you with a custom quote.
+                    {currentProduct?.name ? (
+                      <>Tell us what you need for <strong className="text-[#2D545E]">{currentProduct.name}</strong> and our team will get back to you with an itemized quote.</>
+                    ) : (
+                      <>Select your product or service below to receive an itemized manufacturing estimate.</>
+                    )}
                   </p>
+                </div>
+
+                {/* Product / Service Selector (Dropdown) */}
+                <div className="bg-[#2D545E]/5 border border-[#2D545E]/15 rounded-2xl p-4 space-y-2">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[#2D545E] flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-[#E17055]" />
+                      Select Product or Service *
+                    </span>
+                    <span className="text-[9px] text-slate-500 font-mono lowercase">
+                      choose or change below
+                    </span>
+                  </label>
+
+                  <select
+                    value={selectedProductId}
+                    onChange={handleProductSelect}
+                    className="w-full bg-white border border-slate-300 focus:border-[#2D545E] focus:ring-2 focus:ring-[#2D545E]/20 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none transition-all shadow-xs cursor-pointer"
+                    required
+                  >
+                    <option value="">— Choose a Product or Service Category —</option>
+
+                    <optgroup label="Packaging & Product Labels">
+                      <option value="custom-boxes">Custom Product Boxes & Cartons</option>
+                      <option value="product-labels">Product Labels & Bottle Stickers</option>
+                      <option value="custom-stickers">Custom Die-Cut Vinyl Stickers</option>
+                    </optgroup>
+
+                    <optgroup label="Marketing Collateral & Corporate Stationery">
+                      <option value="business-cards">Luxury Business Cards (350–700gsm)</option>
+                      <option value="bulk-flyers">Bulk Marketing Flyers & Leaflets</option>
+                      <option value="brochures-catalogs">Company Brochures & Catalogs</option>
+                    </optgroup>
+
+                    <optgroup label="Large Format & Display Signage">
+                      <option value="posters-displays">High-Resolution Wall & Display Posters</option>
+                      <option value="vinyl-banners">Outdoor Vinyl Banners & Roll-Up Stands</option>
+                      <option value="rigid-signage">Rigid Signage (Acrylic, ACP & Foam Board)</option>
+                    </optgroup>
+
+                    <optgroup label="Commercial Press Technologies">
+                      <option value="offset-litho">High-Volume Offset Lithography</option>
+                      <option value="digital-short-run">Digital Fast-Turnaround Short Runs</option>
+                    </optgroup>
+
+                    <optgroup label="Other / Custom Inquiry">
+                      <option value="custom-bespoke">Bespoke / Custom Print Project</option>
+                    </optgroup>
+
+                    {/* Any extra dynamic products from database */}
+                    {allAvailableProducts
+                      .filter(
+                        (p) =>
+                          !DEFAULT_CATALOG_ITEMS.some((d) => d.id === p.id) &&
+                          p.id !== selectedProductId
+                      )
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                  </select>
                 </div>
 
                 {/* Row 1: Contact Details (3 Columns) */}
@@ -245,7 +471,7 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                     <label className="block text-[11px] font-semibold text-slate-700 mb-1">Phone Number *</label>
                     <input
                       type="tel"
-                      placeholder="(555) 123-4567"
+                      placeholder="+92 312 5747610"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       className="w-full bg-white border border-slate-200 focus:border-[#2D545E] focus:ring-1 focus:ring-[#2D545E]/20 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none transition-all"
@@ -254,14 +480,14 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                   </div>
                 </div>
 
-                {/* Row 2: Quantity, Product Type & Company Name (3 Columns) */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Row 2: Quantity & Company Name */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Estimated Quantity *</label>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Estimated Quantity (Units) *</label>
                     <input
                       type="number"
                       min="1"
-                      placeholder="e.g. 1000"
+                      placeholder="e.g. 500"
                       value={quantity}
                       onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
                       className="w-full bg-white border border-slate-200 focus:border-[#2D545E] focus:ring-1 focus:ring-[#2D545E]/20 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none transition-all font-mono"
@@ -270,21 +496,10 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Product Type *</label>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Company / Brand Name</label>
                     <input
                       type="text"
-                      value={productType}
-                      onChange={(e) => setProductType(e.target.value)}
-                      className="w-full bg-white border border-slate-200 focus:border-[#2D545E] focus:ring-1 focus:ring-[#2D545E]/20 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none transition-all"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Company Name</label>
-                    <input
-                      type="text"
-                      placeholder="Company name"
+                      placeholder="Company name (optional)"
                       value={companyName}
                       onChange={(e) => setCompanyName(e.target.value)}
                       className="w-full bg-white border border-slate-200 focus:border-[#2D545E] focus:ring-1 focus:ring-[#2D545E]/20 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none transition-all"
@@ -292,10 +507,10 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                   </div>
                 </div>
 
-                {/* Row 3: Dynamic Product Specifications (2 Columns Grid) */}
-                {product.options && product.options.length > 0 && (
+                {/* Row 3: Dynamic Product Specifications (If available) */}
+                {currentProduct?.options && currentProduct.options.length > 0 && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    {product.options.map((opt) => (
+                    {currentProduct.options.map((opt) => (
                       <div key={opt.id}>
                         <label className="block text-[11px] font-semibold text-slate-700 mb-1">{opt.label}</label>
                         {opt.type === 'select' ? (
@@ -328,7 +543,7 @@ export default function OrderModal({ product, onClose, onSubmit, onLoginRequest 
                   <label className="block text-[11px] font-semibold text-slate-700 mb-1">Print & Production Specifications</label>
                   <textarea
                     rows={3}
-                    placeholder="Tell us about your required dimensions, paper stock/material, printing colors, finishing options, or special custom requirements..."
+                    placeholder="Tell us about your required dimensions (W x H x D), paper stock/material, pantone/CMYK colors, finishing options (matte, gloss, foil, spot UV), or special custom requirements..."
                     value={specifications}
                     onChange={(e) => setSpecifications(e.target.value)}
                     className="w-full bg-white border border-slate-200 focus:border-[#2D545E] focus:ring-1 focus:ring-[#2D545E]/20 rounded-xl p-3 text-xs font-medium text-slate-800 outline-none transition-all resize-y placeholder:text-slate-400"

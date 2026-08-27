@@ -3,7 +3,6 @@ const crypto = require('crypto');
 const fs = require('fs');
 const express = require('express');
 const mysql = require('mysql2/promise');
-const { renderRouteHtml } = require('./serverSeoData.cjs');
 require('dotenv').config();
 
 const app = express();
@@ -215,6 +214,7 @@ async function sendWelcomeEmail(customerEmail, customerName, plainPassword) {
   }
 
   const portalUrl = (process.env.APP_URL || 'https://printplaza.net').replace(/\/$/, '');
+  const logoUrl   = `${portalUrl}/brand/print-plaza-logo.png`;
   const fromAddress = buildFromAddress();
   const transporter  = createSmtpTransporter();
 
@@ -225,9 +225,11 @@ async function sendWelcomeEmail(customerEmail, customerName, plainPassword) {
 <body style="font-family:Arial,sans-serif;background:#f4f6f8;margin:0;padding:30px">
 <table align="center" style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;width:100%;max-width:600px">
   <tr style="background:#2D545E;color:#fff">
-    <td style="padding:30px;text-align:center">
-      <h1 style="margin:0;font-size:24px;letter-spacing:1px">PRINT PLAZA</h1>
-      <p style="margin:5px 0 0;font-size:13px;opacity:.8">Press &amp; Packaging Production Portal</p>
+    <td style="padding:28px 24px;text-align:center">
+      <a href="${portalUrl}" style="text-decoration:none;display:inline-block" target="_blank">
+        <img src="${logoUrl}" alt="Print Plaza" width="180" style="max-height:50px;max-width:210px;width:auto;height:auto;display:inline-block;border:0;outline:none;text-decoration:none;margin-bottom:8px" />
+      </a>
+      <p style="margin:4px 0 0;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#e2e8f0;font-family:Arial,sans-serif;font-weight:600">Press &amp; Packaging Production Portal</p>
     </td>
   </tr>
   <tr><td style="padding:35px;color:#1e293b">
@@ -287,6 +289,7 @@ async function sendQuotationUpdateEmail(customerEmail, customerName, quoteObj) {
   const transporter = createSmtpTransporter();
   const fromAddress = buildFromAddress();
   const portalUrl   = (process.env.APP_URL || 'https://printplaza.net').replace(/\/$/, '');
+  const logoUrl     = `${portalUrl}/brand/print-plaza-logo.png`;
 
   const quoteId     = String(quoteObj.id || quoteObj.quote_number || 'QUOTE').slice(0, 12).toUpperCase();
   const quotedPrice = Number(quoteObj.quoted_price || quoteObj.quotedPrice || 0).toFixed(2);
@@ -303,9 +306,11 @@ async function sendQuotationUpdateEmail(customerEmail, customerName, quoteObj) {
 <body style="font-family:Arial,sans-serif;background:#f4f6f8;margin:0;padding:30px">
 <table align="center" style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;width:100%;max-width:600px">
   <tr style="background:#2D545E;color:#fff">
-    <td style="padding:30px;text-align:center">
-      <h1 style="margin:0;font-size:24px;letter-spacing:1px">PRINT PLAZA</h1>
-      <p style="margin:5px 0 0;font-size:13px;opacity:.8">Quotation Update Notification</p>
+    <td style="padding:28px 24px;text-align:center">
+      <a href="${portalUrl}" style="text-decoration:none;display:inline-block" target="_blank">
+        <img src="${logoUrl}" alt="Print Plaza" width="180" style="max-height:50px;max-width:210px;width:auto;height:auto;display:inline-block;border:0;outline:none;text-decoration:none;margin-bottom:8px" />
+      </a>
+      <p style="margin:4px 0 0;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#e2e8f0;font-family:Arial,sans-serif;font-weight:600">Quotation Update Notification</p>
     </td>
   </tr>
   <tr><td style="padding:35px;color:#1e293b">
@@ -1582,40 +1587,8 @@ app.use(express.static(distDir, {
   },
 }));
 
-let cachedTemplateHtml = null;
-let lastTemplateReadTime = 0;
-
-function getIndexTemplate() {
-  const now = Date.now();
-  if (cachedTemplateHtml && (now - lastTemplateReadTime < 5000)) {
-    return cachedTemplateHtml;
-  }
-  const indexPath = fs.existsSync(path.join(distDir, 'index.html'))
-    ? path.join(distDir, 'index.html')
-    : path.join(__dirname, 'index.html');
-  try {
-    cachedTemplateHtml = fs.readFileSync(indexPath, 'utf8');
-    lastTemplateReadTime = now;
-    return cachedTemplateHtml;
-  } catch (err) {
-    console.error('Failed to read index.html template:', err);
-    return cachedTemplateHtml || '<!doctype html><html><head><title>Print Plaza</title></head><body><div id="root"></div></body></html>';
-  }
-}
-
-app.use((req, res) => {
-  // If the request looks like a static asset that wasn't found, return 404
-  if (/\.(js|css|png|jpg|jpeg|gif|svg|ico|json|map|woff|woff2|ttf|eot)$/i.test(req.path)) {
-    res.status(404).send('Asset not found');
-    return;
-  }
-
-  const templateHtml = getIndexTemplate();
-  const renderedHtml = renderRouteHtml(templateHtml, req.path);
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.send(renderedHtml);
+app.use((_req, res) => {
+  res.sendFile(path.join(distDir, 'index.html'));
 });
 
 app.use((error, _req, res, _next) => {

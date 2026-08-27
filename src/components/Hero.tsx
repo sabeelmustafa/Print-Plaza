@@ -11,9 +11,10 @@ import { useState } from 'react';
 interface HeroProps {
   settings?: SiteSettings['homepage'];
   theme?: SiteSettings['theme'];
+  onRequestQuote?: () => void;
 }
 
-export default function Hero({ settings, theme }: HeroProps) {
+export default function Hero({ settings, theme, onRequestQuote }: HeroProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const primaryColor = theme?.primaryColor || '#2D545E';
   const accentColor = theme?.accentColor || '#E17055';

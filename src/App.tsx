@@ -13,21 +13,7 @@ import OrderModal from './components/OrderModal';
 import AuthModal from './components/AuthModal';
 import AdminPanel, { WebsiteEditorPage } from './components/AdminPanel';
 import UserPanel from './components/UserPanel';
-import {
-  AboutPage,
-  ContactPage,
-  PrivacyPolicyPage,
-  ServicePage,
-  SERVICE_PAGES,
-  useSeo,
-} from './components/SeoPages';
-import {
-  HomeCoreServicesSection,
-  HomeAboutSection,
-  HomeContactSection,
-} from './components/HomeSeoSections';
 import { SERVICES as CONSTANT_SERVICES } from './constants';
-import { ALL_SEO_ROUTES, BUSINESS_INFO } from './seoData';
 import { ServiceCategory, Product, SiteSettings } from './types';
 import { CheckCircle2, ChevronLeft } from 'lucide-react';
 import { AuthProvider, useAuth } from './lib/AuthContext';
@@ -168,57 +154,37 @@ function SiteFooter({ siteSettings }: { siteSettings: SiteSettings }) {
 
           <div>
             <h5 className="text-[10px] uppercase tracking-[0.28em] font-black mb-8 sm:mb-10 text-[#E17055]">
-              Services & Pages
+              Departments
             </h5>
             <ul className="space-y-3 sm:space-y-4 text-xs font-bold tracking-tight opacity-75">
               <li>
-                <a href="/custom-packaging-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                <a href="#products" className="hover:text-[#E17055] transition-colors uppercase">
                   Custom Packaging
                 </a>
               </li>
               <li>
-                <a href="/product-label-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                <a href="#products" className="hover:text-[#E17055] transition-colors uppercase">
                   Product Labels
                 </a>
               </li>
               <li>
-                <a href="/business-card-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                <a href="#products" className="hover:text-[#E17055] transition-colors uppercase">
                   Business Cards
                 </a>
               </li>
               <li>
-                <a href="/brochure-printing" className="hover:text-[#E17055] transition-colors uppercase">
-                  Brochures
+                <a href="#products" className="hover:text-[#E17055] transition-colors uppercase">
+                  Brochures & Flyers
                 </a>
               </li>
               <li>
-                <a href="/flyer-printing" className="hover:text-[#E17055] transition-colors uppercase">
-                  Flyers & Leaflets
+                <a href="#products" className="hover:text-[#E17055] transition-colors uppercase">
+                  Posters & Banners
                 </a>
               </li>
               <li>
-                <a href="/poster-printing" className="hover:text-[#E17055] transition-colors uppercase">
-                  Posters & Displays
-                </a>
-              </li>
-              <li>
-                <a href="/banner-printing" className="hover:text-[#E17055] transition-colors uppercase">
-                  Banners & Stands
-                </a>
-              </li>
-              <li>
-                <a href="/signage-printing" className="hover:text-[#E17055] transition-colors uppercase">
+                <a href="#products" className="hover:text-[#E17055] transition-colors uppercase">
                   Rigid Signage
-                </a>
-              </li>
-              <li>
-                <a href="/offset-printing" className="hover:text-[#E17055] transition-colors uppercase">
-                  Offset Lithography
-                </a>
-              </li>
-              <li>
-                <a href="/digital-printing" className="hover:text-[#E17055] transition-colors uppercase">
-                  Digital Printing
                 </a>
               </li>
             </ul>
@@ -231,19 +197,19 @@ function SiteFooter({ siteSettings }: { siteSettings: SiteSettings }) {
             <ul className="space-y-4 sm:space-y-5 text-xs font-medium leading-relaxed opacity-75 font-mono">
               <li>
                 <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Email</span>
-                <a href={`mailto:${BUSINESS_INFO.email}`} className="hover:text-white">
-                  {BUSINESS_INFO.email}
+                <a href={`mailto:${siteSettings.footer?.email || 'sales@printplaza.net'}`} className="hover:text-white">
+                  {siteSettings.footer?.email || 'sales@printplaza.net'}
                 </a>
               </li>
               <li>
                 <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Phone / WhatsApp</span>
-                <a href={`tel:${BUSINESS_INFO.phone}`} className="hover:text-white">
-                  {BUSINESS_INFO.displayPhone}
+                <a href={`tel:${siteSettings.footer?.phone || '+923125747610'}`} className="hover:text-white">
+                  {siteSettings.footer?.phone || '+92 312 5747610'}
                 </a>
               </li>
               <li>
                 <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Address</span>
-                <span>{BUSINESS_INFO.formattedAddress}</span>
+                <span>{siteSettings.footer?.address || 'Main Talagang Road, Chakwal, Punjab, Pakistan'}</span>
               </li>
               <li>
                 <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Hours</span>
@@ -256,17 +222,14 @@ function SiteFooter({ siteSettings }: { siteSettings: SiteSettings }) {
         <div className="mt-20 sm:mt-28 pt-10 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-8 text-[10px] font-black uppercase tracking-[0.32em] opacity-60 text-center md:text-left">
           <p>&copy; {new Date().getFullYear()} Print Plaza. High Quality Commercial Printing & Packaging.</p>
           <div className="flex flex-wrap gap-8 items-center justify-center">
-            <a href="/about" className="hover:opacity-100">
-              About Us
+            <a href="#services" className="hover:opacity-100">
+              Services
             </a>
-            <a href="/contact" className="hover:opacity-100">
+            <a href="#products" className="hover:opacity-100">
+              Production
+            </a>
+            <a href="#footer" className="hover:opacity-100">
               Contact
-            </a>
-            <a href="/privacy-policy" className="hover:opacity-100">
-              Privacy Policy
-            </a>
-            <a href="/sitemap.xml" className="hover:opacity-100">
-              Sitemap
             </a>
             <div className="flex gap-1">
               <div className="w-2 h-2 bg-[#2D545E]" />
@@ -281,11 +244,12 @@ function SiteFooter({ siteSettings }: { siteSettings: SiteSettings }) {
 
 function AppContent() {
   const { user, isAdmin, loading: authLoading } = useAuth();
-  const [currentPath, setCurrentPath] = useState(() => window.location.pathname.replace(/\/$/, '') || '/');
   const [services, setServices] = useState<ServiceCategory[]>(CONSTANT_SERVICES);
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({});
   const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [quoteModalOpen, setQuoteModalOpen] = useState(false);
+  const [initialServiceName, setInitialServiceName] = useState<string | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [view, setView] = useState<'main' | 'dashboard'>('main');
@@ -300,16 +264,6 @@ function AppContent() {
   useEffect(() => {
     fetchCmsData();
   }, [view]);
-
-  useEffect(() => {
-    const syncRoute = () => setCurrentPath(window.location.pathname.replace(/\/$/, '') || '/');
-    window.addEventListener('popstate', syncRoute);
-    window.addEventListener('plaza:navigate', syncRoute);
-    return () => {
-      window.removeEventListener('popstate', syncRoute);
-      window.removeEventListener('plaza:navigate', syncRoute);
-    };
-  }, []);
 
   const fetchCmsData = async () => {
     try {
@@ -333,14 +287,38 @@ function AppContent() {
     }
   };
 
-  // Sync homepage SEO when on root
-  const homeSeo = ALL_SEO_ROUTES['/'];
-  useSeo(
-    homeSeo.metaTitle,
-    homeSeo.description,
-    '/',
-    homeSeo.schema
-  );
+  const handleOpenQuote = (productOrService?: Product | string | null) => {
+    if (!productOrService) {
+      setSelectedProduct(null);
+      setInitialServiceName(null);
+    } else if (typeof productOrService === 'string') {
+      const allProducts = services.flatMap((s) => s.products);
+      const match = allProducts.find(
+        (p) =>
+          p.name.toLowerCase() === productOrService.toLowerCase() ||
+          p.id.toLowerCase() === productOrService.toLowerCase()
+      );
+      if (match) {
+        setSelectedProduct(match);
+        setInitialServiceName(match.name);
+      } else {
+        setSelectedProduct(null);
+        setInitialServiceName(productOrService);
+      }
+    } else {
+      setSelectedProduct(productOrService);
+      setInitialServiceName(productOrService.name);
+    }
+    setQuoteModalOpen(true);
+  };
+
+  const handleOrderSubmit = () => {
+    setQuoteModalOpen(false);
+    setSelectedProduct(null);
+    setInitialServiceName(null);
+    setShowSuccess(true);
+    setTimeout(() => setShowSuccess(false), 5000);
+  };
 
   if (authLoading) {
     return (
@@ -358,43 +336,6 @@ function AppContent() {
     );
   }
 
-  const handleOrderSubmit = () => {
-    setSelectedProduct(null);
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 5000);
-  };
-
-  const servicePage = SERVICE_PAGES.find((page) => page.path === currentPath);
-  const isPrivacyPolicy = currentPath === '/privacy-policy';
-  const isAboutPage = currentPath === '/about';
-  const isContactPage = currentPath === '/contact';
-
-  if (servicePage || isPrivacyPolicy || isAboutPage || isContactPage) {
-    return (
-      <div className="min-h-screen bg-[#FDFCFB] font-sans text-black selection:bg-[#2D545E] selection:text-white relative">
-        <div className="fixed inset-0 bg-grainy opacity-[0.03] pointer-events-none z-50 overflow-hidden" />
-
-        <Navbar
-          onLogin={() => setShowAuthModal(true)}
-          onViewDashboard={() => setView('dashboard')}
-          settings={{ ...siteSettings.header, useTransparentHeader: false }}
-        />
-
-        {servicePage && <ServicePage page={servicePage} />}
-        {isAboutPage && <AboutPage />}
-        {isContactPage && <ContactPage />}
-        {isPrivacyPolicy && <PrivacyPolicyPage />}
-
-        <SiteFooter siteSettings={siteSettings} />
-        <AuthModal
-          isOpen={showAuthModal}
-          onClose={() => setShowAuthModal(false)}
-          onSuccess={() => setView('dashboard')}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#FDFCFB] font-sans text-black selection:bg-[#2D545E] selection:text-white relative">
       {/* Fixed Background Elements */}
@@ -403,11 +344,16 @@ function AppContent() {
       <Navbar
         onLogin={() => setShowAuthModal(true)}
         onViewDashboard={() => setView('dashboard')}
+        onRequestQuote={() => handleOpenQuote()}
         settings={siteSettings.header}
       />
 
       <main>
-        <Hero settings={siteSettings.homepage} theme={siteSettings.theme} />
+        <Hero
+          settings={siteSettings.homepage}
+          theme={siteSettings.theme}
+          onRequestQuote={() => handleOpenQuote()}
+        />
 
         {/* 1. Production Unit / Fast Quote Grid */}
         <section id="products" className="py-24 sm:py-36 bg-[#FDFCFB] relative overflow-hidden border-b border-black/5">
@@ -441,15 +387,15 @@ function AppContent() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-black/8 border border-black/8">
               {services.flatMap((s) => s.products).slice(0, 6).map((product) => (
                 <div key={product.id} className="bg-[#FDFCFB]">
-                  <ProductCard product={product} onOrder={setSelectedProduct} />
+                  <ProductCard product={product} onOrder={handleOpenQuote} />
                 </div>
               ))}
             </div>
 
             <div className="mt-20 sm:mt-24 flex justify-center">
-              <a href="#core-services" className="group flex flex-col items-center gap-6">
+              <a href="#services" className="group flex flex-col items-center gap-6">
                 <span className="text-[10px] font-black uppercase tracking-[0.5em] text-black/40 group-hover:text-black transition-colors">
-                  Explore All 8 Specialized Departments &darr;
+                  Explore Specialized Services &darr;
                 </span>
                 <div className="w-px h-16 bg-gradient-to-b from-black/20 to-transparent group-hover:from-[#2D545E] transition-colors" />
               </a>
@@ -457,17 +403,8 @@ function AppContent() {
           </div>
         </section>
 
-        {/* 2. Core 8 Services Deep-Dive Section (100-150 words per service) */}
-        <HomeCoreServicesSection />
-
-        {/* 3. Interactive Category Grid */}
+        {/* 2. Interactive Category Grid */}
         <ServiceGrid categories={services} onSelect={setSelectedCategory} />
-
-        {/* 4. About Print Plaza Section */}
-        <HomeAboutSection />
-
-        {/* 5. Direct Contact & Studio Location Section */}
-        <HomeContactSection />
 
         <AnimatePresence>
           {selectedCategory && (
@@ -504,7 +441,7 @@ function AppContent() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
                   {selectedCategory.products.map((product) => (
                     <div key={product.id} className="h-full">
-                      <ProductCard product={product} onOrder={setSelectedProduct} />
+                      <ProductCard product={product} onOrder={handleOpenQuote} />
                     </div>
                   ))}
                 </div>
@@ -523,10 +460,17 @@ function AppContent() {
       />
 
       <AnimatePresence>
-        {selectedProduct && (
+        {(quoteModalOpen || selectedProduct) && (
           <OrderModal
             product={selectedProduct}
-            onClose={() => setSelectedProduct(null)}
+            initialServiceName={initialServiceName}
+            products={services.flatMap((s) => s.products)}
+            categories={services}
+            onClose={() => {
+              setQuoteModalOpen(false);
+              setSelectedProduct(null);
+              setInitialServiceName(null);
+            }}
             onSubmit={handleOrderSubmit}
             onLoginRequest={() => setShowAuthModal(true)}
           />
