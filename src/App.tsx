@@ -148,16 +148,9 @@ function SiteFooter({ siteSettings }: { siteSettings: SiteSettings }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-16 md:gap-20">
           <div className="sm:col-span-2">
             <div className="mb-10 sm:mb-12">
-              <div className="flex items-center gap-3.5 mb-4">
-                <img
-                  src="/brand/print-plaza-icon.png"
-                  alt="Print Plaza"
-                  className="w-9 h-9 sm:w-10 sm:h-10 object-contain"
-                />
-                <h6 className="font-display font-black text-4xl sm:text-5xl tracking-tight uppercase leading-none">
-                  {siteSettings.footer?.brandText || 'Print Plaza.'}
-                </h6>
-              </div>
+              <h6 className="font-display font-black text-4xl sm:text-5xl mb-4 tracking-tight uppercase leading-none">
+                {siteSettings.footer?.brandText || 'Print Plaza.'}
+              </h6>
               <div className="text-[10px] uppercase tracking-[0.32em] font-black text-[#66A0AA]">
                 {siteSettings.footer?.tagline || 'Commercial Print & Packaging Manufacturing Studio'}
               </div>

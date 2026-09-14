@@ -23,12 +23,10 @@ export default function Navbar({ onLogin, onViewDashboard, onRequestQuote, setti
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const useTransparentHeader = settings?.useTransparentHeader !== false;
-  const brandIcon = settings?.brandIcon || '/brand/print-plaza-icon.png';
-  const showFullLogo = Boolean(settings?.useFullLogo && (settings?.logoImage || settings?.logoImageDark));
   const normalLogo = settings?.logoImageDark || settings?.logoImage || '/brand/print-plaza-logo.png';
   const heroLogo = settings?.logoImageLight || normalLogo;
   const logoImage = !useTransparentHeader || isScrolled || isMenuOpen ? normalLogo : heroLogo;
-  const logoSize = Math.min(Math.max(Number(settings?.logoSize || 38), 24), 96);
+  const logoSize = Math.min(Math.max(Number(settings?.logoSize || 36), 24), 96);
   const navFontSize = Math.min(Math.max(Number(settings?.navMenuFontSize || 10), 9), 16);
   const navItems: NavMenuItem[] = settings?.navItems?.length
     ? settings.navItems
@@ -60,8 +58,8 @@ export default function Navbar({ onLogin, onViewDashboard, onRequestQuote, setti
     >
       <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16">
         <div className={`flex justify-between items-center transition-all duration-300 ${isScrolled ? 'h-16' : 'h-20'}`}>
-          <a href="/" className="flex items-center gap-3.5 group cursor-pointer">
-            {showFullLogo ? (
+          <a href="/" className="flex items-center gap-4 group cursor-pointer">
+            {logoImage ? (
               <img
                 src={logoImage}
                 alt={settings?.logoText || 'Print Plaza'}
@@ -69,30 +67,16 @@ export default function Navbar({ onLogin, onViewDashboard, onRequestQuote, setti
                 style={{ height: `${logoSize}px`, maxWidth: `${Math.max(160, logoSize * 5)}px` }}
               />
             ) : (
-              <>
-                <img
-                  src={brandIcon}
-                  alt={settings?.logoText || 'Print Plaza'}
-                  className="w-auto object-contain transition-transform duration-300 group-hover:scale-105"
-                  style={{ height: `${logoSize}px`, width: `${logoSize}px` }}
-                />
-                <div className="flex flex-col">
-                  <span
-                    className={`font-display font-black text-2xl tracking-tighter leading-none transition-colors duration-300 ${
-                      headerIsTransparent ? 'text-white' : 'text-slate-900'
-                    }`}
-                  >
-                    {settings?.logoText || 'PRINT PLAZA'}
-                  </span>
-                  <span
-                    className={`text-[9px] uppercase tracking-[0.38em] font-extrabold mt-0.5 transition-colors duration-300 ${
-                      headerIsTransparent ? 'text-[#66A0AA]' : 'text-[#2D545E]'
-                    }`}
-                  >
-                    {settings?.tagline || 'Industrial Print Production'}
-                  </span>
-                </div>
-              </>
+              <div className="flex gap-1.5 relative">
+                <div className="w-2.5 h-7 bg-[#2D545E] transform -skew-x-12 group-hover:rotate-6 transition-all duration-300" />
+                <div className="w-2.5 h-7 bg-[#E17055] transform -skew-x-12 group-hover:-rotate-6 transition-all duration-300" />
+              </div>
+            )}
+            {!logoImage && (
+              <div className="flex flex-col">
+                <span className="font-display font-black text-2xl tracking-tighter leading-none">{settings?.logoText || 'PRINT PLAZA'}</span>
+                <span className="text-[9px] uppercase tracking-[0.4em] font-extrabold mt-0.5 text-[#2D545E]">{settings?.tagline || 'Industrial Print Production'}</span>
+              </div>
             )}
           </a>
 
