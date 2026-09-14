@@ -55,6 +55,8 @@ export interface NavMenuItem {
 export interface SiteSettings {
   header?: {
     logoText?: string;
+    brandIcon?: string;
+    useFullLogo?: boolean;
     logoImage?: string;
     logoImageDark?: string;
     logoImageLight?: string;

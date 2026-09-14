@@ -96,10 +96,11 @@ const blankCategory: Partial<ServiceCategory> = {
 const defaultSettings: SiteSettings = {
   header: {
     logoText: 'PRINT PLAZA',
-    logoImage: '/brand/print-plaza-logo.png',
-    logoImageDark: '/brand/print-plaza-logo.png',
-    logoImageLight: '/brand/print-plaza-logo.png',
-    logoSize: 36,
+    brandIcon: '/brand/print-plaza-icon.png',
+    logoImage: '/brand/print-plaza-icon.png',
+    logoImageDark: '/brand/print-plaza-icon.png',
+    logoImageLight: '/brand/print-plaza-icon.png',
+    logoSize: 38,
     useTransparentHeader: true,
     tagline: 'Industrial Print Production',
     servicesLabel: 'Services',
@@ -274,13 +275,10 @@ export default function AdminPanel() {
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex font-sans antialiased">
       {/* PlazaHQ Sidebar Navigation */}
       <aside className="w-64 bg-[#14262C] text-slate-300 flex flex-col border-r border-[#223E47] shrink-0">
-        {/* Brand Header with Dual Diagonal Slash Accents matching logo */}
+        {/* Brand Header with Dual Diagonal Slash Brand Icon */}
         <div className="h-16 px-5 flex items-center gap-3 border-b border-[#223E47]">
-          <div className="w-9 h-9 rounded-xl bg-[#1E373F] border border-[#2D545E] flex items-center justify-center p-1.5 shadow-md">
-            <div className="flex items-center gap-1.5 h-full">
-              <div className="w-2 h-full bg-[#2D545E] -skew-x-12 rounded-xs" />
-              <div className="w-2 h-full bg-[#E17055] -skew-x-12 rounded-xs" />
-            </div>
+          <div className="w-9 h-9 rounded-xl bg-[#1E373F] border border-[#2D545E] flex items-center justify-center p-1.5 shadow-md overflow-hidden">
+            <img src="/brand/print-plaza-icon.png" alt="Print Plaza" className="w-full h-full object-contain" />
           </div>
           <div>
             <span className="font-extrabold text-white tracking-tight text-base leading-none block">PlazaHQ <span className="text-[#E17055]">ERP</span></span>
