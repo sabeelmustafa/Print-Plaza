@@ -9,7 +9,7 @@ import { X, Upload, CheckCircle2, ArrowRight, Package, Layers, Sparkles } from '
 import { Product, ServiceCategory } from '../types';
 import { useAuth } from '../lib/AuthContext';
 import { DataService } from '../lib/dataService';
-import { SERVICES as DEFAULT_SERVICES } from '../constants';
+import { useCatalogProducts } from '../lib/useCatalogProducts';
 
 export interface OrderModalProps {
   product?: Product | null;
@@ -20,21 +20,6 @@ export interface OrderModalProps {
   onSubmit: (orderData: any) => void;
   onLoginRequest?: () => void;
 }
-
-const DEFAULT_CATALOG_ITEMS = [
-  { id: 'custom-boxes', name: 'Custom Product Boxes', category: 'Packaging & Labels', description: 'Premium folding cartons, mailers & custom packaging.', image: 'https://images.unsplash.com/photo-1542319630-55fb7f7c944a?auto=format&fit=crop&q=80&w=800&h=600' },
-  { id: 'product-labels', name: 'Product Labels & Stickers', category: 'Packaging & Labels', description: 'Waterproof BOPP roll & sheet adhesive labels.', image: 'https://images.unsplash.com/photo-1626015270271-e73792040f7b?auto=format&fit=crop&q=80&w=800&h=600' },
-  { id: 'business-cards', name: 'Luxury Business Cards', category: 'Corporate Print', description: '350–700gsm heavy cardstocks, soft-touch & spot UV.', image: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=800&h=600' },
-  { id: 'bulk-flyers', name: 'Bulk Marketing Flyers', category: 'Offset Printing', description: 'Cost-effective leaflets for marketing campaigns and events.', image: 'https://images.unsplash.com/photo-1644342939989-1065672049e6?auto=format&fit=crop&q=80&w=800&h=600' },
-  { id: 'brochures-catalogs', name: 'Company Brochures & Catalogs', category: 'Commercial Print', description: 'Bi-fold, tri-fold, catalogs, and company profile booklets.', image: 'https://images.unsplash.com/photo-1586075010923-2dd4570fb338?auto=format&fit=crop&q=80&w=800&h=600' },
-  { id: 'posters-displays', name: 'High-Resolution Wall Posters', category: 'Large Format', description: 'Gallery display posters in A3, A2, A1, A0 and custom dimensions.', image: 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&q=80&w=800&h=600' },
-  { id: 'vinyl-banners', name: 'Vinyl Banners & Roll-Up Stands', category: 'Large Format', description: 'Heavy-duty 510gsm vinyl banners and retractable pull-up stands.', image: 'https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&q=80&w=800&h=600' },
-  { id: 'rigid-signage', name: 'Rigid Signage (Acrylic & ACP)', category: 'Signage', description: 'Direct UV flatbed printing on acrylic, aluminum composite, and foam boards.', image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&q=80&w=800&h=600' },
-  { id: 'offset-litho', name: 'Offset Printing (High Volume)', category: 'Offset Printing', description: 'High-volume commercial lithography with exact Pantone PMS matching.', image: 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?auto=format&fit=crop&q=80&w=800&h=600' },
-  { id: 'digital-short-run', name: 'Digital Fast-Turnaround Printing', category: 'Digital Printing', description: 'On-demand short runs with fast 24-48 hour turnaround.', image: 'https://images.unsplash.com/photo-1508873696983-2df5293cb32b?auto=format&fit=crop&q=80&w=800&h=600' },
-  { id: 'custom-stickers', name: 'Custom Die-Cut Vinyl Stickers', category: 'Packaging & Labels', description: 'Die-cut vinyl stickers with matte, gloss, or holographic lamination.', image: 'https://images.unsplash.com/photo-1572375992501-4b0892d50c69?auto=format&fit=crop&q=80&w=800&h=600' },
-  { id: 'custom-bespoke', name: 'Bespoke / Custom Print Project', category: 'Custom Job', description: 'Have unique dimensions, specialty stock, or custom finishing? Tell us what you need.', image: 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?auto=format&fit=crop&q=80&w=800&h=600' },
-];
 
 export default function OrderModal({
   product,
@@ -49,100 +34,20 @@ export default function OrderModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // Compile full list of available products
-  const allAvailableProducts = React.useMemo(() => {
-    const list: Product[] = [];
-    const seen = new Set<string>();
-
-    if (product) {
-      list.push(product);
-      seen.add(product.id);
-    }
-
-    products.forEach((p) => {
-      if (!seen.has(p.id)) {
-        list.push(p);
-        seen.add(p.id);
-      }
+  const { products: allAvailableProducts, loading: catalogLoading, error: catalogError, retry: retryCatalog } = useCatalogProducts();
+  const [selectedProductId, setSelectedProductId] = useState(product?.id || '');
+  useEffect(() => {
+    if (!allAvailableProducts.length) return;
+    setSelectedProductId(previous => {
+      if (allAvailableProducts.some(item => item.id === previous)) return previous;
+      return allAvailableProducts.find(item => item.id === product?.id || item.name.toLowerCase() === initialServiceName?.toLowerCase())?.id || '';
     });
-
-    categories.forEach((cat) => {
-      (cat.products || []).forEach((p) => {
-        if (!seen.has(p.id)) {
-          list.push(p);
-          seen.add(p.id);
-        }
-      });
-    });
-
-    if (list.length === 0) {
-      DEFAULT_SERVICES.forEach((cat) => {
-        (cat.products || []).forEach((p) => {
-          if (!seen.has(p.id)) {
-            list.push(p);
-            seen.add(p.id);
-          }
-        });
-      });
-    }
-
-    return list;
-  }, [product, products, categories]);
-
-  // Determine initial selected product ID or custom name
-  const findInitialProductId = () => {
-    if (product?.id) return product.id;
-    if (initialServiceName) {
-      const match = allAvailableProducts.find(
-        (p) =>
-          p.name.toLowerCase() === initialServiceName.toLowerCase() ||
-          initialServiceName.toLowerCase().includes(p.name.toLowerCase()) ||
-          p.name.toLowerCase().includes(initialServiceName.toLowerCase())
-      );
-      if (match) return match.id;
-      const catalogMatch = DEFAULT_CATALOG_ITEMS.find(
-        (item) =>
-          item.name.toLowerCase() === initialServiceName.toLowerCase() ||
-          initialServiceName.toLowerCase().includes(item.name.toLowerCase()) ||
-          item.name.toLowerCase().includes(initialServiceName.toLowerCase())
-      );
-      if (catalogMatch) return catalogMatch.id;
-      return 'custom-bespoke';
-    }
-    return '';
-  };
-
-  const [selectedProductId, setSelectedProductId] = useState<string>(findInitialProductId);
-  const [productType, setProductType] = useState<string>(() => {
-    if (product?.name) return product.name;
-    if (initialServiceName) return initialServiceName;
-    return '';
-  });
-
-  // Current active product resolution
-  const currentProduct = React.useMemo(() => {
-    if (selectedProductId) {
-      const matched = allAvailableProducts.find((p) => p.id === selectedProductId);
-      if (matched) return matched;
-      const defaultMatch = DEFAULT_CATALOG_ITEMS.find((item) => item.id === selectedProductId);
-      if (defaultMatch) {
-        return {
-          id: defaultMatch.id,
-          name: defaultMatch.name,
-          description: defaultMatch.description,
-          price: 0,
-          unit: 'units',
-          image: defaultMatch.image,
-          categoryId: defaultMatch.category,
-          options: [],
-        } as Product;
-      }
-    }
-    return product || null;
-  }, [selectedProductId, allAvailableProducts, product]);
+  }, [allAvailableProducts, product?.id, initialServiceName]);
+  const currentProduct = allAvailableProducts.find(item => item.id === selectedProductId) || null;
+  const productType = currentProduct?.name || '';
 
   // Form State
-  const [fullName, setFullName] = useState(user?.displayName || '');
+  const [fullName, setFullName] = useState(user?.name || user?.displayName || '');
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -153,38 +58,17 @@ export default function OrderModal({
 
   // Sync user credentials if auth arrives
   useEffect(() => {
-    if (user?.displayName && !fullName) setFullName(user.displayName);
+    if ((user?.name || user?.displayName) && !fullName) setFullName(user.name || user.displayName);
     if (user?.email && !email) setEmail(user.email);
   }, [user]);
 
-  // Handle product selection dropdown change
   const handleProductSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    setSelectedProductId(val);
-
-    if (!val) {
-      setProductType('');
-      setOptions({});
-      return;
-    }
-
-    const matched = allAvailableProducts.find((p) => p.id === val);
-    if (matched) {
-      setProductType(matched.name);
-      setOptions({});
-      return;
-    }
-
-    const defaultMatch = DEFAULT_CATALOG_ITEMS.find((item) => item.id === val);
-    if (defaultMatch) {
-      setProductType(defaultMatch.name);
-      setOptions({});
-      return;
-    }
-
-    setProductType(val);
+    setSelectedProductId(e.target.value);
     setOptions({});
   };
+  useEffect(() => {
+    setOptions(Object.fromEntries((currentProduct?.options || []).filter(option => option.defaultValue !== undefined).map(option => [option.id, option.defaultValue!])));
+  }, [currentProduct?.id]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -200,18 +84,13 @@ export default function OrderModal({
       return;
     }
 
-    const finalProductName = productType || currentProduct?.name || 'Custom Print Job';
+    if (!currentProduct || catalogLoading || catalogError) { alert('Select a listed product before requesting a quotation.'); return; }
+    if (!Number.isSafeInteger(quantity) || quantity < 1 || (currentProduct.maxQuantity && quantity > currentProduct.maxQuantity)) { alert('Enter a valid quantity within the product limit.'); return; }
+    const finalProductName = currentProduct.name;
 
     setIsSubmitting(true);
     try {
-      let artworkUrl = '';
-      if (artworkFile) {
-        try {
-          artworkUrl = await DataService.uploadImage(artworkFile, artworkFile.name);
-        } catch (_fileErr) {
-          artworkUrl = artworkFile.name;
-        }
-      }
+      const artwork = artworkFile ? await DataService.prepareArtwork(artworkFile) : undefined;
 
       await DataService.submitQuoteRequest({
         userId: user?.uid || undefined,
@@ -226,14 +105,14 @@ export default function OrderModal({
         options: { ...options },
         finishingSpecs: {},
         notes: specifications || undefined,
-        artworkUrl: artworkUrl || undefined,
+        artwork,
       });
 
       onSubmit({ userEmail: email, userName: fullName, productName: finalProductName });
       setIsSuccess(true);
     } catch (_err) {
       console.error('[OrderModal] submitQuoteRequest failed:', _err);
-      alert('Failed to submit quote request. Please try again.');
+      alert(_err instanceof Error ? _err.message : 'Failed to submit quote request. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -384,7 +263,7 @@ export default function OrderModal({
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-[#2D545E] flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <Layers className="w-3.5 h-3.5 text-[#E17055]" />
-                      Select Product or Service *
+                      Product / Item *
                     </span>
                     <span className="text-[9px] text-slate-500 font-mono lowercase">
                       choose or change below
@@ -392,53 +271,18 @@ export default function OrderModal({
                   </label>
 
                   <select
+                    aria-label="Product / Item"
+                    disabled={catalogLoading || !!catalogError}
                     value={selectedProductId}
                     onChange={handleProductSelect}
                     className="w-full bg-white border border-slate-300 focus:border-[#2D545E] focus:ring-2 focus:ring-[#2D545E]/20 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none transition-all shadow-xs cursor-pointer"
                     required
                   >
-                    <option value="">— Choose a Product or Service Category —</option>
-
-                    <optgroup label="Packaging & Product Labels">
-                      <option value="custom-boxes">Custom Product Boxes & Cartons</option>
-                      <option value="product-labels">Product Labels & Bottle Stickers</option>
-                      <option value="custom-stickers">Custom Die-Cut Vinyl Stickers</option>
-                    </optgroup>
-
-                    <optgroup label="Marketing Collateral & Corporate Stationery">
-                      <option value="business-cards">Luxury Business Cards (350–700gsm)</option>
-                      <option value="bulk-flyers">Bulk Marketing Flyers & Leaflets</option>
-                      <option value="brochures-catalogs">Company Brochures & Catalogs</option>
-                    </optgroup>
-
-                    <optgroup label="Large Format & Display Signage">
-                      <option value="posters-displays">High-Resolution Wall & Display Posters</option>
-                      <option value="vinyl-banners">Outdoor Vinyl Banners & Roll-Up Stands</option>
-                      <option value="rigid-signage">Rigid Signage (Acrylic, ACP & Foam Board)</option>
-                    </optgroup>
-
-                    <optgroup label="Commercial Press Technologies">
-                      <option value="offset-litho">High-Volume Offset Lithography</option>
-                      <option value="digital-short-run">Digital Fast-Turnaround Short Runs</option>
-                    </optgroup>
-
-                    <optgroup label="Other / Custom Inquiry">
-                      <option value="custom-bespoke">Bespoke / Custom Print Project</option>
-                    </optgroup>
-
-                    {/* Any extra dynamic products from database */}
-                    {allAvailableProducts
-                      .filter(
-                        (p) =>
-                          !DEFAULT_CATALOG_ITEMS.some((d) => d.id === p.id) &&
-                          p.id !== selectedProductId
-                      )
-                      .map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
+                    <option value="">{catalogLoading ? 'Loading products…' : 'Choose a product / item'}</option>
+                    {allAvailableProducts.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                   </select>
+                  {catalogError && <p role="alert" className="text-xs text-red-700">{catalogError} <button type="button" className="underline" onClick={retryCatalog}>Retry</button></p>}
+                  {!catalogLoading && !catalogError && !allAvailableProducts.length && <p className="text-xs text-slate-500">No products are currently available.</p>}
                 </div>
 
                 {/* Row 1: Contact Details (3 Columns) */}
@@ -576,7 +420,7 @@ export default function OrderModal({
                 <div className="pt-2">
                   <button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || catalogLoading || !!catalogError || !currentProduct}
                     className="w-full bg-[#2D545E] hover:bg-[#1E373F] text-white py-4 px-6 rounded-xl text-xs font-bold uppercase tracking-[0.2em] transition-all shadow-md shadow-[#2D545E]/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 group hover:shadow-lg"
                   >
                     {isSubmitting ? (

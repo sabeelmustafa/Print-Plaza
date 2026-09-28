@@ -8,8 +8,10 @@ function validateJob(body) {
   if (typeof body.title !== 'string' || !body.title.trim() || body.title.length > 191) return 'Enter a production job name (maximum 191 characters).';
   if (!Array.isArray(body.orderIds) || !body.orderIds.length || body.orderIds.length > 200 || body.orderIds.some(id => typeof id !== 'string') || new Set(body.orderIds).size !== body.orderIds.length) return 'Select 1–200 distinct orders.';
   if (!body.specs || typeof body.specs !== 'object' || Array.isArray(body.specs)) return 'Production specifications are required.';
+  if (Object.entries(body.specs).some(([key, value]) => !['paper', 'finishing'].includes(key) && typeof value !== 'string')) return 'Production instruction fields must contain text.';
   if (!Array.isArray(body.specs.paper) || !body.specs.paper.length || body.specs.paper.some(p => !p || typeof p.type !== 'string' || !p.type.trim() || typeof p.cutSize !== 'string' || !p.cutSize.trim() || !Number.isSafeInteger(Number(p.sheets)) || Number(p.sheets) <= 0)) return 'Each paper stock needs a type, sheet cut size and positive whole sheet quantity.';
   if (!Array.isArray(body.specs.finishing) || body.specs.finishing.some(f => !f || typeof f.operation !== 'string' || !f.operation.trim() || typeof f.details !== 'string' || !f.details.trim() || !Array.isArray(f.orderIds) || f.orderIds.some(id => !body.orderIds.includes(id)))) return 'Finishing instructions must apply to orders selected in this PJO.';
+  if (body.specs.paper.some(p => Object.values(p).some(value => typeof value !== 'string')) || body.specs.finishing.some(f => Object.entries(f).some(([key, value]) => key !== 'orderIds' && typeof value !== 'string'))) return 'Paper and finishing fields must contain text.';
   if (JSON.stringify(body.specs).length > 100000) return 'Production instructions are too large.';
   return null;
 }

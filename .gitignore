@@ -8,3 +8,6 @@ coverage/
 .env*
 !.env.example
 public/brand/Logo.ai
+
+uploads/
+private-artwork/

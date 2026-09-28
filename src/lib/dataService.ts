@@ -1,17 +1,15 @@
 import { Product, Order, ServiceCategory, SiteSettings, MediaAsset, ProductionJob, ProductionSpecs } from '../types';
 import { SERVICES as INITIAL_SERVICES } from '../constants';
 
-const PRODUCTS_KEY = 'plaza_studio_products';
-const ORDERS_KEY = 'plaza_studio_orders';
-
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
+    ...options,
     credentials: 'include',
+    signal: options.signal || AbortSignal.timeout(20000),
     headers: {
       'Content-Type': 'application/json',
       ...(options.headers || {}),
     },
-    ...options,
   });
 
   if (!response.ok) {
@@ -33,44 +31,29 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-function getLocalProducts(): Product[] {
-  const stored = localStorage.getItem(PRODUCTS_KEY);
-  if (stored) return JSON.parse(stored);
-
-  const initialProducts = INITIAL_SERVICES.flatMap(s => s.products);
-  localStorage.setItem(PRODUCTS_KEY, JSON.stringify(initialProducts));
-  return initialProducts;
-}
-
-function saveLocalProduct(product: Partial<Product>) {
-  const products = getLocalProducts();
-  const updatedProducts = product.id
-    ? products.map(p => p.id === product.id ? { ...p, ...product } : p)
-    : [
-        ...products,
-        {
-          ...product,
-          id: Math.random().toString(36).slice(2, 9),
-          createdAt: new Date().toISOString()
-        } as Product
-      ];
-
-  localStorage.setItem(PRODUCTS_KEY, JSON.stringify(updatedProducts));
-  return updatedProducts;
-}
-
-function getLocalOrders(userId?: string): Order[] {
-  const stored = localStorage.getItem(ORDERS_KEY);
-  const allOrders: Order[] = stored ? JSON.parse(stored) : [];
-  return userId ? allOrders.filter(o => o.userId === userId) : allOrders;
-}
+type StorefrontData = { products: Product[]; categories: Omit<ServiceCategory, 'products'>[]; settings: SiteSettings };
+let storefrontRequest: Promise<StorefrontData> | undefined;
 
 export const DataService = {
-  getCategories: async (): Promise<ServiceCategory[]> => {
+  getCachedStorefront: (): { products: Product[]; categories: Omit<ServiceCategory, 'products'>[]; settings: SiteSettings } | null => {
     try {
-      const categories = await request<Omit<ServiceCategory, 'products'>[]>('/api/categories');
+      const cached = JSON.parse(localStorage.getItem('plaza_public_storefront') || 'null');
+      return cached && Array.isArray(cached.products) && Array.isArray(cached.categories) && cached.settings ? cached : null;
+    } catch { return null; }
+  },
+  getStorefront: (): Promise<StorefrontData> => {
+    if (!storefrontRequest) storefrontRequest = request<StorefrontData>('/api/storefront').then(data => {
+      try { localStorage.setItem('plaza_public_storefront', JSON.stringify(data)); } catch { /* Storage may be disabled. */ }
+      return data;
+    }).finally(() => { storefrontRequest = undefined; });
+    return storefrontRequest;
+  },
+  getCategories: async (strict = false): Promise<ServiceCategory[]> => {
+    try {
+      const categories = await request<Omit<ServiceCategory, 'products'>[]>(strict ? '/api/categories?all=true' : '/api/categories');
       return categories.map(category => ({ ...category, products: [] }));
     } catch (_error) {
+      if (strict) throw _error;
       return INITIAL_SERVICES;
     }
   },
@@ -80,82 +63,26 @@ export const DataService = {
       method: 'POST',
       body: JSON.stringify(category),
     });
-    return DataService.getCategories();
+    return DataService.getCategories(true);
   },
 
-  getProducts: async (): Promise<Product[]> => {
+  getProducts: async (strict = false): Promise<Product[]> => {
     try {
-      return await request<Product[]>('/api/products');
+      return await request<Product[]>(strict ? '/api/products?all=true' : '/api/products');
     } catch (_error) {
-      return getLocalProducts();
+      if (strict) throw _error;
+      return INITIAL_SERVICES.flatMap(s => s.products);
     }
   },
 
-  saveProduct: async (product: Partial<Product>) => {
-    try {
-      await request('/api/admin/products', {
-        method: 'POST',
-        body: JSON.stringify(product),
-      });
-      return DataService.getProducts();
-    } catch (_error) {
-      return saveLocalProduct(product);
-    }
-  },
+  saveProduct: async (product: Partial<Product>) => { await request('/api/admin/products', { method: 'POST', body: JSON.stringify(product) }); return DataService.getProducts(true); },
 
-  deleteProduct: async (id: string) => {
-    try {
-      await request(`/api/admin/products/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      });
-      return DataService.getProducts();
-    } catch (_error) {
-      const updated = getLocalProducts().filter(p => p.id !== id);
-      localStorage.setItem(PRODUCTS_KEY, JSON.stringify(updated));
-      return updated;
-    }
-  },
+  deleteProduct: async (id: string) => { await request(`/api/admin/products/${encodeURIComponent(id)}`, { method: 'DELETE' }); return DataService.getProducts(true); },
 
-  getOrders: async (userId?: string, userEmail?: string | null): Promise<Order[]> => {
-    try {
-      const params = new URLSearchParams();
-      if (userId) params.set('userId', userId);
-      if (userEmail) params.set('userEmail', userEmail);
-      const query = params.toString() ? `?${params.toString()}` : '';
-      return await request<Order[]>(`/api/orders${query}`);
-    } catch (_error) {
-      return getLocalOrders(userId);
-    }
-  },
+  getOrders: async (userId?: string, userEmail?: string | null): Promise<Order[]> => { const params = new URLSearchParams(); if (userId) params.set('userId', userId); if (userEmail) params.set('userEmail', userEmail); return request<Order[]>(`/api/orders?${params}`); },
 
-  saveOrder: async (order: Partial<Order>) => {
-    try {
-      await request('/api/orders', {
-        method: 'POST',
-        body: JSON.stringify(order),
-      });
-      return DataService.getOrders(order.userId);
-    } catch (_error) {
-      const orders = getLocalOrders();
-      const newOrder = {
-        ...order,
-        id: Math.random().toString(36).slice(2, 9),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        status: 'pending'
-      } as Order;
+  saveOrder: async (order: Partial<Order>) => { await request('/api/orders', { method: 'POST', body: JSON.stringify(order) }); return DataService.getOrders(order.userId); },
 
-      const updated = [newOrder, ...orders];
-      localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
-      return updated;
-    }
-  },
-
-  /**
-   * Submit a quote request from the storefront. Posts to /api/quotations so it
-   * lands in the quotations table (not the orders table) and auto-creates the
-   * customer record.
-   */
   submitQuoteRequest: async (data: {
     userId?: string;
     userName: string;
@@ -170,6 +97,7 @@ export const DataService = {
     options?: Record<string, string | number | boolean>;
     notes?: string;
     artworkUrl?: string;
+    artwork?: { fileName: string; data: string };
   }) => {
     const payload = {
       ...data,
@@ -199,29 +127,7 @@ export const DataService = {
     return DataService.getOrders();
   },
 
-  updateOrderFinance: async (orderId: string, details: {
-    costPrice: number;
-    sellPrice: number;
-    currency?: string;
-    invoiceNotes?: string;
-    paymentDueDate?: string;
-    finishingSpecs?: any;
-    quoteStatus?: any;
-  }) => {
-    try {
-      await request(`/api/admin/orders/${encodeURIComponent(orderId)}/finance`, {
-        method: 'PATCH',
-        body: JSON.stringify(details),
-      });
-      return DataService.getOrders();
-    } catch (_error) {
-      const updated = getLocalOrders().map(o =>
-        o.id === orderId ? { ...o, ...details, updatedAt: new Date().toISOString() } : o
-      );
-      localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
-      return updated;
-    }
-  },
+  updateOrderFinance: async (orderId: string, details: { costPrice: number; sellPrice: number; currency?: string; invoiceNotes?: string; paymentDueDate?: string; finishingSpecs?: any; quoteStatus?: any }) => { await request(`/api/admin/orders/${encodeURIComponent(orderId)}/finance`, { method: 'PATCH', body: JSON.stringify(details) }); return DataService.getOrders(); },
 
   addPayment: async (orderId: string, payment: {
     amount: number;
@@ -247,10 +153,11 @@ export const DataService = {
     return DataService.getOrders();
   },
 
-  getSiteSettings: async (): Promise<SiteSettings> => {
+  getSiteSettings: async (strict = false): Promise<SiteSettings> => {
     try {
       return await request<SiteSettings>('/api/site-settings');
     } catch (_error) {
+      if (strict) throw _error;
       return {};
     }
   },
@@ -260,7 +167,7 @@ export const DataService = {
       method: 'PUT',
       body: JSON.stringify({ value }),
     });
-    return DataService.getSiteSettings();
+    return;
   },
 
   getMedia: async (): Promise<MediaAsset[]> => {
@@ -279,6 +186,13 @@ export const DataService = {
     return DataService.getMedia();
   },
 
+  prepareArtwork: async (file: File) => {
+    if (!/\.(png|jpe?g|pdf|ai|eps|zip)$/i.test(file.name)) throw new Error('Choose a PNG, JPG, PDF, AI, EPS or ZIP artwork file.');
+    if (!file.size || file.size > 8 * 1024 * 1024) throw new Error('Artwork must be smaller than 8 MB and cannot be empty.');
+    const dataUrl = await readFileAsDataUrl(file);
+    return { fileName: file.name, data: dataUrl.split(',')[1] };
+  },
+
   uploadImage: async (file: File, title?: string): Promise<string> => {
     const dataUrl = await readFileAsDataUrl(file);
     const [, data = ''] = dataUrl.split(',');
@@ -295,54 +209,11 @@ export const DataService = {
     return result.url;
   },
 
-  getQuotations: async (): Promise<any[]> => {
-    try {
-      return await request<any[]>('/api/quotations');
-    } catch (_error) {
-      const stored = localStorage.getItem('plaza_studio_quotations');
-      return stored ? JSON.parse(stored) : [];
-    }
-  },
+  getQuotations: (): Promise<any[]> => request<any[]>('/api/quotations'),
 
-  saveQuotation: async (quote: any) => {
-    try {
-      await request('/api/quotations', {
-        method: 'POST',
-        body: JSON.stringify(quote),
-      });
-      return DataService.getQuotations();
-    } catch (_error) {
-      const stored = localStorage.getItem('plaza_studio_quotations');
-      const list = stored ? JSON.parse(stored) : [];
-      const newQuote = {
-        ...quote,
-        id: quote.id || `quote-${Math.random().toString(36).slice(2, 7)}`,
-        quoteNumber: quote.quoteNumber || `QT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-        createdAt: new Date().toISOString(),
-        quoteStatus: quote.quoteStatus || 'new',
-        isQuotation: true,
-      };
-      const updated = [newQuote, ...list];
-      localStorage.setItem('plaza_studio_quotations', JSON.stringify(updated));
-      return updated;
-    }
-  },
+  saveQuotation: async (quote: any) => { return request('/api/quotations', { method: 'POST', body: JSON.stringify(quote) }); },
 
-  updateQuotation: async (quoteId: string, updates: any) => {
-    try {
-      await request(`/api/quotations/${encodeURIComponent(quoteId)}`, {
-        method: 'PATCH',
-        body: JSON.stringify(updates),
-      });
-      return DataService.getQuotations();
-    } catch (_error) {
-      const stored = localStorage.getItem('plaza_studio_quotations');
-      const list = stored ? JSON.parse(stored) : [];
-      const updated = list.map((q: any) => q.id === quoteId ? { ...q, ...updates, updatedAt: new Date().toISOString() } : q);
-      localStorage.setItem('plaza_studio_quotations', JSON.stringify(updated));
-      return updated;
-    }
-  },
+  updateQuotation: async (quoteId: string, updates: any) => request<{ ok: boolean; emailSent: boolean; emailError?: string }>(`/api/quotations/${encodeURIComponent(quoteId)}`, { method: 'PATCH', body: JSON.stringify(updates) }),
 
   confirmQuotation: async (quoteId: string, data: any, legacy = false) => {
     if (legacy) {
@@ -363,13 +234,7 @@ export const DataService = {
   updateProductionJob: (id: string, status: ProductionJob['status']) =>
     request(`/api/admin/production-jobs/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
 
-  getCustomers: async (): Promise<any[]> => {
-    try {
-      return await request<any[]>('/api/admin/customers');
-    } catch (_error) {
-      return [];
-    }
-  },
+  getCustomers: (): Promise<any[]> => request<any[]>('/api/admin/customers'),
 
   createCustomer: async (customerData: any) => {
     return await request<any>('/api/admin/customers', {

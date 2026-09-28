@@ -1,4 +1,4 @@
-module.exports = function quotationConfirmation({ pool, parseJson, createId }) {
+module.exports = function quotationConfirmation({ pool, parseJson, createId, isAdminRequest = () => false }) {
   return async (req, res, next) => {
   let conn;
   try {
@@ -13,14 +13,25 @@ module.exports = function quotationConfirmation({ pool, parseJson, createId }) {
     }
 
     const quote = rows[0];
+    const admin = isAdminRequest(req);
+    if (!admin && (!req.customer || req.customer.email.toLowerCase() !== String(quote.user_email).toLowerCase())) {
+      await conn.rollback();
+      return res.status(403).json({ error: 'This quotation does not belong to your account.' });
+    }
+    if (!admin && !quote.converted_order_id && quote.status !== 'approved') {
+      await conn.rollback();
+      return res.status(409).json({ error: 'This quotation is not ready for confirmation. Please wait for our team to review it.' });
+    }
+    const details = admin ? req.body : {};
+
     if (quote.converted_order_id) {
       await conn.commit();
       return res.json({ ok: true, orderId: quote.converted_order_id });
     }
     const orderId = createId('order');
-    const sellPrice = Math.max(0, Number(req.body.sellPrice ?? quote.quoted_price ?? 0));
-    const costPrice = Math.max(0, Number(req.body.costPrice || 0));
-    const finishingSpecs = req.body.finishingSpecs || parseJson(quote.finishing_specs, {});
+    const sellPrice = Math.max(0, Number(details.sellPrice ?? quote.quoted_price ?? 0));
+    const costPrice = Math.max(0, Number(details.costPrice || 0));
+    const finishingSpecs = details.finishingSpecs || parseJson(quote.finishing_specs, {});
     const optionsObj = {
       ...parseJson(quote.options_json, {}),
       phone: quote.phone,
@@ -61,7 +72,7 @@ module.exports = function quotationConfirmation({ pool, parseJson, createId }) {
         sellPrice,
         costPrice,
         sellPrice,
-        req.body.currency || quote.currency_code || 'PKR',
+        details.currency || quote.currency_code || 'PKR',
         quote.notes || `Converted from Quote #${quote.quote_number || quoteId}`,
         'pending',
       ]

@@ -4,6 +4,7 @@ const fs = require('fs');
 const express = require('express');
 const mysql = require('mysql2/promise');
 require('dotenv').config();
+const customerSession = require('./customerSession.cjs');
 
 let renderRouteHtml = (html) => html;
 try {
@@ -19,6 +20,8 @@ const app = express();
 const port = process.env.PORT || 3000;
 const distDir = path.join(__dirname, 'dist');
 const uploadDir = path.join(__dirname, 'uploads');
+const artworkDir = path.join(__dirname, 'private-artwork');
+const artworkService = require('./artwork.cjs');
 
 app.disable('x-powered-by');
 app.use(express.json({ limit: '12mb' }));
@@ -61,7 +64,6 @@ if (pool) {
 
 async function ensureBusinessSchema() {
   if (!pool) return;
-  await require('./production.cjs').ensureSchema(pool);
 
   // Helper: silently ignore errors on individual migration steps
   const safe = async (label, sql) => {
@@ -162,12 +164,18 @@ async function ensureBusinessSchema() {
   await safe('customers.notes',            "ALTER TABLE customers ADD COLUMN notes TEXT NULL");
   await safe('customers.company_name',     "ALTER TABLE customers ADD COLUMN company_name VARCHAR(191) NULL");
 
+  try { await require('./production.cjs').ensureSchema(pool); } catch (error) { console.error('[SCHEMA] Production tables unavailable:', error.message); }
+
   // Back-fill customers from existing orders / quotations
   try {
+    const [knownCustomers] = await pool.query('SELECT LOWER(user_email) AS email FROM customers');
+    const knownEmails = new Set(knownCustomers.map(customer => customer.email));
     const [existingOrders] = await pool.query(
       'SELECT DISTINCT user_email, user_name, options_json FROM orders WHERE user_email IS NOT NULL AND TRIM(user_email) != ""'
     );
     for (const o of existingOrders) {
+      if (knownEmails.has(String(o.user_email).toLowerCase())) continue;
+      knownEmails.add(String(o.user_email).toLowerCase());
       const opts = parseJson(o.options_json, {});
       await upsertCustomer(o.user_email, o.user_name, opts.phone || opts.Phone, opts.companyName);
     }
@@ -175,6 +183,8 @@ async function ensureBusinessSchema() {
       'SELECT DISTINCT user_email, user_name, phone, company_name, notes FROM quotations WHERE user_email IS NOT NULL AND TRIM(user_email) != ""'
     );
     for (const q of existingQuotes) {
+      if (knownEmails.has(String(q.user_email).toLowerCase())) continue;
+      knownEmails.add(String(q.user_email).toLowerCase());
       await upsertCustomer(q.user_email, q.user_name, q.phone, q.company_name, q.notes);
     }
   } catch (_e) {
@@ -466,12 +476,12 @@ function generatePassword() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let pass = 'PP-';
   for (let i = 0; i < 5; i++) {
-    pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    pass += chars.charAt(crypto.randomInt(chars.length));
   }
   return pass;
 }
 
-async function upsertCustomer(email, name, phone, companyName, notes, autoSendWelcome = false) {
+async function upsertCustomer(email, name, phone, companyName, notes, autoSendWelcome = false, updateExisting = true) {
   if (!pool || !email) return null;
   const userEmail = String(email).trim().toLowerCase();
   if (!userEmail) return null;
@@ -501,6 +511,7 @@ async function upsertCustomer(email, name, phone, companyName, notes, autoSendWe
     return { id, isNew: true, plainPass };
   } else {
     const customer = existing[0];
+    if (!updateExisting) return { id: customer.id, isNew: false };
     let plainPass = customer.password_plain;
     if (!plainPass) {
       plainPass = generatePassword();
@@ -559,7 +570,7 @@ function getCookie(req, name) {
 
   for (const part of cookies.split(';')) {
     const [key, ...value] = part.trim().split('=');
-    if (key === name) return decodeURIComponent(value.join('='));
+    if (key === name) { try { return decodeURIComponent(value.join('=')); } catch { return null; } }
   }
 
   return null;
@@ -573,8 +584,8 @@ function signAdminSession() {
 }
 
 function safeEqual(left, right) {
-  const leftBuffer = Buffer.from(left || '');
-  const rightBuffer = Buffer.from(right || '');
+  const leftBuffer = Buffer.from(typeof left === 'string' ? left : '');
+  const rightBuffer = Buffer.from(typeof right === 'string' ? right : '');
 
   if (leftBuffer.length !== rightBuffer.length) return false;
   return crypto.timingSafeEqual(leftBuffer, rightBuffer);
@@ -644,6 +655,8 @@ app.get('/api/admin/session', (req, res) => {
     ),
   });
 });
+
+app.use('/api/admin', requireAdmin);
 
 function normalizeProduct(row) {
   return {
@@ -731,29 +744,31 @@ function extensionForMime(mimeType) {
   return allowed[mimeType] || null;
 }
 
-app.get('/api/health', async (_req, res) => {
-  if (!pool) {
-    res.json({ ok: true, database: 'not-configured' });
-    return;
-  }
-
-  try {
-    await pool.query('SELECT 1');
-    res.json({ ok: true, database: 'connected' });
-  } catch (error) {
-    res.status(500).json({ ok: false, database: 'error', error: error.message });
-  }
+const publicCatalog = require('./publicCatalog.cjs').createCachedLoader(async () => {
+  const [[products], [categories], [settings]] = await Promise.all([
+    pool.query('SELECT * FROM products WHERE active = 1 ORDER BY sort_order ASC, name ASC'),
+    pool.query('SELECT * FROM categories WHERE active = 1 ORDER BY sort_order ASC, title ASC'),
+    pool.query('SELECT setting_key, setting_value FROM site_settings'),
+  ]);
+  return { products: products.map(normalizeProduct), categories: categories.map(normalizeCategory), settings: Object.fromEntries(settings.map(row => [row.setting_key, parseJson(row.setting_value, {})])) };
 });
-
-app.get('/api/categories', requireDb, async (_req, res, next) => {
+app.use('/api/admin', (req, res, next) => {
+  if (/^\/(products|categories|site-settings)(\/|$)/.test(req.path) && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) res.on('finish', () => { if (res.statusCode < 400) publicCatalog.invalidate(); });
+  next();
+});
+app.get('/api/storefront', requireDb, async (_req, res, next) => {
+  try { res.setHeader('Cache-Control', 'public, max-age=30'); res.json(await publicCatalog.get()); } catch (error) { next(error); }
+});
+app.get('/api/categories', requireDb, async (req, res, next) => {
   try {
-    const [rows] = await pool.query(
-      'SELECT * FROM categories WHERE active = 1 ORDER BY sort_order ASC, title ASC'
-    );
-    res.json(rows.map(normalizeCategory));
-  } catch (error) {
-    next(error);
-  }
+    if (req.query.all === 'true') {
+      if (!isAdminRequest(req)) return res.status(401).json({ error: 'Admin access required.' });
+      const [rows] = await pool.query('SELECT * FROM categories ORDER BY sort_order ASC, title ASC');
+      return res.json(rows.map(normalizeCategory));
+    }
+    res.setHeader('Cache-Control', 'public, max-age=30');
+    res.json((await publicCatalog.get()).categories);
+  } catch (error) { next(error); }
 });
 
 app.post('/api/admin/categories', requireDb, requireAdmin, async (req, res, next) => {
@@ -784,15 +799,16 @@ app.post('/api/admin/categories', requireDb, requireAdmin, async (req, res, next
   }
 });
 
-app.get('/api/products', requireDb, async (_req, res, next) => {
+app.get('/api/products', requireDb, async (req, res, next) => {
   try {
-    const [rows] = await pool.query(
-      'SELECT * FROM products WHERE active = 1 ORDER BY sort_order ASC, name ASC'
-    );
-    res.json(rows.map(normalizeProduct));
-  } catch (error) {
-    next(error);
-  }
+    if (req.query.all === 'true') {
+      if (!isAdminRequest(req)) return res.status(401).json({ error: 'Admin access required.' });
+      const [rows] = await pool.query('SELECT * FROM products ORDER BY sort_order ASC, name ASC');
+      return res.json(rows.map(normalizeProduct));
+    }
+    res.setHeader('Cache-Control', 'public, max-age=30');
+    res.json((await publicCatalog.get()).products);
+  } catch (error) { next(error); }
 });
 
 app.post('/api/admin/products', requireDb, requireAdmin, async (req, res, next) => {
@@ -845,16 +861,17 @@ app.delete('/api/admin/products/:id', requireDb, requireAdmin, async (req, res, 
   }
 });
 
-app.get('/api/orders', requireDb, async (req, res, next) => {
-  try {
-    const userId = String(req.query.userId || '').trim();
-    const userEmail = String(req.query.userEmail || '').trim().toLowerCase();
-    const adminRequest = isAdminRequest(req) || !process.env.ADMIN_PASSWORD || (!userId && !userEmail);
-    if (!userId && !userEmail && !adminRequest) {
-      res.status(401).json({ error: 'Admin access required.' });
-      return;
-    }
+function requireAccount(req, res, next) {
+  req.customer = customerSession.verify(getCookie(req, customerSession.cookieName));
+  if (!isAdminRequest(req) && !req.customer) return res.status(401).json({ error: 'Please sign in to your customer account.' });
+  next();
+}
 
+app.get('/api/orders', requireAccount, requireDb, async (req, res, next) => {
+  try {
+    const adminRequest = isAdminRequest(req);
+    const userId = adminRequest ? String(req.query.userId || '').trim() : '';
+    const userEmail = adminRequest ? String(req.query.userEmail || '').trim().toLowerCase() : req.customer.email.toLowerCase();
     const filters = [];
     const params = [];
     if (userId) {
@@ -867,8 +884,9 @@ app.get('/api/orders', requireDb, async (req, res, next) => {
     }
 
     const query = `SELECT o.*,
-        COALESCE((SELECT SUM(p.amount) FROM payment_records p WHERE p.order_id = o.id), 0) AS paid_amount
+        COALESCE(paid.total_paid, 0) AS paid_amount
       FROM orders o
+      LEFT JOIN (SELECT order_id, SUM(amount) AS total_paid FROM payment_records GROUP BY order_id) paid ON paid.order_id = o.id
       ${filters.length ? `WHERE (${filters.join(' OR ')})` : ''}
       ORDER BY o.created_at DESC`;
     const [rows] = await pool.query(query, params);
@@ -944,7 +962,7 @@ app.get('/api/orders', requireDb, async (req, res, next) => {
   }
 });
 
-app.post('/api/orders', requireDb, async (req, res, next) => {
+app.post('/api/orders', requireAdmin, requireDb, async (req, res, next) => {
   try {
     const order = req.body;
     const id = createId('order');
@@ -1036,46 +1054,7 @@ app.post('/api/admin/orders', requireDb, requireAdmin, async (req, res, next) =>
   }
 });
 
-app.patch('/api/admin/orders/:id/finance', requireDb, requireAdmin, async (req, res, next) => {
-  try {
-    const costPrice = Math.max(0, Number(req.body.costPrice || 0));
-    const sellPrice = Math.max(0, Number(req.body.sellPrice || 0));
-    await pool.query(
-      `UPDATE orders
-       SET cost_price = ?, sell_price = ?, total_price = ?, currency_code = ?,
-           invoice_notes = ?, payment_due_date = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-      [
-        costPrice,
-        sellPrice,
-        sellPrice,
-        normalizeCurrency(req.body.currency),
-        String(req.body.invoiceNotes || '').trim() || null,
-        req.body.paymentDueDate || null,
-        req.params.id,
-      ]
-    );
-
-    // Update options_json for quotation & finishing fields
-    if (req.body.isQuotation !== undefined || req.body.pjoNumber || req.body.finishingSpecs || req.body.quoteStatus) {
-      const [orderRows] = await pool.query('SELECT options_json FROM orders WHERE id = ?', [req.params.id]);
-      if (orderRows.length) {
-        const currentOpts = parseJson(orderRows[0].options_json, {});
-        const updatedOpts = {
-          ...currentOpts,
-          ...(req.body.isQuotation !== undefined ? { isQuotation: req.body.isQuotation } : {}),
-          ...(req.body.pjoNumber ? { pjoNumber: req.body.pjoNumber } : {}),
-          ...(req.body.quoteStatus ? { quoteStatus: req.body.quoteStatus } : {}),
-          ...(req.body.finishingSpecs ? { finishingSpecs: req.body.finishingSpecs } : {}),
-        };
-        await pool.query('UPDATE orders SET options_json = ? WHERE id = ?', [JSON.stringify(updatedOpts), req.params.id]);
-      }
-    }
-    res.json({ ok: true });
-  } catch (error) {
-    next(error);
-  }
-});
+app.patch('/api/admin/orders/:id/finance', requireAdmin, requireDb, require('./orderFinance.cjs')({ pool, parseJson, normalizeCurrency }));
 
 app.post('/api/admin/orders/:id/payments', requireDb, requireAdmin, async (req, res, next) => {
   try {
@@ -1163,9 +1142,10 @@ app.patch('/api/admin/orders/:id/status', requireDb, requireAdmin, async (req, r
 /*                            QUOTATIONS MANAGEMENT                           */
 /* -------------------------------------------------------------------------- */
 
-app.get('/api/quotations', requireDb, async (_req, res, next) => {
+app.get('/api/quotations', requireAccount, requireDb, async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM quotations ORDER BY created_at DESC');
+    const adminRequest = isAdminRequest(req);
+    const [rows] = await pool.query(`SELECT * FROM quotations ${adminRequest ? '' : 'WHERE LOWER(user_email) = ?'} ORDER BY created_at DESC`, adminRequest ? [] : [req.customer.email.toLowerCase()]);
     res.json(rows.map((row) => ({
       id: row.id,
       quoteNumber: row.quote_number,
@@ -1197,15 +1177,25 @@ app.get('/api/quotations', requireDb, async (_req, res, next) => {
 });
 
 app.post('/api/quotations', requireDb, async (req, res, next) => {
+  let attachment;
+  let saved = false;
   try {
     const quote = req.body;
-    const id = quote.id || createId('quote');
-    const quoteNumber = quote.quoteNumber || `QT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const optionsObj = quote.options || {};
+    const admin = isAdminRequest(req);
+    if (!String(quote.userName || '').trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(quote.userEmail || '')) || !Number.isSafeInteger(Number(quote.quantity)) || Number(quote.quantity) <= 0) return res.status(400).json({ error: 'Enter a name, valid email and positive whole quantity.' });
+    const [listedProducts] = await pool.query('SELECT id, name, max_quantity FROM products WHERE id = ? AND active = 1', [String(quote.productId || '')]);
+    if (!listedProducts.length) return res.status(400).json({ error: 'Select a currently listed product / item.' });
+    const selectedProduct = listedProducts[0];
+    if (Number(quote.quantity) > 2147483647 || (selectedProduct.max_quantity && Number(quote.quantity) > Number(selectedProduct.max_quantity))) return res.status(400).json({ error: 'Quantity exceeds the limit for this product.' });
+    const id = createId('quote');
+    const quoteNumber = `QT-${new Date().getFullYear()}-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+    const optionsObj = { ...(quote.options || {}) };
+    if (quote.artwork) { attachment = await artworkService.saveArtwork(artworkDir, quote.artwork); optionsObj.artworkFile = attachment.url; }
     const finishingSpecs = quote.finishingSpecs || {};
     const phone = quote.phone || optionsObj.phone || '';
     const companyName = quote.companyName || optionsObj.companyName || '';
-    const quotedPrice = Math.max(0, Number(quote.quotedPrice || quote.totalPrice || quote.sellPrice || 0));
+    const quotedPrice = admin ? Number(quote.quotedPrice ?? quote.totalPrice ?? quote.sellPrice ?? 0) : 0;
+    if (!Number.isFinite(quotedPrice) || quotedPrice < 0) throw Object.assign(new Error('Enter a valid quotation price.'), { status: 400 });
 
     await pool.query(
       `INSERT INTO quotations (
@@ -1221,39 +1211,42 @@ app.post('/api/quotations', requireDb, async (req, res, next) => {
         String(quote.userEmail || '').trim(),
         String(phone).trim(),
         String(companyName).trim(),
-        String(quote.productId || 'custom-packaging'),
-        String(quote.productName || 'Packaging Quotation Request'),
+        selectedProduct.id,
+        selectedProduct.name,
         Math.max(1, Number(quote.quantity || 1)),
         quotedPrice,
         normalizeCurrency(quote.currency),
-        quote.quoteStatus || 'new',
+        admin && ['new', 'negotiating', 'approved', 'declined'].includes(quote.quoteStatus) ? quote.quoteStatus : 'new',
         JSON.stringify(finishingSpecs),
         JSON.stringify(optionsObj),
         String(quote.notes || optionsObj.specifications || '').trim(),
       ]
     );
 
-    await upsertCustomer(quote.userEmail, quote.userName, phone, companyName, quote.notes);
+    saved = true;
+    // A customer-profile failure must not report an already-saved quote as failed.
+    try { await upsertCustomer(quote.userEmail, quote.userName, phone, companyName, quote.notes, false, admin); } catch (error) { console.error('[CUSTOMER PROFILE]', error.message); }
 
     res.status(201).json({ id, quoteNumber, status: 'new' });
   } catch (err) {
-    console.error('[DB ERROR] POST /api/quotations:', err);
-    return res.status(500).json({
-      ok: false,
-      error:      err.message   || 'Failed to save quotation',
-      code:       err.code      || 'DB_ERROR',
-      sqlMessage: err.sqlMessage || undefined,
-    });
+    if (attachment && !saved) await fs.promises.unlink(path.join(artworkDir, attachment.fileName)).catch(() => {});
+    next(err);
   }
 });
 
-app.patch('/api/quotations/:id', requireDb, async (req, res, next) => {
+app.patch('/api/quotations/:id', requireAdmin, requireDb, async (req, res, next) => {
   try {
     const quoteId = req.params.id;
     const { quotedPrice, quoteStatus, phone, companyName, finishingSpecs, notes, currency } = req.body;
 
     const updates = [];
     const params = [];
+
+    if (quotedPrice !== undefined && (!Number.isFinite(Number(quotedPrice)) || Number(quotedPrice) < 0)) return res.status(400).json({ error: 'Enter a valid quotation price.' });
+    if (quoteStatus !== undefined && !['new', 'negotiating', 'approved', 'declined'].includes(quoteStatus)) return res.status(400).json({ error: 'Invalid quotation status. Confirm the quotation to create an order.' });
+    const [existingQuotes] = await pool.query('SELECT converted_order_id FROM quotations WHERE id = ?', [quoteId]);
+    if (!existingQuotes.length) return res.status(404).json({ error: 'Quotation not found.' });
+    if (existingQuotes[0].converted_order_id) return res.status(409).json({ error: 'This quotation has already been confirmed. Edit its customer order instead.' });
 
     if (quotedPrice !== undefined) {
       updates.push('quoted_price = ?');
@@ -1290,16 +1283,18 @@ app.patch('/api/quotations/:id', requireDb, async (req, res, next) => {
     }
 
     let emailSent = false;
+    let emailError;
     if (req.body.notifyCustomer) {
       const [updatedRows] = await pool.query('SELECT * FROM quotations WHERE id = ?', [quoteId]);
       if (updatedRows.length) {
         const quoteObj = updatedRows[0];
-        await sendQuotationUpdateEmail(quoteObj.user_email, quoteObj.user_name, quoteObj);
-        emailSent = true;
+        const result = await sendQuotationUpdateEmail(quoteObj.user_email, quoteObj.user_name, quoteObj);
+        emailSent = Boolean(result.success && result.mode === 'live');
+        if (!emailSent) emailError = result.error || 'Email delivery is not configured.';
       }
     }
 
-    res.json({ ok: true, emailSent });
+    res.json({ ok: true, emailSent, emailError });
   } catch (error) {
     next(error);
   }
@@ -1307,7 +1302,7 @@ app.patch('/api/quotations/:id', requireDb, async (req, res, next) => {
 
 require('./production.cjs').registerProduction(app, { pool, requireDb, requireAdmin, parseJson });
 
-app.post('/api/quotations/:id/convert', requireDb, require('./quotationConfirmation.cjs')({ pool, parseJson, createId }));
+app.post('/api/quotations/:id/convert', requireAccount, requireDb, require('./quotationConfirmation.cjs')({ pool, parseJson, createId, isAdminRequest }));
 
 /* -------------------------------------------------------------------------- */
 /*                            CUSTOMERS MANAGEMENT                            */
@@ -1320,13 +1315,13 @@ app.get('/api/admin/customers', requireDb, async (_req, res) => {
         c.*,
         COALESCE(SUM(CASE
           WHEN o.status != 'cancelled'
-           AND (o.options_json IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(o.options_json, '$.isQuotation')) != 'true')
+           AND (o.options_json IS NULL OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(o.options_json, '$.isQuotation')), 'false') != 'true')
           THEN COALESCE(o.sell_price, o.total_price, 0)
           ELSE 0
         END), 0) AS total_spent,
         COUNT(DISTINCT CASE
           WHEN o.status != 'cancelled'
-           AND (o.options_json IS NULL OR JSON_UNQUOTE(JSON_EXTRACT(o.options_json, '$.isQuotation')) != 'true')
+           AND (o.options_json IS NULL OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(o.options_json, '$.isQuotation')), 'false') != 'true')
           THEN o.id
         END) AS total_orders,
         MAX(o.created_at) AS last_order_at
@@ -1508,7 +1503,7 @@ app.post('/api/customer/login', requireDb, async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const targetEmail = String(email || '').trim().toLowerCase();
-    const targetPass = String(password || '').trim();
+    const targetPass = typeof password === 'string' ? password : '';
 
     if (!targetEmail || !targetPass) {
       res.status(400).json({ error: 'Email and password are required.' });
@@ -1523,14 +1518,15 @@ app.post('/api/customer/login', requireDb, async (req, res, next) => {
     }
 
     const customer = rows[0];
-    const match = (customer.password_plain && customer.password_plain === targetPass) ||
-                  (customer.password_hash && customer.password_hash === targetPass);
+    const match = (customer.password_plain && safeEqual(customer.password_plain, targetPass));
 
     if (!match) {
       res.status(401).json({ error: 'Invalid password. Please check your credentials or welcome email.' });
       return;
     }
 
+    const sessionUser = { uid: customer.id, email: customer.user_email, name: customer.user_name, phone: customer.phone || '', company: customer.company_name || '' };
+    res.cookie(customerSession.cookieName, customerSession.sign(sessionUser), { ...customerSession.cookieOptions, maxAge: 12 * 60 * 60 * 1000 });
     res.json({
       authenticated: true,
       user: {
@@ -1546,25 +1542,18 @@ app.post('/api/customer/login', requireDb, async (req, res, next) => {
   }
 });
 
-app.get('/api/customer/session', requireDb, async (_req, res) => {
-  res.json({ authenticated: false });
+app.get('/api/customer/session', (req, res) => {
+  const user = customerSession.verify(getCookie(req, customerSession.cookieName));
+  res.json({ authenticated: Boolean(user), user });
 });
 
 app.post('/api/customer/logout', (_req, res) => {
+  res.clearCookie(customerSession.cookieName, customerSession.cookieOptions);
   res.json({ ok: true });
 });
 
 app.get('/api/site-settings', requireDb, async (_req, res, next) => {
-  try {
-    const [rows] = await pool.query('SELECT setting_key, setting_value FROM site_settings');
-    const settings = {};
-    for (const row of rows) {
-      settings[row.setting_key] = parseJson(row.setting_value, row.setting_value);
-    }
-    res.json(settings);
-  } catch (error) {
-    next(error);
-  }
+  try { res.setHeader('Cache-Control', 'no-cache'); res.json((await publicCatalog.get()).settings); } catch (error) { next(error); }
 });
 
 app.put('/api/admin/site-settings/:key', requireDb, requireAdmin, async (req, res, next) => {
@@ -1652,6 +1641,10 @@ app.post('/api/admin/uploads', requireAdmin, async (req, res, next) => {
   }
 });
 
+artworkService.registerArtwork(app, { pool, requireAccount, requireDb, isAdminRequest, directory: artworkDir });
+
+app.use('/api', (_req, res) => res.status(404).json({ error: 'API endpoint not found.' }));
+
 app.use('/uploads', express.static(uploadDir, {
   index: false,
   setHeaders(res) {
@@ -1662,10 +1655,15 @@ app.use('/uploads', express.static(uploadDir, {
 
 app.use(express.static(distDir, {
   index: false,
-  setHeaders(res) {
+  setHeaders(res, filePath) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (!filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+    }
   },
 }));
 
@@ -1707,8 +1705,8 @@ app.use((req, res) => {
 
 app.use((error, _req, res, _next) => {
   console.error('[UNHANDLED ERROR]', error);
-  res.status(500).json({
-    error: error.message || 'Server error.',
+  res.status(error.status >= 400 && error.status < 600 ? error.status : 500).json({
+    error: error.status || process.env.NODE_ENV !== 'production' ? error.message || 'Server error.' : 'Unable to complete the request. Please try again.',
     code: error.code || undefined,
     details: process.env.NODE_ENV !== 'production' ? String(error.stack || error) : undefined,
   });

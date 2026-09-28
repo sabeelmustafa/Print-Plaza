@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth';
-import { auth } from './firebase';
+import { DataService } from './dataService';
 
 export interface CustomUser {
   uid: string;
@@ -29,62 +28,20 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
-  const [customUser, setCustomUser] = useState<CustomUser | null>(() => {
-    try {
-      const saved = localStorage.getItem('plaza_client_session');
-      return saved ? JSON.parse(saved) : null;
-    } catch (_e) {
-      return null;
-    }
-  });
+  const [user, setUser] = useState<CustomUser | null>(null);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setFirebaseUser(user);
-      setLoading(false);
-    });
-
-    return unsubscribe;
+    let mounted = true;
+    localStorage.removeItem('plaza_client_session');
+    DataService.getCustomerSession().then(session => {
+      if (mounted) setUser(session.authenticated ? session.user : null);
+    }).finally(() => { if (mounted) setLoading(false); });
+    return () => { mounted = false; };
   }, []);
-
-  const handleSetCustomUser = (u: CustomUser | null) => {
-    setCustomUser(u);
-    if (u) {
-      localStorage.setItem('plaza_client_session', JSON.stringify(u));
-    } else {
-      localStorage.removeItem('plaza_client_session');
-    }
+  const logoutCustomer = async () => {
+    try { await DataService.customerLogout(); setUser(null); }
+    catch { alert('Could not sign out. Please try again.'); }
   };
-
-  const logoutCustomer = () => {
-    handleSetCustomUser(null);
-  };
-
-  const activeUser = customUser || (firebaseUser ? {
-    uid: firebaseUser.uid,
-    email: firebaseUser.email,
-    name: firebaseUser.displayName || firebaseUser.email,
-  } : null);
-
-  return (
-    <AuthContext.Provider value={{ 
-      user: activeUser, 
-      profile: activeUser ? {
-        id: activeUser.uid,
-        email: activeUser.email,
-        displayName: activeUser.name || activeUser.email,
-        role: activeUser.email === 'sabeelchakwal@gmail.com' ? 'admin' : 'client',
-      } : null, 
-      loading, 
-      isAdmin: activeUser?.email === 'sabeelchakwal@gmail.com',
-      setCustomUser: handleSetCustomUser,
-      logoutCustomer,
-    }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ user, profile: user ? { id: user.uid, email: user.email, displayName: user.name || user.email, role: 'client' } : null, loading, isAdmin: false, setCustomUser: setUser, logoutCustomer }}>{children}</AuthContext.Provider>;
 };
-
 export const useAuth = () => useContext(AuthContext);

@@ -6,7 +6,6 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { User as UserIcon, LogOut, Terminal, Lock, Menu, X } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
-import { logOut } from '../lib/firebase';
 import { useEffect, useState } from 'react';
 import type React from 'react';
 import { NavMenuItem, SiteSettings } from '../types';
@@ -19,13 +18,15 @@ interface NavbarProps {
 }
 
 export default function Navbar({ onLogin, onViewDashboard, onRequestQuote, settings }: NavbarProps) {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, logoutCustomer } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const useTransparentHeader = settings?.useTransparentHeader !== false;
   const normalLogo = settings?.logoImageDark || settings?.logoImage || '/brand/print-plaza-logo.png';
   const heroLogo = settings?.logoImageLight || normalLogo;
   const logoImage = !useTransparentHeader || isScrolled || isMenuOpen ? normalLogo : heroLogo;
+  const [logoFailed, setLogoFailed] = useState(false);
+  useEffect(() => setLogoFailed(false), [logoImage]);
   const logoSize = Math.min(Math.max(Number(settings?.logoSize || 36), 24), 96);
   const navFontSize = Math.min(Math.max(Number(settings?.navMenuFontSize || 10), 9), 16);
   const navItems: NavMenuItem[] = settings?.navItems?.length
@@ -59,9 +60,12 @@ export default function Navbar({ onLogin, onViewDashboard, onRequestQuote, setti
       <div className="max-w-7xl mx-auto px-6 sm:px-10 lg:px-16">
         <div className={`flex justify-between items-center transition-all duration-300 ${isScrolled ? 'h-16' : 'h-20'}`}>
           <a href="/" className="flex items-center gap-4 group cursor-pointer">
-            {logoImage ? (
+            {logoImage && !logoFailed ? (
               <img
                 src={logoImage}
+                fetchPriority="high"
+                decoding="async"
+                onError={() => setLogoFailed(true)}
                 alt={settings?.logoText || 'Print Plaza'}
                 className="w-auto object-contain"
                 style={{ height: `${logoSize}px`, maxWidth: `${Math.max(160, logoSize * 5)}px` }}
@@ -72,7 +76,7 @@ export default function Navbar({ onLogin, onViewDashboard, onRequestQuote, setti
                 <div className="w-2.5 h-7 bg-[#E17055] transform -skew-x-12 group-hover:-rotate-6 transition-all duration-300" />
               </div>
             )}
-            {!logoImage && (
+            {(!logoImage || logoFailed) && (
               <div className="flex flex-col">
                 <span className="font-display font-black text-2xl tracking-tighter leading-none">{settings?.logoText || 'PRINT PLAZA'}</span>
                 <span className="text-[9px] uppercase tracking-[0.4em] font-extrabold mt-0.5 text-[#2D545E]">{settings?.tagline || 'Industrial Print Production'}</span>
@@ -85,7 +89,7 @@ export default function Navbar({ onLogin, onViewDashboard, onRequestQuote, setti
             {navItems.map((item) => (
               <a
                 key={item.id}
-                href={item.url || '#'}
+                href={item.url?.startsWith('#') && window.location.pathname !== '/' ? `/${item.url}` : item.url || '#'}
                 target={item.openInNewTab ? '_blank' : undefined}
                 rel={item.openInNewTab ? 'noreferrer' : undefined}
                 className={`font-bold uppercase tracking-[0.2em] transition-colors ${
@@ -111,7 +115,7 @@ export default function Navbar({ onLogin, onViewDashboard, onRequestQuote, setti
                   {isAdmin ? 'System Panel' : 'Client Area'}
                 </button>
                 <button
-                  onClick={() => logOut()}
+                  onClick={() => logoutCustomer()}
                   className={`p-2 transition-colors ${headerIsTransparent ? 'text-white/45 hover:text-white' : 'text-black/20 hover:text-red-500'}`}
                   title="Logout"
                 >
@@ -173,7 +177,7 @@ export default function Navbar({ onLogin, onViewDashboard, onRequestQuote, setti
               {navItems.map((item) => (
                 <div key={item.id}>
                   <a
-                    href={item.url || '#'}
+                    href={item.url?.startsWith('#') && window.location.pathname !== '/' ? `/${item.url}` : item.url || '#'}
                     target={item.openInNewTab ? '_blank' : undefined}
                     rel={item.openInNewTab ? 'noreferrer' : undefined}
                     onClick={closeMenu}
@@ -200,7 +204,7 @@ export default function Navbar({ onLogin, onViewDashboard, onRequestQuote, setti
                   </button>
                   <button
                     onClick={() => {
-                      logOut();
+                      logoutCustomer();
                       setIsMenuOpen(false);
                     }}
                     className="flex items-center gap-4 text-[12px] font-black uppercase tracking-[0.3em] text-red-500 py-2"

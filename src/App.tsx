@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -11,8 +11,9 @@ import ServiceGrid from './components/ServiceGrid';
 import ProductCard from './components/ProductCard';
 import OrderModal from './components/OrderModal';
 import AuthModal from './components/AuthModal';
-import AdminPanel, { WebsiteEditorPage } from './components/AdminPanel';
-import UserPanel from './components/UserPanel';
+const AdminPanel = lazy(() => import('./components/AdminPanel'));
+const WebsiteEditorPage = lazy(() => import('./components/AdminPanel').then(module => ({ default: module.WebsiteEditorPage })));
+const UserPanel = lazy(() => import('./components/UserPanel'));
 import {
   AboutPage,
   ContactPage,
@@ -46,19 +47,19 @@ function AdminLoginPage() {
     event.preventDefault();
     setError('');
 
-    const response = await fetch('/api/admin/login', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
-    });
+    setLoading(true);
+    try {
+      const response = await fetch('/api/admin/login', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || 'Sign-in failed. Please try again.');
+      }
+      setAuthenticated(true);
+    } catch (error) { setError(error instanceof Error ? error.message : 'Unable to reach the server.'); }
+    finally { setLoading(false); }
 
-    if (!response.ok) {
-      setError('Invalid system security credentials.');
-      return;
-    }
-
-    setAuthenticated(true);
   };
 
   if (loading) {
@@ -216,19 +217,19 @@ function SiteFooter({ siteSettings }: { siteSettings: SiteSettings }) {
             <ul className="space-y-4 sm:space-y-5 text-xs font-medium leading-relaxed opacity-75 font-mono">
               <li>
                 <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Email</span>
-                <a href={`mailto:${BUSINESS_INFO.email}`} className="hover:text-white">
-                  {BUSINESS_INFO.email}
+                <a href={`mailto:${siteSettings.footer?.email || BUSINESS_INFO.email}`} className="hover:text-white">
+                  {siteSettings.footer?.email || BUSINESS_INFO.email}
                 </a>
               </li>
               <li>
                 <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Phone / WhatsApp</span>
-                <a href={`tel:${BUSINESS_INFO.phone}`} className="hover:text-white">
-                  {BUSINESS_INFO.displayPhone}
+                <a href={`tel:${siteSettings.footer?.phone || BUSINESS_INFO.phone}`} className="hover:text-white">
+                  {siteSettings.footer?.phone || BUSINESS_INFO.displayPhone}
                 </a>
               </li>
               <li>
                 <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Address</span>
-                <span>{BUSINESS_INFO.formattedAddress}</span>
+                <span>{siteSettings.footer?.address || BUSINESS_INFO.formattedAddress}</span>
               </li>
               <li>
                 <span className="block text-[9px] uppercase tracking-widest text-[#E17055] font-bold">Hours</span>
@@ -267,8 +268,8 @@ function SiteFooter({ siteSettings }: { siteSettings: SiteSettings }) {
 function AppContent() {
   const { user, isAdmin, loading: authLoading } = useAuth();
   const [currentPath, setCurrentPath] = useState(() => window.location.pathname.replace(/\/$/, '') || '/');
-  const [services, setServices] = useState<ServiceCategory[]>(CONSTANT_SERVICES);
-  const [siteSettings, setSiteSettings] = useState<SiteSettings>({});
+  const [services, setServices] = useState<ServiceCategory[]>(() => { const cached = DataService.getCachedStorefront(); return cached ? cached.categories.map(category => ({ ...category, products: cached.products.filter(product => product.categoryId === category.id) })) : CONSTANT_SERVICES; });
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>(() => DataService.getCachedStorefront()?.settings || {});
   const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [quoteModalOpen, setQuoteModalOpen] = useState(false);
@@ -281,7 +282,7 @@ function AppContent() {
   useEffect(() => {
     if (user && !isAdmin) {
       setView('dashboard');
-    }
+    } else if (!user) { setView('main'); }
   }, [user, isAdmin]);
 
   useEffect(() => {
@@ -300,21 +301,9 @@ function AppContent() {
 
   const fetchCmsData = async () => {
     try {
-      const [dbProducts, dbCategories, settings] = await Promise.all([
-        DataService.getProducts(),
-        DataService.getCategories(),
-        DataService.getSiteSettings(),
-      ]);
+      const { products, categories, settings } = await DataService.getStorefront();
       setSiteSettings(settings);
-
-      if (dbProducts.length > 0) {
-        const sourceCategories = dbCategories.length > 0 ? dbCategories : CONSTANT_SERVICES;
-        const categories = sourceCategories.map((cat) => ({
-          ...cat,
-          products: dbProducts.filter((p) => p.categoryId === cat.id),
-        }));
-        setServices(categories);
-      }
+      setServices(categories.map(category => ({ ...category, products: products.filter(product => product.categoryId === category.id) })));
     } catch (error) {
       console.error('Failed to fetch products:', error);
     }
@@ -362,15 +351,7 @@ function AppContent() {
     homeSeo.schema
   );
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-[#FDFCFB] flex items-center justify-center">
-        <div className="w-16 h-px bg-black animate-pulse" />
-      </div>
-    );
-  }
-
-  if (view === 'dashboard') {
+  if (view === 'dashboard' && !authLoading && user) {
     return isAdmin ? (
       <AdminPanel />
     ) : (
@@ -643,12 +624,10 @@ function AppContent() {
 
 export default function App() {
   if (window.location.pathname.startsWith('/admin')) {
-    return <AdminLoginPage />;
+    return <Suspense fallback={<div className="p-8">Loading admin panel…</div>}><AdminLoginPage /></Suspense>;
   }
 
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <AuthProvider><Suspense fallback={<div className="p-8">Loading your account…</div>}><AppContent /></Suspense></AuthProvider>
   );
 }

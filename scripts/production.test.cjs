@@ -76,7 +76,7 @@ test('production status updates grouped orders while excluding delivered and can
 
 test('confirms quotation into a pending order with no PJO and respects a zero price', async () => {
   const f = fixture(sql => sql.startsWith('SELECT * FROM quotations') ? [{ id: 'quote', user_email: 'client@example.test', quantity: 1000, quoted_price: 500, options_json: { isQuotation: true, pjoNumber: 'stale' }, finishing_specs: { lamination: 'Matt' } }] : []);
-  const result = await invoke(confirmation({ pool: f.pool, parseJson, createId: () => 'new-order' }), { sellPrice: 0 });
+  const result = await invoke(confirmation({ pool: f.pool, parseJson, isAdminRequest: () => true, createId: () => 'new-order' }), { sellPrice: 0 });
   assert.equal(result.body.orderId, 'new-order');
   assert.equal(result.body.pjoNumber, undefined);
   const insert = f.calls.find(c => c.sql?.includes('INSERT INTO orders'));
@@ -91,14 +91,14 @@ test('confirms quotation into a pending order with no PJO and respects a zero pr
 
 test('repeated quotation confirmation returns existing order instead of duplicating it', async () => {
   const f = fixture(() => [{ converted_order_id: 'existing' }]);
-  const result = await invoke(confirmation({ pool: f.pool, parseJson, createId: () => 'unexpected' }), {});
+  const result = await invoke(confirmation({ pool: f.pool, parseJson, isAdminRequest: () => true, createId: () => 'unexpected' }), {});
   assert.equal(result.body.orderId, 'existing');
   assert.ok(!f.calls.some(c => c.sql?.includes('INSERT')));
 });
 
 test('quotation update failure rolls back the newly inserted order', async () => {
   const f = fixture(sql => { if (sql.startsWith('SELECT')) return [{ user_email: 'client@example.test' }]; if (sql.includes('UPDATE quotations')) throw new Error('Write failed'); return []; });
-  const result = await invoke(confirmation({ pool: f.pool, parseJson, createId: () => 'new-order' }), {});
+  const result = await invoke(confirmation({ pool: f.pool, parseJson, isAdminRequest: () => true, createId: () => 'new-order' }), {});
   assert.equal(result.error.message, 'Write failed');
   assert.ok(f.calls.includes('rollback'));
   assert.ok(!f.calls.includes('commit'));

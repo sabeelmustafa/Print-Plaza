@@ -26,6 +26,11 @@ jobs:
       - name: Build production assets
         run: npm run build
 
+      - name: Check types and regression tests
+        run: |
+          npm run lint
+          npm test
+
       - name: Prepare cPanel upload
         run: |
           rm -rf .deploy

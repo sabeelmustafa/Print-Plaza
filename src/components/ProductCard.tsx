@@ -16,6 +16,7 @@ interface ProductCardProps {
 
 export default function ProductCard({ product, onOrder }: ProductCardProps) {
   const [imageFailed, setImageFailed] = React.useState(false);
+  React.useEffect(() => setImageFailed(false), [product.image]);
   const reference = product.id.replace(/[^a-z0-9]/gi, '').slice(0, 6).toUpperCase();
 
   return (
@@ -24,6 +25,8 @@ export default function ProductCard({ product, onOrder }: ProductCardProps) {
         {!imageFailed && product.image ? (
           <img
             src={product.image}
+            loading="lazy"
+            decoding="async"
             alt={product.name}
             className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105 grayscale group-hover:grayscale-0"
             referrerPolicy="no-referrer"

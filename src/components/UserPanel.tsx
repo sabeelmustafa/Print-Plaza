@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle, CheckCircle2, Clock, Download, FileText, Package, ReceiptText, ShoppingBag, Sparkles } from 'lucide-react';
 import { DataService } from '../lib/dataService';
+import { useCatalogProducts } from '../lib/useCatalogProducts';
 import { useAuth } from '../lib/AuthContext';
 import { Order, SiteSettings } from '../types';
 
@@ -93,11 +94,14 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
   const [quotations, setQuotations] = useState<any[]>([]);
   const [settings, setSettings] = useState<SiteSettings>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [convertingId, setConvertingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'quotations' | 'orders' | 'invoices' | 'new_quote'>('quotations');
 
   // New quote form state
-  const [productName, setProductName] = useState('Custom Packaging Box');
+  const { products: catalogProducts, loading: catalogLoading, error: catalogError, retry: retryCatalog } = useCatalogProducts();
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const selectedProduct = catalogProducts.find(product => product.id === selectedProductId);
   const [quantity, setQuantity] = useState('500');
   const [notes, setNotes] = useState('');
   const [submittingQuote, setSubmittingQuote] = useState(false);
@@ -132,6 +136,7 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
 
   const fetchClientArea = async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const [orderData, quoteData, siteSettings] = await Promise.all([
         DataService.getOrders(user?.uid, user?.email),
@@ -146,21 +151,23 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
       setOrders(myOrders);
       setQuotations(myQuotes);
       setSettings(siteSettings);
-    } finally {
+    } catch (error) { setLoadError(error instanceof Error ? error.message : 'Unable to load your account.'); } finally {
       setLoading(false);
     }
   };
 
   const handleRequestQuote = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedProduct || catalogLoading || catalogError) { alert('Select a listed product / item.'); return; }
+    if (!Number.isSafeInteger(Number(quantity)) || Number(quantity) < 1 || (selectedProduct.maxQuantity && Number(quantity) > selectedProduct.maxQuantity)) { alert('Enter a valid quantity within the product limit.'); return; }
     setSubmittingQuote(true);
     setQuoteSuccess('');
     try {
       await DataService.saveQuotation({
         userName: user?.name || user?.email,
         userEmail: user?.email,
-        productName,
-        productId: 'custom-quote',
+        productName: selectedProduct.name,
+        productId: selectedProduct.id,
         quantity: Math.max(1, Number(quantity || 1)),
         notes,
         quoteStatus: 'new',
@@ -176,7 +183,7 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
     }
   };
 
-  const totals = useMemo(() => orders.reduce((result, order) => {
+  const totals = useMemo(() => orders.filter(order => !order.isQuotation && order.status !== 'cancelled').reduce((result, order) => {
     const currency = normalizeCurrencyCode(order.currency);
     const sell = Number(order.sellPrice ?? order.totalPrice ?? 0);
     const paid = Number(order.paidAmount || 0);
@@ -194,6 +201,7 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
   return (
     <div className="min-h-screen bg-[#FDFCFB] p-6 sm:p-8 md:p-12 relative">
       <div className="max-w-7xl mx-auto relative z-10">
+        {loadError && <div role="alert" className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg">{loadError} <button onClick={fetchClientArea} className="underline">Retry</button></div>}
         <header className="mb-10 flex flex-col lg:flex-row lg:items-end justify-between gap-8 border-b border-black/10 pb-8">
           <div>
             <div className="flex items-center gap-4 mb-6">
@@ -476,7 +484,7 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
             {activeTab === 'new_quote' && (
               <div className="bg-white border border-slate-200 rounded-2xl p-8 max-w-2xl shadow-md">
                 <h3 className="text-2xl font-bold text-slate-900 mb-2">Request Custom Print Quotation</h3>
-                <p className="text-xs text-slate-500 mb-6">Submit your packaging and printing requirements directly to PlazaHQ press estimators.</p>
+                <p className="text-xs text-slate-500 mb-6">Submit your printing requirements directly to PlazaHQ press estimators.</p>
 
                 {quoteSuccess && (
                   <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl text-xs font-semibold">
@@ -486,15 +494,13 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
 
                 <form onSubmit={handleRequestQuote} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Product / Packaging Type *</label>
-                    <input
-                      type="text"
-                      required
-                      value={productName}
-                      onChange={e => setProductName(e.target.value)}
-                      placeholder="e.g. Rigid Magnetic Gift Box, Kraft Shopping Bag"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-[#2D545E]"
-                    />
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Product / Item *</label>
+                    <select aria-label="Product / Item" required value={selectedProductId} onChange={event => setSelectedProductId(event.target.value)} disabled={catalogLoading || !!catalogError} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-[#2D545E]">
+                      <option value="">{catalogLoading ? 'Loading products…' : 'Choose a product / item'}</option>
+                      {catalogProducts.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
+                    </select>
+                    {catalogError && <p role="alert" className="text-xs text-red-700 mt-2">{catalogError} <button type="button" className="underline" onClick={retryCatalog}>Retry</button></p>}
+                    {!catalogLoading && !catalogError && !catalogProducts.length && <p className="text-xs text-slate-500 mt-2">No products are currently available.</p>}
                   </div>
 
                   <div>
@@ -522,7 +528,7 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
 
                   <button
                     type="submit"
-                    disabled={submittingQuote}
+                    disabled={submittingQuote || catalogLoading || !!catalogError || !selectedProduct}
                     className="w-full py-3.5 bg-[#E17055] hover:bg-orange-600 text-white rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer shadow-md disabled:opacity-50"
                   >
                     {submittingQuote ? 'Submitting Request...' : 'Submit Quotation Request'}

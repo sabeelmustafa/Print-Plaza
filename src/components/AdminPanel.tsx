@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Boxes,
   CheckCircle,
@@ -171,47 +171,38 @@ export default function AdminPanel() {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
 
+  const activeLoad = useRef<Promise<void> | null>(null);
   useEffect(() => {
     loadAll(true);
-    const interval = setInterval(() => {
-      loadAll(false);
-    }, 10000);
+    const interval = setInterval(() => { if (!document.hidden) loadAll(false, true); }, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  const loadAll = async (showSpinner = false) => {
+  const loadAll = (showSpinner = false, background = false): Promise<void> => {
+    if (activeLoad.current) return background ? activeLoad.current : activeLoad.current.then(() => loadAll(showSpinner));
     if (showSpinner) setLoading(true);
     setError('');
-    try {
-      const [nextProducts, nextCategories, nextOrders, nextQuotations, nextCustomers, nextSettings, nextMedia, nextProductionJobs] = await Promise.all([
-        DataService.getProducts(),
-        DataService.getCategories(),
-        DataService.getOrders(),
-        DataService.getQuotations(),
-        DataService.getCustomers(),
-        DataService.getSiteSettings(),
-        DataService.getMedia(),
-        DataService.getProductionJobs(),
-      ]);
-      setProducts(nextProducts);
-      setProductionJobs(nextProductionJobs);
-      setCategories(nextCategories);
-      setOrders(nextOrders);
-      setQuotations(nextQuotations);
-      setCustomerList(nextCustomers);
-      setSettings({
-        header: { ...defaultSettings.header, ...nextSettings.header },
-        theme: { ...defaultSettings.theme, ...nextSettings.theme },
-        homepage: { ...defaultSettings.homepage, ...nextSettings.homepage },
-        footer: { ...defaultSettings.footer, ...nextSettings.footer },
-        documents: { ...defaultSettings.documents, ...nextSettings.documents },
-      });
-      setMedia(nextMedia);
-    } catch (caught) {
-      if (showSpinner) setError(caught instanceof Error ? caught.message : 'Could not load admin data.');
-    } finally {
-      if (showSpinner) setLoading(false);
-    }
+    const tasks: Promise<unknown>[] = [
+      DataService.getOrders().then(value => { setOrders(value); setLoading(false); }),
+      DataService.getQuotations().then(setQuotations),
+      DataService.getCustomers().then(setCustomerList),
+      DataService.getProductionJobs().then(setProductionJobs),
+    ];
+    if (!background) tasks.push(
+      DataService.getProducts(true).then(setProducts),
+      DataService.getCategories(true).then(setCategories),
+      DataService.getMedia().then(setMedia),
+      DataService.getSiteSettings(true).then(value => setSettings({
+        header: { ...defaultSettings.header, ...value.header }, theme: { ...defaultSettings.theme, ...value.theme },
+        homepage: { ...defaultSettings.homepage, ...value.homepage }, footer: { ...defaultSettings.footer, ...value.footer },
+        documents: { ...defaultSettings.documents, ...value.documents },
+      })),
+    );
+    activeLoad.current = Promise.allSettled(tasks).then(results => {
+      const failed = results.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+      if (failed) setError(failed.reason instanceof Error ? failed.reason.message : 'Some admin data could not be loaded. Please refresh.');
+    }).finally(() => { setLoading(false); activeLoad.current = null; });
+    return activeLoad.current;
   };
 
   const flash = (message: string) => {
@@ -220,15 +211,18 @@ export default function AdminPanel() {
   };
 
   const saveProduct = async (event: React.FormEvent) => {
+    try {
     event.preventDefault();
     if (!editingProduct) return;
     await DataService.saveProduct(editingProduct);
     setEditingProduct(null);
     await loadAll();
     flash('Product saved successfully.');
+    } catch (error) { alert(error instanceof Error ? error.message : 'Could not save changes.'); }
   };
 
   const saveCategory = async (event: React.FormEvent) => {
+    try {
     event.preventDefault();
     if (!editingCategory) return;
     await DataService.saveCategory({
@@ -238,14 +232,17 @@ export default function AdminPanel() {
     setEditingCategory(null);
     await loadAll();
     flash('Category saved successfully.');
+    } catch (error) { alert(error instanceof Error ? error.message : 'Could not save changes.'); }
   };
 
   const saveMedia = async (event: React.FormEvent) => {
+    try {
     event.preventDefault();
     await DataService.saveMedia(editingMedia);
     setEditingMedia({ title: '', url: '', altText: '' });
     await loadAll();
     flash('Media saved successfully.');
+    } catch (error) { alert(error instanceof Error ? error.message : 'Could not save changes.'); }
   };
 
   const updateOption = (index: number, updates: Partial<ProductOption>) => {
@@ -268,11 +265,11 @@ export default function AdminPanel() {
   const confirmedPjos = orders.filter(o => !o.isQuotation || o.quoteStatus === 'converted');
 
   // Metrics (Exclude cancelled orders from revenue and balance due)
-  const totalRevenue = orders
+  const totalRevenue = confirmedPjos
     .filter(o => o.status !== 'cancelled')
     .reduce((sum, o) => sum + (o.sellPrice || o.totalPrice || 0), 0);
   const activeJobs = confirmedPjos.filter(o => o.status === 'pending' || o.status === 'processing').length;
-  const pendingPayments = orders
+  const pendingPayments = confirmedPjos
     .filter(o => o.status !== 'cancelled' && o.paymentStatus !== 'paid')
     .reduce((sum, o) => sum + (o.balanceDue ?? Math.max(0, (o.sellPrice || o.totalPrice || 0) - (o.paidAmount || 0))), 0);
 
@@ -591,7 +588,7 @@ export default function AdminPanel() {
       {/* Create Quotation Modal */}
       {creatingQuotation && (
         <CreateQuotationModal
-          products={products}
+          products={products.filter(product => product.active !== false)}
           onClose={() => setCreatingQuotation(false)}
           onSave={async quote => {
             await DataService.saveQuotation(quote);
@@ -1077,14 +1074,14 @@ function QuotationDrawer({
   const handleSaveAndEmail = async () => {
     setSubmitting(true);
     try {
-      await DataService.updateQuotation(quotation.id, {
+      const result = await DataService.updateQuotation(quotation.id, {
         quotedPrice: sellPrice,
         currency,
         quoteStatus,
         finishingSpecs,
         notifyCustomer: true
       });
-      alert(`Quotation #${quotation.id.slice(0, 8)} updated and notification email sent to ${quotation.userEmail}!`);
+      alert(result.emailSent ? `Quotation updated and email sent to ${quotation.userEmail}.` : `Quotation saved, but email was not sent. ${result.emailError || 'Check email settings.'}`);
       onClose();
     } catch (err: any) {
       alert(err?.message || 'Failed to update quote or send email.');
@@ -2548,7 +2545,7 @@ function printPjoJobTicket(order: Order, settings: SiteSettings) {
     </div>
 
     <div class="banner">
-      <div class="banner-item"><span>Product / Substrate</span><strong>${escapeHtml(order.productName)}</strong></div>
+      <div class="banner-item"><span>Product / Item</span><strong>${escapeHtml(order.productName)}</strong></div>
       <div class="banner-item"><span>Production Status</span><strong>${escapeHtml(order.status).toUpperCase()}</strong></div>
       <div class="qty-box"><div>${Number(order.quantity).toLocaleString()}</div><div style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;">TOTAL PIECES</div></div>
     </div>
@@ -2578,7 +2575,7 @@ function printPjoJobTicket(order: Order, settings: SiteSettings) {
       <div class="card-title">Technical Print & Finishing Specifications</div>
       <table class="specs">
         <tbody>
-          <tr><td class="label">Product / Substrate:</td><td class="val">${escapeHtml(order.productName)}</td></tr>
+          <tr><td class="label">Product / Item:</td><td class="val">${escapeHtml(order.productName)}</td></tr>
           <tr><td class="label">Production Quantity:</td><td class="val">${Number(order.quantity).toLocaleString()} pcs</td></tr>
           ${order.finishingSpecs?.lamination ? `<tr><td class="label">Lamination:</td><td class="val"><span class="badge" style="background:#dcfce7;color:#15803d;">${escapeHtml(order.finishingSpecs.lamination)}</span></td></tr>` : ''}
           ${order.finishingSpecs?.foiling && order.finishingSpecs.foiling !== 'None' ? `<tr><td class="label">Hot Foil Stamping:</td><td class="val"><span class="badge" style="background:#fef3c7;color:#b45309;">${escapeHtml(order.finishingSpecs.foiling)}</span></td></tr>` : ''}
@@ -2709,7 +2706,7 @@ function BusinessOrderModal({
       await DataService.updateOrderFinance(order.id, { costPrice, sellPrice, currency });
       await onChanged();
       alert('Order costing and currency saved.');
-    } finally {
+    } catch (error) { alert(error instanceof Error ? error.message : 'Could not save changes.'); } finally {
       setLoading(false);
     }
   };
@@ -2734,7 +2731,7 @@ function BusinessOrderModal({
       setPaymentNotes('');
       await onChanged();
       alert('Payment record added.');
-    } finally {
+    } catch (error) { alert(error instanceof Error ? error.message : 'Could not save changes.'); } finally {
       setLoading(false);
     }
   };
@@ -2745,7 +2742,7 @@ function BusinessOrderModal({
     try {
       await DataService.deletePayment(paymentId);
       await onChanged();
-    } finally {
+    } catch (error) { alert(error instanceof Error ? error.message : 'Could not save changes.'); } finally {
       setLoading(false);
     }
   };
@@ -3394,7 +3391,7 @@ function CreateQuotationModal({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Product / Substrate *</label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Product / Item *</label>
             <select
               value={selectedProductId}
               onChange={(e) => setSelectedProductId(e.target.value)}
@@ -3604,9 +3601,9 @@ export function WebsiteEditorPage() {
 
   const loadEditor = async () => {
     const [nextProducts, nextCategories, nextSettings] = await Promise.all([
-      DataService.getProducts(),
-      DataService.getCategories(),
-      DataService.getSiteSettings(),
+      DataService.getProducts(true),
+      DataService.getCategories(true),
+      DataService.getSiteSettings(true),
     ]);
     setProducts(nextProducts);
     setCategories(nextCategories);
@@ -3625,6 +3622,7 @@ export function WebsiteEditorPage() {
   }, []);
 
   const saveWebsite = async () => {
+    try {
     await Promise.all([
       DataService.saveSiteSetting('header', settings.header),
       DataService.saveSiteSetting('homepage', settings.homepage),
@@ -3634,14 +3632,17 @@ export function WebsiteEditorPage() {
     ]);
     setNotice('Saved');
     setTimeout(() => setNotice(''), 2200);
+    } catch (error) { alert(error instanceof Error ? error.message : 'Could not save website settings.'); }
   };
 
   const saveProduct = async (event: React.FormEvent) => {
+    try {
     event.preventDefault();
     if (!editingProduct) return;
     await DataService.saveProduct(editingProduct);
     setEditingProduct(null);
     await loadEditor();
+    } catch (error) { alert(error instanceof Error ? error.message : 'Could not save changes.'); }
   };
 
   const updateOption = (index: number, updates: Partial<ProductOption>) => {
@@ -3652,6 +3653,7 @@ export function WebsiteEditorPage() {
   };
 
   const saveCategory = async (event: React.FormEvent) => {
+    try {
     event.preventDefault();
     if (!editingCategory) return;
     await DataService.saveCategory({
@@ -3660,6 +3662,7 @@ export function WebsiteEditorPage() {
     });
     setEditingCategory(null);
     await loadEditor();
+    } catch (error) { alert(error instanceof Error ? error.message : 'Could not save changes.'); }
   };
 
   if (loading) {

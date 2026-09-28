@@ -6,7 +6,7 @@
 import { motion } from 'motion/react';
 import { ArrowRight } from 'lucide-react';
 import { SiteSettings } from '../types';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface HeroProps {
   settings?: SiteSettings['homepage'];
@@ -20,6 +20,8 @@ export default function Hero({ settings, theme, onRequestQuote }: HeroProps) {
   const accentColor = theme?.accentColor || '#E17055';
   const heroImage = settings?.heroImage || 'https://images.unsplash.com/photo-1562654501-a0ccc0fc3fb1?auto=format&fit=crop&q=88&w=1920&h=1200';
 
+  useEffect(() => setImageFailed(false), [heroImage]);
+
   return (
     <section
       className="relative min-h-[680px] h-screen overflow-hidden bg-[#202425] text-white border-b border-black/10"
@@ -28,6 +30,8 @@ export default function Hero({ settings, theme, onRequestQuote }: HeroProps) {
       {!imageFailed ? (
         <img
           src={heroImage}
+          fetchPriority="high"
+          decoding="async"
           alt=""
           className="absolute inset-0 w-full h-full object-cover"
           referrerPolicy="no-referrer"
