@@ -105,13 +105,13 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
 
   const handleProceedWithProduction = async (q: any) => {
     const formattedPrice = q.quotedPrice ? money(q.quotedPrice, q.currency) : 'the quoted price';
-    if (!window.confirm(`Proceed with production order for "${q.productName}" at ${formattedPrice}?\n\nThis will generate your Print Job Order (PJO) and immediately queue it into PlazaHQ production.`)) {
+    if (!window.confirm(`Proceed with production order for "${q.productName}" at ${formattedPrice}?\n\nThis will confirm your order and place it in the production pipeline. Our team will schedule it into a suitable print run.`)) {
       return;
     }
 
     setConvertingId(q.id);
     try {
-      await DataService.convertQuotationToPjo(q.id, {
+      await DataService.confirmQuotation(q.id, {
         sellPrice: q.quotedPrice,
         currency: q.currency,
         finishingSpecs: q.finishingSpecs,
@@ -299,7 +299,7 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
                             q.quoteStatus === 'converted' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
                             q.quoteStatus === 'approved' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
                           }`}>
-                            {q.quoteStatus === 'converted' ? `Converted (${q.convertedPjoNumber || 'PJO'})` : (q.quoteStatus || 'Pending Review')}
+                            {q.quoteStatus === 'converted' ? 'Order confirmed' : (q.quoteStatus || 'Pending Review')}
                           </span>
                         </div>
                       </div>
@@ -341,7 +341,7 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
                                 <span className="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded uppercase">Ready for Production</span>
                               </p>
                               <p className="text-[11px] text-slate-600 mt-0.5">
-                                Proceed to create your Print Job Order (PJO) and queue this order directly into the press & finishing pipeline.
+                                Confirm your order and add it to the production pipeline for print scheduling.
                               </p>
                             </div>
                           </div>
@@ -371,7 +371,7 @@ export default function UserPanel({ onBack }: { onBack: () => void }) {
                         <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                           <div className="flex items-center gap-2.5 text-xs text-slate-700">
                             <Package className="w-4 h-4 text-[#2D545E]" />
-                            <span>Print Job Order Active in Pipeline: <strong className="font-mono text-[#2D545E]">{q.convertedPjoNumber || 'PJO Generated'}</strong></span>
+                            <span>Confirmed order in pipeline: <strong className="font-mono text-[#2D545E]">{q.convertedOrderId || 'Awaiting print scheduling'}</strong></span>
                           </div>
                           <button
                             type="button"

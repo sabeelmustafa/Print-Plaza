@@ -61,6 +61,7 @@ if (pool) {
 
 async function ensureBusinessSchema() {
   if (!pool) return;
+  await require('./production.cjs').ensureSchema(pool);
 
   // Helper: silently ignore errors on individual migration steps
   const safe = async (label, sql) => {
@@ -901,7 +902,7 @@ app.get('/api/orders', requireDb, async (req, res, next) => {
     res.json(rows.map((row) => {
       const optionsObj = parseJson(row.options_json, {});
       const isQuotation = Boolean(optionsObj.isQuotation);
-      const pjoNumber = optionsObj.pjoNumber || (isQuotation ? null : (optionsObj.pjoNumber || `#${row.id.slice(0, 8)}`));
+      const pjoNumber = optionsObj.pjoNumber || null;
       const quoteStatus = optionsObj.quoteStatus || (isQuotation ? 'new' : 'converted');
       const finishingSpecs = optionsObj.finishingSpecs || null;
 
@@ -1125,6 +1126,7 @@ app.delete('/api/admin/payments/:id', requireDb, requireAdmin, async (req, res, 
 });
 
 app.patch('/api/admin/orders/:id/status', requireDb, requireAdmin, async (req, res, next) => {
+  let conn;
   try {
     const allowed = ['pending', 'processing', 'completed', 'delivered', 'cancelled'];
     if (!allowed.includes(req.body.status)) {
@@ -1132,14 +1134,29 @@ app.patch('/api/admin/orders/:id/status', requireDb, requireAdmin, async (req, r
       return;
     }
 
-    await pool.query(
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    const [rows] = await conn.query('SELECT options_json FROM orders WHERE id = ? FOR UPDATE', [req.params.id]);
+    if (!rows.length) { await conn.rollback(); return res.status(404).json({ error: 'Order not found.' }); }
+    const opts = parseJson(rows[0].options_json, {});
+    if (['pending', 'processing', 'completed'].includes(req.body.status) && opts.productionJobId) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Change production status on the grouped PJO. Orders can still be delivered or cancelled individually.' });
+    }
+    if (['processing', 'completed'].includes(req.body.status) && !opts.pjoNumber) {
+      await conn.rollback();
+      return res.status(409).json({ error: 'Create a PJO for this waiting order before starting production.' });
+    }
+    await conn.query(
       'UPDATE orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [req.body.status, req.params.id]
     );
+    await conn.commit();
     res.json({ ok: true });
   } catch (error) {
+    if (conn) await conn.rollback();
     next(error);
-  }
+  } finally { conn?.release(); }
 });
 
 /* -------------------------------------------------------------------------- */
@@ -1288,73 +1305,9 @@ app.patch('/api/quotations/:id', requireDb, async (req, res, next) => {
   }
 });
 
-app.post('/api/quotations/:id/convert', requireDb, async (req, res, next) => {
-  try {
-    const quoteId = req.params.id;
-    const [rows] = await pool.query('SELECT * FROM quotations WHERE id = ?', [quoteId]);
-    if (!rows.length) {
-      res.status(404).json({ error: 'Quotation not found.' });
-      return;
-    }
+require('./production.cjs').registerProduction(app, { pool, requireDb, requireAdmin, parseJson });
 
-    const quote = rows[0];
-    const pjoNumber = req.body.pjoNumber || `PJO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const orderId = createId('order');
-    const sellPrice = Math.max(0, Number(req.body.sellPrice || quote.quoted_price || 0));
-    const costPrice = Math.max(0, Number(req.body.costPrice || 0));
-    const finishingSpecs = req.body.finishingSpecs || parseJson(quote.finishing_specs, {});
-    const optionsObj = {
-      ...parseJson(quote.options_json, {}),
-      phone: quote.phone,
-      companyName: quote.company_name,
-      pjoNumber,
-      quoteStatus: 'converted',
-      finishingSpecs,
-    };
-
-    await pool.query(
-      `INSERT INTO orders (
-         id, user_id, user_name, user_email, product_id, product_name,
-         quantity, options_json, items_json, total_price, cost_price, sell_price, currency_code,
-         invoice_notes, status
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        orderId,
-        quote.user_id || quote.user_email,
-        quote.user_name,
-        quote.user_email,
-        quote.product_id,
-        quote.product_name,
-        quote.quantity,
-        JSON.stringify(optionsObj),
-        JSON.stringify([{
-          productId: quote.product_id,
-          productName: quote.product_name,
-          quantity: quote.quantity,
-          options: optionsObj,
-          totalPrice: sellPrice
-        }]),
-        sellPrice,
-        costPrice,
-        sellPrice,
-        quote.currency_code || 'PKR',
-        quote.notes || `Converted from Quote #${quote.quote_number || quoteId}`,
-        'pending',
-      ]
-    );
-
-    await pool.query(
-      `UPDATE quotations SET status = 'converted', converted_pjo_number = ?, converted_order_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [pjoNumber, orderId, quoteId]
-    );
-
-    await upsertCustomer(quote.user_email, quote.user_name, quote.phone, quote.company_name, quote.notes);
-
-    res.json({ ok: true, orderId, pjoNumber });
-  } catch (error) {
-    next(error);
-  }
-});
+app.post('/api/quotations/:id/convert', requireDb, require('./quotationConfirmation.cjs')({ pool, parseJson, createId }));
 
 /* -------------------------------------------------------------------------- */
 /*                            CUSTOMERS MANAGEMENT                            */

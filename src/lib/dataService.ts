@@ -1,4 +1,4 @@
-import { Product, Order, ServiceCategory, SiteSettings, MediaAsset } from '../types';
+import { Product, Order, ServiceCategory, SiteSettings, MediaAsset, ProductionJob, ProductionSpecs } from '../types';
 import { SERVICES as INITIAL_SERVICES } from '../constants';
 
 const PRODUCTS_KEY = 'plaza_studio_products';
@@ -15,7 +15,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(await response.text());
+    const message = await response.text();
+    let detail = message;
+    try { detail = JSON.parse(message).error || message; } catch { /* Non-JSON server response. */ }
+    throw new Error(detail);
   }
 
   return response.json() as Promise<T>;
@@ -185,41 +188,15 @@ export const DataService = {
   },
 
   createAdminOrder: async (order: Partial<Order>) => {
-    try {
-      await request('/api/admin/orders', {
-        method: 'POST',
-        body: JSON.stringify(order),
-      });
-      return DataService.getOrders();
-    } catch (_error) {
-      const orders = getLocalOrders();
-      const newOrder = {
-        ...order,
-        id: order.id || `order-${Math.random().toString(36).slice(2, 7)}`,
-        createdAt: order.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        status: order.status || 'pending'
-      } as Order;
-      const updated = [newOrder, ...orders];
-      localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
-      return updated;
-    }
+    await request('/api/admin/orders', { method: 'POST', body: JSON.stringify(order) });
+    return DataService.getOrders();
   },
 
   updateOrderStatus: async (orderId: string, status: string) => {
-    try {
-      await request(`/api/admin/orders/${encodeURIComponent(orderId)}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status }),
-      });
-      return DataService.getOrders();
-    } catch (_error) {
-      const updated = getLocalOrders().map(o =>
-        o.id === orderId ? { ...o, status: status as Order['status'], updatedAt: new Date().toISOString() } : o
-      );
-      localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
-      return updated;
-    }
+    await request(`/api/admin/orders/${encodeURIComponent(orderId)}/status`, {
+      method: 'PATCH', body: JSON.stringify({ status }),
+    });
+    return DataService.getOrders();
   },
 
   updateOrderFinance: async (orderId: string, details: {
@@ -240,36 +217,6 @@ export const DataService = {
     } catch (_error) {
       const updated = getLocalOrders().map(o =>
         o.id === orderId ? { ...o, ...details, updatedAt: new Date().toISOString() } : o
-      );
-      localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
-      return updated;
-    }
-  },
-
-  convertToPjo: async (orderId: string, pjoData: {
-    sellPrice: number;
-    costPrice: number;
-    finishingSpecs?: any;
-  }) => {
-    const pjoNumber = `PJO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const updatePayload = {
-      ...pjoData,
-      isQuotation: false,
-      quoteStatus: 'converted' as const,
-      pjoNumber,
-      status: 'pending' as const, // Ready for Pre-Press / Proofing stage in pipeline
-      updatedAt: new Date().toISOString()
-    };
-
-    try {
-      await request(`/api/admin/orders/${encodeURIComponent(orderId)}/finance`, {
-        method: 'PATCH',
-        body: JSON.stringify(updatePayload),
-      });
-      return DataService.getOrders();
-    } catch (_error) {
-      const updated = getLocalOrders().map(o =>
-        o.id === orderId ? { ...o, ...updatePayload } : o
       );
       localStorage.setItem(ORDERS_KEY, JSON.stringify(updated));
       return updated;
@@ -397,18 +344,24 @@ export const DataService = {
     }
   },
 
-  convertQuotationToPjo: async (quoteId: string, pjoData: any) => {
-    try {
-      await request(`/api/quotations/${encodeURIComponent(quoteId)}/convert`, {
-        method: 'POST',
-        body: JSON.stringify(pjoData),
+  confirmQuotation: async (quoteId: string, data: any, legacy = false) => {
+    if (legacy) {
+      return request(`/api/admin/orders/${encodeURIComponent(quoteId)}/finance`, {
+        method: 'PATCH', body: JSON.stringify({ ...data, isQuotation: false, quoteStatus: 'converted' }),
       });
-      await Promise.all([DataService.getOrders(), DataService.getQuotations()]);
-      return DataService.getOrders();
-    } catch (_error) {
-      return DataService.convertToPjo(quoteId, pjoData);
     }
+    return request(`/api/quotations/${encodeURIComponent(quoteId)}/convert`, {
+      method: 'POST', body: JSON.stringify(data),
+    });
   },
+
+  getProductionJobs: () => request<ProductionJob[]>('/api/admin/production-jobs'),
+  saveProductionSpecs: (id: string, data: { title: string; orderIds: string[]; specs: ProductionSpecs }) =>
+    request(`/api/admin/production-jobs/${encodeURIComponent(id)}/specs`, { method: 'PUT', body: JSON.stringify(data) }),
+  createProductionJob: (data: { title: string; orderIds: string[]; specs: ProductionSpecs }) =>
+    request('/api/admin/production-jobs', { method: 'POST', body: JSON.stringify(data) }),
+  updateProductionJob: (id: string, status: ProductionJob['status']) =>
+    request(`/api/admin/production-jobs/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
 
   getCustomers: async (): Promise<any[]> => {
     try {

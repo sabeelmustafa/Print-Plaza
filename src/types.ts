@@ -159,6 +159,45 @@ export interface PaymentRecord {
   createdAt?: string;
 }
 
+export interface ProductionPaper {
+  type: string;
+  gsm: string;
+  source: string;
+  parentSize: string;
+  cutSize: string;
+  cutQuantity: string;
+  ups: string;
+  sheets: string;
+  wastage: string;
+}
+
+export interface ProductionSpecs {
+  deliveryDate: string;
+  machine: string;
+  sides: string;
+  frontColors: string;
+  backColors: string;
+  plates: string;
+  plateSource: string;
+  colorCheck: string;
+  paper: ProductionPaper[];
+  finishing: { operation: string; details: string; quantity: string; source: string; orderIds: string[] }[];
+  notes: string;
+  finalQuantity: string;
+  manager: string;
+}
+
+export interface ProductionJob {
+  id: string;
+  pjoNumber: string;
+  title: string;
+  status: 'pending' | 'processing' | 'completed';
+  orderIds: string[];
+  specs: ProductionSpecs;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Quotation {
   id: string;
   quoteNumber?: string;

@@ -46,6 +46,8 @@ import {
 import { DataService } from '../lib/dataService';
 import { MediaAsset, NavMenuItem, Order, OrderItem, Product, ProductOption, ServiceCategory, SiteSettings } from '../types';
 import Hero from './Hero';
+import { CreateProductionJob, ProductionJobList } from './ProductionJobs';
+import { ProductionJob } from '../types';
 import ProductCard from './ProductCard';
 import ServiceGrid from './ServiceGrid';
 import { printClientInvoice } from './UserPanel';
@@ -158,6 +160,8 @@ export default function AdminPanel() {
   const [businessOrder, setBusinessOrder] = useState<Order | null>(null);
   const [activeQuotation, setActiveQuotation] = useState<Order | null>(null);
   const [creatingOrder, setCreatingOrder] = useState(false);
+  const [creatingPjo, setCreatingPjo] = useState(false);
+  const [productionJobs, setProductionJobs] = useState<ProductionJob[]>([]);
   const [creatingQuotation, setCreatingQuotation] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
   
@@ -179,7 +183,7 @@ export default function AdminPanel() {
     if (showSpinner) setLoading(true);
     setError('');
     try {
-      const [nextProducts, nextCategories, nextOrders, nextQuotations, nextCustomers, nextSettings, nextMedia] = await Promise.all([
+      const [nextProducts, nextCategories, nextOrders, nextQuotations, nextCustomers, nextSettings, nextMedia, nextProductionJobs] = await Promise.all([
         DataService.getProducts(),
         DataService.getCategories(),
         DataService.getOrders(),
@@ -187,8 +191,10 @@ export default function AdminPanel() {
         DataService.getCustomers(),
         DataService.getSiteSettings(),
         DataService.getMedia(),
+        DataService.getProductionJobs(),
       ]);
       setProducts(nextProducts);
+      setProductionJobs(nextProductionJobs);
       setCategories(nextCategories);
       setOrders(nextOrders);
       setQuotations(nextQuotations);
@@ -257,7 +263,7 @@ export default function AdminPanel() {
   // Filtered Lists for Workflow Separation (Quotations Desk vs Production Pipeline)
   const pendingQuotations = [
     ...quotations.filter(q => q.quoteStatus !== 'converted'),
-    ...orders.filter(o => Boolean(o.isQuotation) && o.quoteStatus !== 'converted' && !quotations.some(q => q.id === o.id)),
+    ...orders.filter(o => Boolean(o.isQuotation) && o.quoteStatus !== 'converted' && !quotations.some(q => q.id === o.id)).map(o => ({ ...o, legacyOrderQuotation: true })),
   ];
   const confirmedPjos = orders.filter(o => !o.isQuotation || o.quoteStatus === 'converted');
 
@@ -310,7 +316,7 @@ export default function AdminPanel() {
             onClick={() => setCreatingOrder(true)}
             className="w-full bg-[#E17055] hover:bg-[#D45F44] text-white font-bold text-xs py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md shadow-[#E17055]/25 cursor-pointer"
           >
-            <Plus className="w-4 h-4" /> New Print Job Order
+            <Plus className="w-4 h-4" /> New Customer Order
           </button>
         </div>
 
@@ -339,7 +345,7 @@ export default function AdminPanel() {
             <h1 className="text-lg font-bold text-slate-900 capitalize tracking-tight">
               {activeTab === 'dashboard' && 'Operations Dashboard'}
               {activeTab === 'quotations' && 'Storefront Quotations Desk'}
-              {activeTab === 'orders' && 'Print Job Pipeline (PJOs)'}
+              {activeTab === 'orders' && 'Customer Order Pipeline'}
               {activeTab === 'products' && 'Product & Substrates Manager'}
               {activeTab === 'categories' && 'Service Category Manager'}
               {activeTab === 'customers' && 'Customer Ledger'}
@@ -353,6 +359,7 @@ export default function AdminPanel() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button onClick={() => setCreatingPjo(true)} className="px-4 py-2 rounded-lg bg-[#2D545E] text-white text-sm font-bold">+ Create PJO</button>
             {/* Search Bar */}
             <div className="relative hidden lg:block w-64">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -434,17 +441,22 @@ export default function AdminPanel() {
               )}
 
               {activeTab === 'orders' && (
+                <>
+                <ProductionJobList jobs={productionJobs} orders={confirmedPjos} settings={settings} refresh={() => loadAll()} />
                 <OrdersEditor
                   orders={confirmedPjos}
                   searchQuery={searchQuery}
                   onCreate={() => setCreatingOrder(true)}
                   onManage={setBusinessOrder}
                   onStatus={async (id, status) => {
-                    await DataService.updateOrderStatus(id, status);
-                    await loadAll();
-                    flash(`Job Order status updated to ${status}.`);
+                    try {
+                      await DataService.updateOrderStatus(id, status);
+                      await loadAll();
+                      flash(`Order status updated to ${status}.`);
+                    } catch (error) { setError(error instanceof Error ? error.message : 'Unable to update order.'); }
                   }}
                 />
+                </>
               )}
 
               {activeTab === 'products' && (
@@ -537,7 +549,7 @@ export default function AdminPanel() {
             await loadAll();
             setActiveQuotation(null);
             setActiveTab('orders');
-            flash('Quotation finalized & converted into a Print Job Order (PJO)!');
+            flash('Quotation confirmed. Order added to the production pipeline.');
           }}
         />
       )}
@@ -561,6 +573,7 @@ export default function AdminPanel() {
         />
       )}
 
+      {creatingPjo && <CreateProductionJob orders={confirmedPjos} onClose={() => setCreatingPjo(false)} onSaved={async () => { await loadAll(); setActiveTab('orders'); flash('Production job order created.'); }} />}
       {/* Create Order Modal */}
       {creatingOrder && (
         <CreateOrderModal
@@ -699,7 +712,7 @@ function DashboardOverview({
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-xs font-medium">
-            <span>Active Press PJOs</span>
+            <span>Active Customer Orders</span>
             <div className="w-8 h-8 rounded-lg bg-[#2D545E]/10 text-[#2D545E] flex items-center justify-center font-bold"><Printer className="w-4 h-4" /></div>
           </div>
           <div className="text-2xl font-bold text-slate-900 mt-2">{activeJobs}</div>
@@ -727,7 +740,7 @@ function DashboardOverview({
             </div>
             <div>
               <h3 className="font-bold text-sm text-white">You have {quotations.length} new customer quote request{quotations.length > 1 ? 's' : ''}</h3>
-              <p className="text-xs text-slate-300">Review specs, configure laminations & hot foils, finalize prices, and convert to Print Job Orders (PJOs).</p>
+              <p className="text-xs text-slate-300">Review specs, configure laminations & hot foils, finalize prices, and confirm orders into the production pipeline.</p>
             </div>
           </div>
           <button
@@ -745,10 +758,10 @@ function DashboardOverview({
         <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-slate-500" /> Active Print Job Orders (PJOs)
+              <Clock className="w-4 h-4 text-slate-500" /> Customer Orders in Pipeline
             </h2>
             <button onClick={onViewOrders} className="text-xs text-[#2D545E] hover:text-[#1E373F] font-bold flex items-center gap-1 cursor-pointer">
-              View all PJOs <ChevronRight className="w-3.5 h-3.5" />
+              View pipeline <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
@@ -768,7 +781,7 @@ function DashboardOverview({
                 {orders.slice(0, 5).map((order) => (
                   <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3 font-mono text-slate-900 font-bold">
-                      {order.pjoNumber || `#${order.id.slice(0, 8)}`}
+                      {`#${order.id.slice(0, 8)}`} · {order.pjoNumber || (order.status === 'pending' ? 'Waiting for PJO' : 'No PJO')}
                     </td>
                     <td className="py-3 font-semibold text-slate-900">{order.userName || order.userEmail}</td>
                     <td className="py-3 text-slate-600">{order.productName} ({order.quantity} pcs)</td>
@@ -776,7 +789,7 @@ function DashboardOverview({
                     <td className="py-3 text-right font-semibold text-slate-900">${(order.sellPrice || order.totalPrice).toFixed(2)}</td>
                     <td className="py-3 text-right">
                       <button onClick={() => onManageJob(order)} className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-[11px] font-semibold transition-colors cursor-pointer">
-                        Manage PJO
+                        Manage Order
                       </button>
                     </td>
                   </tr>
@@ -904,7 +917,7 @@ function QuotationsEditor({
       <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-sm font-bold text-slate-900">Storefront Quotation Desk ({quotations.length} Pending Requests)</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Review customer requirements, configure finishing options (Laminations, Hot Foils, Spot UV), finalize pricing, and convert into Print Job Orders (PJOs).</p>
+          <p className="text-xs text-slate-500 mt-0.5">Review customer requirements, configure finishing options (Laminations, Hot Foils, Spot UV), finalize pricing, and confirm orders into the production pipeline. Create a separate PJO when orders are ready to print together.</p>
         </div>
         <button
           onClick={onCreateQuotation}
@@ -971,7 +984,7 @@ function QuotationsEditor({
                         onClick={() => onManageQuotation(quote)}
                         className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 ml-auto transition-colors cursor-pointer"
                       >
-                        <Sliders className="w-3.5 h-3.5" /> Configure Specs & PJO
+                        <Sliders className="w-3.5 h-3.5" /> Review & Confirm
                       </button>
                     </td>
                   </tr>
@@ -996,7 +1009,7 @@ function QuotationsEditor({
 function QuoteStatusBadge({ status }: { status: string }) {
   switch (status) {
     case 'converted':
-      return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">PJO Converted</span>;
+      return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Order Confirmed</span>;
     case 'approved':
       return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Price Approved</span>;
     case 'negotiating':
@@ -1081,16 +1094,18 @@ function QuotationDrawer({
   };
 
   const handleConvertToPjo = async () => {
-    if (!confirm(`Finalize quote and create Print Job Order (PJO) for ${quotation.userName || quotation.userEmail}?`)) return;
+    if (!confirm(`Confirm quotation and add an order to the production pipeline for ${quotation.userName || quotation.userEmail}?`)) return;
     setSubmitting(true);
     try {
-      await DataService.convertQuotationToPjo(quotation.id, {
+      await DataService.confirmQuotation(quotation.id, {
         sellPrice,
         costPrice,
         currency,
         finishingSpecs
-      });
+      }, Boolean((quotation as any).legacyOrderQuotation));
       await onConverted();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not confirm quotation.');
     } finally {
       setSubmitting(false);
     }
@@ -1403,7 +1418,7 @@ function QuotationDrawer({
             disabled={submitting}
             className="px-4 py-2.5 bg-[#E17055] hover:bg-[#D45F44] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md transition-all shrink-0"
           >
-            <Sparkles className="w-4 h-4" /> Create PJO &rarr;
+            <Sparkles className="w-4 h-4" /> Confirm & Add to Pipeline &rarr;
           </button>
         </div>
       </div>
@@ -1435,13 +1450,15 @@ function OrdersEditor({
     const pjo = o.pjoNumber || o.id;
     const matchesSearch =
       pjo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       o.userEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (o.userName && o.userName.toLowerCase().includes(searchQuery.toLowerCase())) ||
       o.productName.toLowerCase().includes(searchQuery.toLowerCase());
 
     if (statusFilter === 'active_pipeline') {
-      return matchesSearch && o.status !== 'delivered';
+      return matchesSearch && o.status !== 'delivered' && o.status !== 'cancelled';
     }
+    if (statusFilter === 'waiting_pjo') return matchesSearch && o.status === 'pending' && !o.pjoNumber;
     const matchesStatus = statusFilter === 'all' || o.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -1461,6 +1478,7 @@ function OrdersEditor({
             className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-slate-400"
           >
             <option value="active_pipeline">Active Production Pipeline ({activePipelineCount})</option>
+            <option value="waiting_pjo">Waiting for PJO ({orders.filter(o => o.status === 'pending' && !o.pjoNumber).length})</option>
             <option value="delivered">📦 Delivered & Job History ({deliveredCount})</option>
             <option value="all">All Stages & History ({orders.length})</option>
             <option value="pending">Proofing / Pre-Press ({orders.filter(o => o.status === 'pending').length})</option>
@@ -1505,7 +1523,7 @@ function OrdersEditor({
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase text-[10px]">
-                  <th className="py-3.5 px-4">PJO Number</th>
+                  <th className="py-3.5 px-4">Order / PJO</th>
                   <th className="py-3.5 px-4">Customer Details</th>
                   <th className="py-3.5 px-4">Product Specs</th>
                   <th className="py-3.5 px-4">Stage</th>
@@ -1518,7 +1536,7 @@ function OrdersEditor({
                 {filteredOrders.map((order) => (
                   <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3.5 px-4">
-                      <span className="font-mono font-bold text-slate-900 block">{order.pjoNumber || `#${order.id.slice(0, 8)}`}</span>
+                      <span className="font-mono font-bold text-slate-900 block">{`#${order.id.slice(0, 8)}`} · {order.pjoNumber || (order.status === 'pending' ? 'Waiting for PJO' : 'No PJO')}</span>
                       <span className="text-[10px] text-slate-400 block">{new Date(order.createdAt).toLocaleDateString()}</span>
                     </td>
                     <td className="py-3.5 px-4">
@@ -1562,7 +1580,7 @@ function OrdersEditor({
                 {filteredOrders.length === 0 && (
                   <tr>
                     <td colSpan={7} className="py-12 text-center text-slate-400">
-                      No print job orders in this view.
+                      No customer orders in this view.
                     </td>
                   </tr>
                 )}
@@ -1613,7 +1631,7 @@ function KanbanPipelineBoard({
                   className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs hover:border-slate-300 transition-all space-y-3"
                 >
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-mono font-bold text-slate-900">{order.pjoNumber || `#${order.id.slice(0, 8)}`}</span>
+                    <span className="font-mono font-bold text-slate-900">{`#${order.id.slice(0, 8)}`} · {order.pjoNumber || (order.status === 'pending' ? 'Waiting for PJO' : 'No PJO')}</span>
                     <span className="font-bold text-slate-900">{formatCurrency(order.sellPrice || order.totalPrice, order.currency)}</span>
                   </div>
 
@@ -1869,7 +1887,7 @@ function CustomersEditor({
     const existing = customerMap.get(key);
     
     // Quotations and cancelled jobs DO NOT count towards orders count or lifetime spend
-    const isQuotation = Boolean(o.isQuotation || opts.isQuotation || o.quoteStatus);
+    const isQuotation = Boolean(o.isQuotation || opts.isQuotation) && o.quoteStatus !== 'converted';
     const isCancelled = o.status === 'cancelled';
     const isConfirmedPaidOrder = !isQuotation && !isCancelled;
     const amount = isConfirmedPaidOrder ? (o.sellPrice || o.totalPrice || 0) : 0;
@@ -2039,7 +2057,7 @@ function BusinessEditor({
                 return (
                   <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                      {order.pjoNumber || `INV-#${order.id.slice(0, 8)}`}
+                      {`INV-#${order.id.slice(0, 8)}`}
                     </td>
                     <td className="py-3.5 px-4 font-semibold text-slate-900">{order.userEmail}</td>
                     <td className="py-3.5 px-4 font-bold text-slate-900">{formatCurrency(total, order.currency)}</td>
@@ -2478,7 +2496,7 @@ function printPjoJobTicket(order: Order, settings: SiteSettings) {
     .map(([key, val]) => `<tr><td class="label">${escapeHtml(key)}:</td><td class="val">${escapeHtml(val)}</td></tr>`)
     .join('');
 
-  popup.document.write(`<!doctype html><html><head><title>PJO ${escapeHtml(order.pjoNumber || order.id)}</title><style>
+  popup.document.write(`<!doctype html><html><head><title>Order specifications ${escapeHtml(order.id)}</title><style>
     *{box-sizing:border-box}
     body{margin:0;background:#f4f3f0;color:#111;font-family:Arial,Helvetica,sans-serif}
     .sheet{max-width:900px;margin:0 auto;background:#fff;min-height:100vh}
@@ -2520,10 +2538,10 @@ function printPjoJobTicket(order: Order, settings: SiteSettings) {
     <div class="header">
       <div>
         ${logoUrl ? `<img class="logo" src="${escapeHtml(logoUrl)}" alt="${escapeHtml(brandName)}">` : `<h1 style="margin:0;font-size:24px;">${escapeHtml(brandName)}</h1>`}
-        <div class="pjo-sub">Factory Production Job Order Ticket</div>
+        <div class="pjo-sub">Customer Order Specifications</div>
       </div>
       <div style="text-align:right;">
-        <div class="pjo-title">JOB TICKET</div>
+        <div class="pjo-title">ORDER SPECIFICATIONS</div>
         <div class="pjo-num">${escapeHtml(order.pjoNumber || `#${order.id.slice(0, 8)}`)}</div>
         <div style="font-size:11px;color:#666;margin-top:2px;">Created: ${new Date(order.createdAt).toLocaleDateString()} ${new Date(order.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
       </div>
@@ -2738,7 +2756,7 @@ function BusinessOrderModal({
         {/* Drawer Header */}
         <div className="h-16 px-6 bg-[#14262C] text-white flex items-center justify-between shrink-0 border-b border-[#1E373F]">
           <div>
-            <h2 className="font-bold text-sm">Print Job Ticket {order.pjoNumber || `#${order.id.slice(0, 8)}`}</h2>
+            <h2 className="font-bold text-sm">Customer Order {`#${order.id.slice(0, 8)}`} · {order.pjoNumber || (order.status === 'pending' ? 'Waiting for PJO' : 'No PJO')}</h2>
             <p className="text-[11px] text-slate-300">{order.productName} &bull; {order.quantity} pcs</p>
           </div>
           <div className="flex items-center gap-2">
@@ -2747,7 +2765,7 @@ function BusinessOrderModal({
               title="Print Production Ticket without financial or price data"
               className="px-3 py-1.5 bg-[#2D545E] hover:bg-[#1E373F] text-xs font-semibold rounded-lg flex items-center gap-1.5 text-white transition-colors cursor-pointer border border-cyan-800"
             >
-              <Printer className="w-3.5 h-3.5" /> Print Production PJO
+              <Printer className="w-3.5 h-3.5" /> Print Order Specs
             </button>
             <button
               onClick={() => printClientInvoice(order, settings)}
@@ -2772,7 +2790,7 @@ function BusinessOrderModal({
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            Production Specifications (PJO)
+            Order Specifications
           </button>
           <button
             onClick={() => setActiveSubTab('finance')}
@@ -2816,7 +2834,7 @@ function BusinessOrderModal({
                           <Phone className="w-3.5 h-3.5" /> {phoneNum}
                         </p>
                       )}
-                      <p className="text-slate-400 text-[10px]">PJO Created: {new Date(order.createdAt).toLocaleString()}</p>
+                      <p className="text-slate-400 text-[10px]">Order Created: {new Date(order.createdAt).toLocaleString()}</p>
                     </div>
                   </div>
                 );
@@ -3132,7 +3150,6 @@ function CreateOrderModal({
     setLoading(true);
     try {
       const totalPrice = customPrice ?? 0;
-      const pjoNumber = `PJO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
       await onSave({
         productId: product.id,
@@ -3148,9 +3165,10 @@ function CreateOrderModal({
         status: 'pending',
         paymentStatus: 'unpaid',
         isQuotation: false,
-        pjoNumber,
         createdAt: new Date().toISOString()
       });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not save order.');
     } finally {
       setLoading(false);
     }
@@ -3160,7 +3178,7 @@ function CreateOrderModal({
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-md overflow-hidden">
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-900">Create New Print Work Order (PJO)</h2>
+          <h2 className="text-base font-bold text-slate-900">Add Customer Order to Pipeline</h2>
           <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
         </div>
 
@@ -3249,7 +3267,7 @@ function CreateOrderModal({
               Cancel
             </button>
             <button type="submit" disabled={loading} className="px-5 py-2 bg-[#E17055] hover:bg-[#D45F44] text-white rounded-xl text-xs font-bold shadow-md shadow-[#E17055]/20">
-              Create PJO Ticket
+              Add to Pipeline
             </button>
           </div>
         </form>
@@ -3313,6 +3331,8 @@ function CreateQuotationModal({
         isQuotation: true,
         createdAt: new Date().toISOString()
       });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Could not save order.');
     } finally {
       setLoading(false);
     }
